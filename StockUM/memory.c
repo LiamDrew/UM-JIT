@@ -116,11 +116,10 @@ void set_register(Memory_T *mem, unsigned index, uint32_t new_contents)
     mem->registers[index] = new_contents;
 }
 
-// I seriously need to improve the way I handle the mapping and unmapping of segments
+
 
 uint32_t map_segment(Memory_T *mem, uint32_t size, bool *mem_exhausted)
 {
-    // printf("mapping a seq\n");
     assert(mem != NULL);
     Array_T *new_seg = new_array(size);
 
@@ -128,7 +127,6 @@ uint32_t map_segment(Memory_T *mem, uint32_t size, bool *mem_exhausted)
     for (uint32_t i = 0; i < size; i++)
     {
         array_update(new_seg, i, 0);
-        // new_seg->size++; // cheap and bad fix
     }
 
     uint32_t new_seg_id;
@@ -182,8 +180,6 @@ void unmap_segment(Memory_T *mem, uint32_t segment)
     //  * double frees */
 
     // printf("Unmapping Segment number is %u\n", segment);
-
-    // // TODO: we have a major bug here. This is setting the active segment to null.
     Seq_put(mem->segment_sequence, segment, NULL);
     free_array(&to_be_freed);
 }
