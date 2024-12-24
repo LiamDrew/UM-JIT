@@ -4,17 +4,14 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <sys/stat.h>
-#include <string.h>
 
 #define NUM_REGISTERS 8
-
-#define POWER ((uint64_t)1 << 32);
 
 /* MEMORY */
 typedef uint32_t Instruction;
 
-// Initializing all registers to 0
-// register uint32_t program_counter = 0;
+// Initializing program counter and all registers to 0
+uint32_t program_counter = 0;
 uint32_t registers[NUM_REGISTERS] = {0};
 
 // Array of segments
@@ -30,11 +27,11 @@ uint32_t *recycled_ids;
 uint32_t rec_size = 0;
 uint32_t rec_capacity = 0;
 
+uint64_t power = (uint64_t)1 << 32;
 
-static inline uint32_t map_segment(uint32_t size);
-static inline void unmap_segment(uint32_t segment);
-static inline void load_segment(uint32_t index, uint32_t *zero_segment);
-
+uint32_t map_segment(uint32_t size);
+void unmap_segment(uint32_t segment);
+void load_program(uint32_t segment);
 
 // IO
 
@@ -52,13 +49,47 @@ uint64_t Bitpack_news(uint64_t word, unsigned width, unsigned lsb, int64_t value
 bool Bitpack_fitsu(uint64_t n, unsigned width);
 bool Bitpack_fitss(int64_t n, unsigned width);
 
-
 // CONTROLLERS
 
-void handle_instructions(uint32_t *zero_segment);
-void handle_halt();
+void initialize_memory(FILE *fp, size_t fsize);
+void handle_instructions();
+void handle_halt(); // NOTE: May need fixing
 
-uint32_t *initialize_memory(FILE *fp, size_t fsize)
+int main(int argc, char *argv[])
+{
+    if (argc != 2)
+    {
+        fprintf(stderr, "Usage: ./um [executable.um]\n");
+        return EXIT_FAILURE;
+    }
+
+    FILE *fp = fopen(argv[1], "r");
+
+    if (fp == NULL)
+    {
+        fprintf(stderr, "File %s could not be opened.\n", argv[1]);
+        return EXIT_FAILURE;
+    }
+
+    size_t fsize = 0;
+    struct stat file_stat;
+    if (stat(argv[1], &file_stat) == 0)
+    {
+        fsize = file_stat.st_size;
+    }
+    else
+    {
+        assert(false);
+    }
+
+    initialize_memory(fp, fsize);
+
+    handle_instructions();
+
+    return EXIT_SUCCESS;
+}
+
+void initialize_memory(FILE *fp, size_t fsize)
 {
     seq_capacity = 128;
 
@@ -73,7 +104,7 @@ uint32_t *initialize_memory(FILE *fp, size_t fsize)
     assert(recycled_ids);
 
     // load initial segment
-    register uint32_t *temp = malloc(fsize);
+    uint32_t *temp = malloc(fsize * sizeof(uint32_t));
     assert(temp != NULL);
 
     uint32_t word = 0;
@@ -111,260 +142,216 @@ uint32_t *initialize_memory(FILE *fp, size_t fsize)
     segment_sequence[0] = temp;
     segment_lengths[0] = fsize;
     seq_size++;
-
-    return temp;
 }
 
-int main(int argc, char *argv[])
+void handle_instructions()
 {
-    if (argc != 2)
-    {
-        fprintf(stderr, "Usage: ./um [executable.um]\n");
-        return EXIT_FAILURE;
-    }
-
-    FILE *fp = fopen(argv[1], "r");
-
-    if (fp == NULL)
-    {
-        fprintf(stderr, "File %s could not be opened.\n", argv[1]);
-        return EXIT_FAILURE;
-    }
-
-
-    size_t fsize = 0;
-    struct stat file_stat;
-    if (stat(argv[1], &file_stat) == 0) {
-        fsize = file_stat.st_size;
-    } else {
-        assert(false);
-    }
-
-    uint32_t *zero_segment = initialize_memory(fp, fsize);
-
-    handle_instructions(zero_segment);
-
-    return EXIT_SUCCESS;
-}
-
-static inline uint32_t decode_instruction(uint32_t word, uint32_t *a, uint32_t *b,
-                                      uint32_t *c, uint32_t *value_to_load)
-{
-    uint32_t opcode = (word >> 28) & 0xF;
-
-    if (opcode == 13) {
-        *a = (word >> 25) & 0x7;
-        *value_to_load = word & 0x1FFFFFF;
-    } else {
-        *c = word & 0x7;
-        *b = (word >> 3) & 0x7;
-        *a = (word >> 6) & 0x7;
-    }
-
-    return opcode;
-}
-
-static inline void print_char(uint32_t c);
-
-static inline void conditional_move(uint32_t a, uint32_t b, uint32_t c)
-{
-    if (registers[c] != 0) {
-        registers[a] = registers[b];
-    }
-}
-
-static inline void segmented_load(uint32_t a, uint32_t b, uint32_t c)
-{
-    registers[a] = segment_sequence[registers[b]][registers[c]];
-}
-
-static inline void segmented_store(uint32_t a, uint32_t b, uint32_t c)
-{
-    segment_sequence[registers[a]][registers[b]] = registers[c];
-}
-
-static inline void addition(uint32_t a, uint32_t b, uint32_t c)
-{
-    registers[a] = (registers[b] + registers[c]) % POWER;
-}
-
-static inline void multiplication(uint32_t a, uint32_t b, uint32_t c)
-{
-    registers[a] = (registers[b] * registers[c]) % POWER;
-}
-
-static inline void division(uint32_t a, uint32_t b, uint32_t c)
-{
-    registers[a] = registers[b] / registers[c];
-}
-
-static inline void bitwise_nand(uint32_t a, uint32_t b, uint32_t c)
-{
-    registers[a] = ~(registers[b] & registers[c]);
-}
-
-static inline void print_char(uint32_t c)
-{
-    putchar((unsigned char)registers[c]);
-}
-
-static inline void read_char(uint32_t c)
-{
-    registers[c] = getc(stdin);
-}
-
-static inline void load_value(uint32_t a, uint32_t value_to_load)
-{
-    registers[a] = value_to_load;
-}
-
-static inline Instruction get_instruction(uint32_t **program_pointer)
-{
-    Instruction word = **program_pointer;
-    (*program_pointer)++;
-
-    return word;
-}
-
-void handle_instructions(uint32_t *zero_segment)
-{
-    uint32_t *program_pointer = zero_segment;
     Instruction word;
+    while (true)
+    {
+        word = segment_sequence[0][program_counter];
+        program_counter++;
 
-    while (true) {
-        word = get_instruction(&program_pointer);
-        // word = *program_pointer;
-        // program_pointer++;
-
-        uint32_t a = 0, b = 0, c = 0;
+        uint32_t a, b, c;
         uint32_t value_to_load = 0;
+        uint32_t opcode = word;
+        opcode = opcode >> 28;
 
-        uint32_t opcode = decode_instruction(word, &a, &b, &c, &value_to_load);
+        if (opcode == 13)
+        {
+            a = (word >> 25) & 0x7;
+            value_to_load = word & 0x1FFFFFF;
+        }
+        else
+        {
+            c = word & 0x7;
+            b = (word >> 3) & 0x7;
+            a = (word >> 6) & 0x7;
+        }
 
-        switch (opcode) {
-            case 0:
-                /* Conditional Move */
-                conditional_move(a, b, c);
-                break;
-            case 1:
-                /* Segmented Load (Memory Module) */
-                segmented_load(a, b, c);
-                break;
-            case 2:
-                /* Segmented Store (Memory Module) */
-                segmented_store(a, b, c);
-                break;
-            case 3:
-                /* Addition */
-                addition(a, b, c);
-                break;
-            case 4:
-                /* Multiplication */
-                multiplication(a, b, c);
-                break;
-            case 5:
-                /* Division */
-                division(a, b, c);
-                break;
-            case 6:
-                /* Bitwise NAND */
-                bitwise_nand(a, b, c);
-                break;
-            case 7:
-                /* Halt */
-                handle_halt();
-                break;
-            case 8:
-                /* Map Segment (Memory Module) */
-                registers[b] = map_segment(registers[c]);
-                break;
-            case 9:
-                /* Unmap Segment (Memory Module) */
-                unmap_segment(registers[c]);
-                break;
-            case 10:
-                /* Output (IO) */
-                print_char(c);
-                break;
-            case 11:
-                /* Input (IO) */
-                read_char(c);
-                break;
-            case 12:
-                /* Load Program (Memory Module) */
-                load_segment(registers[b], zero_segment);
-                program_pointer = zero_segment + registers[c];
-                break;
-            case 13:
-                /* Load Value */
-                load_value(a, value_to_load);
-                break;
+        switch (opcode)
+        {
+        case 0:
+            /* Conditional Move */
+            if (registers[c] != 0)
+            {
+                registers[a] = registers[b];
             }
+            break;
+        case 1:
+            /* Segmented Load (Memory Module) */
+            registers[a] = segment_sequence[registers[b]][registers[c]];
+
+            // registers[a] = segmented_load(registers[b],
+            //                             registers[c], segment_sequence);
+            break;
+        case 2:
+            /* Segmented Store (Memory Module) */
+            segment_sequence[registers[a]][registers[b]] = registers[c];
+            // segmented_store(registers[a],
+            //                 registers[b], registers[c], segment_sequence);
+            break;
+        case 3:
+            /* Addition */
+            registers[a] = (registers[b] + registers[c]) % power;
+            break;
+        case 4:
+            /* Multiplication */
+            registers[a] = (registers[b] * registers[c]) % power;
+            break;
+        case 5:
+            /* Division */
+            registers[a] = registers[b] / registers[c];
+            break;
+        case 6:
+            registers[a] = ~(registers[b] & registers[c]);
+            break;
+        case 7:
+            /* Halt */
+            handle_halt();
+            break;
+        case 8:
+            /* Map Segment (Memory Module) */
+            registers[b] = map_segment(registers[c]);
+            break;
+        case 9:
+            /* Unmap Segment (Memory Module) */
+            unmap_segment(registers[c]);
+            break;
+        case 10:
+            /* Output (IO) */
+            putchar((unsigned char)registers[c]);
+            // output_register(registers[c]);
+            break;
+        case 11:
+            /* Input (IO) */
+            registers[c] = getc(stdin); // This doesn't handle EOF
+            // registers[c] = read_in_to_register();
+            break;
+        case 12:
+            /* Load Program (Memory Module) */
+            load_program(registers[b]);
+            program_counter = registers[c];
+            break;
+        case 13:
+            /* Load Value */
+            registers[a] = value_to_load;
+            break;
+        }
     }
 }
 
-static inline void load_segment(uint32_t index, uint32_t *zero_segment)
+void output_register(uint32_t register_contents)
 {
-    if (index == 0) { return; }
-
-    /* get word size of segment at the provided address */
-    uint32_t copied_seq_size = segment_lengths[index];
-
-    // copy bytes over into 0 segment
-    memcpy(zero_segment, segment_sequence[index], copied_seq_size * sizeof(uint32_t));
+    /* Assert it's a char*/
+    assert(register_contents <= 255);
+    /* Print the char*/
+    unsigned char c = (unsigned char)register_contents;
+    printf("%c", c);
 }
 
-
-// TODO: plenty of performance to be gained by reducing malloc calls
-// when mapping and unmapping segments
-static inline uint32_t map_segment(uint32_t size)
+uint32_t read_in_to_register()
 {
+    int c;
+    uint32_t contents = 0;
+    c = getc(stdin);
+    /* Check it's not an EOF character*/
+    if (c == EOF)
+    {
+        contents -= 1;
+        // fprintf(stderr, "contents is %u \n", contents);
+        return contents;
+    }
+    else
+    {
+        assert(c <= 255);
+        contents = (uint32_t)c;
+        return contents;
+    }
+}
+
+// I seriously need to improve the way I handle the mapping and unmapping of segments
+uint32_t map_segment(uint32_t size)
+{
+    uint32_t *temp = calloc(size, sizeof(uint32_t));
     uint32_t new_seg_id;
 
     /* If there are no available recycled segment ids, make a new one */
-    if (rec_size == 0) {
-        if (seq_size == seq_capacity) { // expand if necessary
+    if (rec_size == 0)
+    {
+        if (seq_size == seq_capacity)
+        { // expand if necessary
             seq_capacity = seq_capacity * 2 + 2;
             segment_sequence = realloc(segment_sequence, (seq_capacity) * sizeof(uint32_t *));
             segment_lengths = realloc(segment_lengths, (seq_capacity) * sizeof(uint32_t));
         }
 
-        new_seg_id = seq_size++;
+        segment_sequence[seq_size] = temp;
+        new_seg_id = seq_size;
+        seq_size++;
     }
 
     /* Otherwise, reuse an old one */
-    else {
+    else
+    {
         rec_size--;
         new_seg_id = recycled_ids[rec_size];
+        recycled_ids[rec_size] = 0;
+        segment_sequence[new_seg_id] = temp;
     }
 
-    // If there isn't existing memory we can use, prepare some
-    if (segment_sequence[new_seg_id] == NULL || size > segment_lengths[new_seg_id]) {
-        segment_sequence[new_seg_id] = realloc(segment_sequence[new_seg_id], size * sizeof(uint32_t));
-        segment_lengths[new_seg_id] = size;
-    }
-
-    // zero out only the memory we need, but don't update the allocated size
-    memset(segment_sequence[new_seg_id], 0, size * sizeof(uint32_t));
-
+    segment_lengths[new_seg_id] = size;
     return new_seg_id;
 }
 
-static inline void unmap_segment(uint32_t segment)
+void unmap_segment(uint32_t segment)
 {
-    if (rec_size == rec_capacity) {
+    uint32_t *to_be_freed = segment_sequence[segment];
+    free(to_be_freed);
+    segment_sequence[segment] = NULL;
+
+    if (rec_size == rec_capacity)
+    {
         rec_capacity = rec_capacity * 2 + 2;
+        // realloc recycled ids
         recycled_ids = realloc(recycled_ids, (rec_capacity) * sizeof(uint32_t));
-        assert(recycled_ids != NULL);
+    }
+    recycled_ids[rec_size] = segment;
+    segment_lengths[segment] = 0;
+    rec_size++;
+}
+
+void load_program(uint32_t segment)
+{
+
+    if (segment == 0)
+    {
+        return;
     }
 
-    recycled_ids[rec_size++] = segment;
+    /* get address of segment at provided index*/
+    uint32_t copied_seq_size = segment_lengths[segment];
+
+    /* free the first segment */
+    free(segment_sequence[0]);
+
+    /* malloc a new segment in index 0 with size of one to be copied */
+    segment_sequence[0] = (uint32_t *)malloc(copied_seq_size * sizeof(uint32_t));
+
+    /* Cache performance? */
+    for (uint32_t i = 0; i < copied_seq_size; i++)
+    {
+        segment_sequence[0][i] = segment_sequence[segment][i];
+    }
+
+    segment_lengths[0] = copied_seq_size;
 }
 
 /* Needs to free memory */
 void handle_halt()
 {
-    for (uint32_t i = 0; i < seq_size; i++) {
+    for (uint32_t i = 0; i < seq_size; i++)
+    {
         free(segment_sequence[i]);
     }
 
@@ -372,10 +359,9 @@ void handle_halt()
     free(segment_lengths);
     free(recycled_ids);
 
+    // NOTE: I distrust this. Won't this lead to a memory leak?
     exit(EXIT_SUCCESS);
 }
-
-
 
 // BITPACK IMPLEMENTATION
 

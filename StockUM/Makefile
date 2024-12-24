@@ -3,6 +3,7 @@ src = $(wildcard *.c)
 obj = $(src:.c=.o)
 
 CC = gcc
+# CC = clang
 CFLAGS = -g -Wall -Wextra -Werror -O2
 LDFLAGS = -g
 
