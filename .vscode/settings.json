@@ -2,6 +2,8 @@
     "files.associations": {
         "assert.h": "c",
         "atomic": "c",
-        "cstring": "c"
+        "cstring": "c",
+        "string.h": "c",
+        "stdbool.h": "c"
     }
 }

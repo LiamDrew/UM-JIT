@@ -3,8 +3,6 @@
 
 int main()
 {
-    printf("Testing Instruments...\n");
-    sleep(3);
-    printf("Done.\n");
+    asm volatile("marker_label2: .inst 0xCAFEBABE");
     return 0;
 }

@@ -269,7 +269,6 @@ static inline void fill_cache(Instruction *cache, Instruction **program_pointer)
     *program_pointer += NUM_INSTRS;
 }
 
-// #define DEBUG true
 void handle_instructions(uint32_t *zero)
 {
     // Initialize memory
@@ -279,19 +278,7 @@ void handle_instructions(uint32_t *zero)
 
     while (true)
     {
-        #ifdef DEBUG
-            asm volatile("marker_label: .word 0xDEADBEEF");
-        #endif
-
-
         fill_cache(cache, &pp);
-        // cache[0] = *pp;
-        // pp += NUM_INSTRS;
-
-        #ifdef DEBUG
-            asm volatile("marker_label2: .word 0xDEADBEEF");
-        #endif
-
         empty_cache(cache, &pp, regs, zero);
     }
 }

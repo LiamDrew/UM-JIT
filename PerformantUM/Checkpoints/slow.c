@@ -5,26 +5,12 @@
 #include <assert.h>
 #include <sys/stat.h>
 #include <string.h>
-#include <pthread.h>
 
 #define NUM_REGISTERS 8
-#define POWER ((uint64_t)1 << 32);
+#define POWER ((uint64_t)1 << 32)
 #define NUM_INSTRS 1
 
 typedef uint32_t Instruction;
-
-// Array of segments
-uint32_t **segment_sequence = NULL;
-uint32_t seq_size = 0;
-uint32_t seq_capacity = 0;
-
-// Corresponding length of each segment
-uint32_t *segment_lengths = NULL;
-
-// Array of recycled IDs
-uint32_t *recycled_ids = NULL;
-uint32_t rec_size = 0;
-uint32_t rec_capacity = 0;
 
 uint64_t Bitpack_newu(uint64_t word, unsigned width, unsigned lsb, uint64_t value)
 {
@@ -40,22 +26,9 @@ uint64_t Bitpack_newu(uint64_t word, unsigned width, unsigned lsb, uint64_t valu
     return return_word;
 }
 
-/* DRIVERS/CONTROLLERS */
-
 uint32_t *initialize_memory(FILE *fp, size_t fsize)
 {
-    /* MEMORY */
-
-    seq_capacity = 128;
-    segment_sequence = (uint32_t **)calloc(seq_capacity, sizeof(uint32_t *));
-    segment_lengths = (uint32_t *)calloc(seq_capacity, sizeof(uint32_t));
-
-    rec_capacity = 128;
-    recycled_ids = (uint32_t *)calloc(rec_capacity, sizeof(uint32_t *));
-
-    // load initial segment
     uint32_t *temp = (uint32_t *)calloc(fsize, sizeof(uint32_t));
-
     uint32_t word = 0;
     int c;
     int i = 0;
@@ -80,99 +53,112 @@ uint32_t *initialize_memory(FILE *fp, size_t fsize)
     }
 
     fclose(fp);
-    segment_sequence[0] = temp;
-    segment_lengths[0] = fsize; // length is the number of words, not number of bytes
-    seq_size++;
-
     return temp;
 }
 
 /* INSTRUCTION FETCHING */
 
-void handle_halt()
+void handle_halt(uint32_t ***segs, uint32_t *seg_size, uint32_t **seg_lens, uint32_t **rec_ids)
 {
-    for (uint32_t i = 0; i < seq_size; i++)
-        free(segment_sequence[i]);
-    free(segment_sequence);
-    free(segment_lengths);
-    free(recycled_ids);
+    for (uint32_t i = 0; i < *seg_size; i++)
+        free((*segs)[i]);
+    free(*segs);
+    free(*seg_lens);
+    free(*rec_ids);
     exit(EXIT_SUCCESS);
 }
 
-uint32_t map_segment(uint32_t size)
+uint32_t map_segment(uint32_t size, uint32_t ***segs, uint32_t *seg_size,
+                     uint32_t *seg_cap, uint32_t **seg_lens,
+                     uint32_t *rec_ids, uint32_t *rec_size)
 {
     uint32_t new_seg_id;
 
     /* If there are no available recycled segment ids, make a new one */
-    if (rec_size == 0)
+    if (*rec_size == 0)
     {
-        if (seq_size == seq_capacity)
+        if (*seg_size == *seg_cap)
         { // expand if necessary
-            seq_capacity = seq_capacity * 2 + 2;
-            segment_lengths = (uint32_t *)realloc(segment_lengths, (seq_capacity) * sizeof(uint32_t));
-            segment_sequence = (uint32_t **)realloc(segment_sequence, (seq_capacity) * sizeof(uint32_t *));
+            *seg_cap = *seg_cap * 2 + 2;
+            assert(*seg_lens != NULL);
+            assert(*segs != NULL);
+            *seg_lens = (uint32_t *)realloc(*seg_lens, *seg_cap * sizeof(uint32_t));
+            *segs = (uint32_t **)realloc(*segs, *seg_cap * sizeof(uint32_t *));
 
-            for (uint32_t i = seq_size; i < seq_capacity; i++)
+            for (uint32_t i = *seg_size; i < *seg_cap; i++)
             {
-                segment_sequence[i] = NULL;
-                segment_lengths[i] = 0;
+                (*segs)[i] = NULL;
+                (*seg_lens)[i] = 0;
             }
         }
 
-        new_seg_id = seq_size++;
+        new_seg_id = (*seg_size)++;
     }
 
     /* Otherwise, reuse an old one */
-    else
-        new_seg_id = recycled_ids[--rec_size];
 
-    if (segment_sequence[new_seg_id] == NULL || size > segment_lengths[new_seg_id])
+    else
+        new_seg_id = rec_ids[--(*rec_size)];
+
+    // TODO: something is wrong in memory here. I will try to patch it together first
+    // but there is a deeper issue.
+    // if ((*segs)[new_seg_id] == NULL || size > (*seg_lens)[new_seg_id]) {
+    //     assert((*segs)[new_seg_id] == NULL);
+    //     (*segs)[new_seg_id] = (uint32_t *)realloc((*segs)[new_seg_id], size * sizeof(uint32_t));
+    //     (*seg_lens)[new_seg_id] = size;
+    // }
+
+    if ((*segs)[new_seg_id] == NULL)
     {
-        segment_sequence[new_seg_id] = (uint32_t *)realloc(segment_sequence[new_seg_id], size * sizeof(uint32_t));
-        segment_lengths[new_seg_id] = size;
+        // assert(false);
+        // (*segs)[new_seg_id] = (uint32_t *)realloc((*segs)[new_seg_id], size * sizeof(uint32_t));
+        (*segs)[new_seg_id] = (uint32_t *)calloc(size, sizeof(uint32_t));
+        (*seg_lens)[new_seg_id] = size;
     }
 
-    // Update the segment length and zero out memory
-    // NOTE: we do not want to reset the size unless we have to
-    memset(segment_sequence[new_seg_id], 0, size * sizeof(uint32_t));
+    else if (size > (*seg_lens)[new_seg_id])
+    {
+        assert(false);
+        (*segs)[new_seg_id] = (uint32_t *)realloc((*segs)[new_seg_id], size * sizeof(uint32_t));
+        (*seg_lens)[new_seg_id] = size;
+    }
 
+    memset((*segs)[new_seg_id], 0, size * sizeof(uint32_t));
     return new_seg_id;
 }
 
-void unmap_segment(uint32_t segment)
+void unmap_segment(uint32_t segment, uint32_t **rec_ids, uint32_t *rec_size, uint32_t *rec_cap)
 {
-    if (rec_size == rec_capacity)
+    if (*rec_size == *rec_cap)
     {
-        rec_capacity = rec_capacity * 2 + 2;
-        recycled_ids = (uint32_t *)realloc(recycled_ids, (rec_capacity) * sizeof(uint32_t));
+        *rec_cap = *rec_cap * 2 + 2;
+        *rec_ids = (uint32_t *)realloc(*rec_ids, *rec_cap * sizeof(uint32_t));
     }
-
-    recycled_ids[rec_size++] = segment;
+    *rec_ids[*rec_size++] = segment;
 }
 
-void load_segment(uint32_t index, uint32_t *zero)
+void load_segment(uint32_t index, uint32_t *zero, uint32_t **segs, uint32_t *seg_lens)
 {
     if (index > 0)
     {
-        uint32_t copied_seq_size = segment_lengths[index];
-        memcpy(zero, segment_sequence[index], copied_seq_size * sizeof(uint32_t));
+        uint32_t copied_seq_size = seg_lens[index];
+        memcpy(zero, segs[index], copied_seq_size * sizeof(uint32_t));
     }
 }
 
-static inline Instruction get_instr(Instruction *cache, unsigned index)
+Instruction get_instr(Instruction *cache, unsigned index)
 {
     return cache[index];
 }
 
-static inline uint32_t decode_instruction(uint32_t word, uint32_t *a, uint32_t *b,
-                                          uint32_t *c, uint32_t *value_to_load)
+uint32_t decode_instruction(uint32_t word, uint32_t *a, uint32_t *b,
+                            uint32_t *c, uint32_t *val)
 {
     uint32_t opcode = (word >> 28) & 0xF;
-
     if (opcode == 13)
     {
         *a = (word >> 25) & 0x7;
-        *value_to_load = word & 0x1FFFFFF;
+        *val = word & 0x1FFFFFF;
     }
     else
     {
@@ -180,11 +166,13 @@ static inline uint32_t decode_instruction(uint32_t word, uint32_t *a, uint32_t *
         *b = (word >> 3) & 0x7;
         *a = (word >> 6) & 0x7;
     }
-
     return opcode;
 }
 
-static inline void empty_cache(Instruction *cache, Instruction **pp, uint32_t *regs, uint32_t *zero)
+void empty_cache(Instruction *cache, Instruction **pp, uint32_t *regs,
+                 uint32_t *zero, uint32_t ***segs, uint32_t **seg_lens,
+                 uint32_t *seg_size, uint32_t *seg_cap,
+                 uint32_t **rec_ids, uint32_t *rec_size, uint32_t *rec_cap)
 {
     Instruction word;
     uint32_t a = 0, b = 0, c = 0, val = 0;
@@ -200,11 +188,11 @@ static inline void empty_cache(Instruction *cache, Instruction **pp, uint32_t *r
 
         /* Segmented Load (Memory Module) */
         else if (opcode == 1)
-            regs[a] = segment_sequence[regs[b]][regs[c]];
+            regs[a] = (*segs)[regs[b]][regs[c]];
 
         /* Segmented Store (Memory Module) */
         else if (opcode == 2)
-            segment_sequence[regs[a]][regs[b]] = regs[c];
+            (*segs)[regs[a]][regs[b]] = regs[c];
 
         /* Bitwise NAND */
         else if (opcode == 6)
@@ -213,7 +201,7 @@ static inline void empty_cache(Instruction *cache, Instruction **pp, uint32_t *r
         /* Load Segment (Memory Module) */
         else if (opcode == 12)
         {
-            load_segment(regs[b], zero);
+            load_segment(regs[b], zero, *segs, *seg_lens);
             *pp = zero + regs[c];
             break;
         }
@@ -233,11 +221,12 @@ static inline void empty_cache(Instruction *cache, Instruction **pp, uint32_t *r
 
         /* Map Segment (Memory Module) */
         else if (opcode == 8)
-            regs[b] = map_segment(regs[c]);
+            regs[b] = map_segment(regs[c], segs, seg_size,
+                                  seg_cap, seg_lens, *rec_ids, rec_size);
 
         /* Unmap Segment (Memory Module) */
         else if (opcode == 9)
-            unmap_segment(regs[c]);
+            unmap_segment(regs[c], rec_ids, rec_size, rec_cap);
 
         /* Division */
         else if (opcode == 5)
@@ -258,7 +247,7 @@ static inline void empty_cache(Instruction *cache, Instruction **pp, uint32_t *r
 
         /* Halt or Invalid Opcode*/
         else
-            handle_halt();
+            handle_halt(segs, seg_size, seg_lens, rec_ids);
     }
 }
 
@@ -269,33 +258,35 @@ static inline void fill_cache(Instruction *cache, Instruction **program_pointer)
     *program_pointer += NUM_INSTRS;
 }
 
-// #define DEBUG true
-void handle_instructions(uint32_t *zero)
+void handle_instructions(uint32_t *zero, uint32_t fsize)
 {
-    // Initialize memory
+    uint32_t seg_cap = 128;
+    uint32_t seg_size = 0;
+    uint32_t **segs = (uint32_t **)calloc(seg_cap, sizeof(uint32_t *));
+    uint32_t *seg_lens = (uint32_t *)calloc(seg_cap, sizeof(uint32_t));
+
+    uint32_t rec_cap = 128;
+    uint32_t rec_size = 0;
+    uint32_t *rec_ids = (uint32_t *)calloc(seg_cap, sizeof(uint32_t));
+
+    segs[0] = zero;
+    seg_lens[0] = fsize;
+    seg_size++;
+
     uint32_t regs[NUM_REGISTERS] = {0};
     Instruction *pp = zero;
     Instruction cache[NUM_INSTRS];
 
     while (true)
     {
-        #ifdef DEBUG
-            asm volatile("marker_label: .word 0xDEADBEEF");
-        #endif
-
-
         fill_cache(cache, &pp);
-        // cache[0] = *pp;
-        // pp += NUM_INSTRS;
-
-        #ifdef DEBUG
-            asm volatile("marker_label2: .word 0xDEADBEEF");
-        #endif
-
-        empty_cache(cache, &pp, regs, zero);
+        
+        empty_cache(cache, &pp, regs, zero, &segs, &seg_lens, &seg_size, &seg_cap,
+                    &rec_ids, &rec_size, &rec_cap);
     }
 }
 
+// TODO: Do a bit of cleanup down here
 int main(int argc, char *argv[])
 {
     if (argc != 2)
@@ -316,11 +307,7 @@ int main(int argc, char *argv[])
     struct stat file_stat;
     if (stat(argv[1], &file_stat) == 0)
         fsize = file_stat.st_size;
-    else
-        assert(false);
-
     uint32_t *zero_segment = initialize_memory(fp, fsize + (NUM_INSTRS * sizeof(Instruction)));
-
-    handle_instructions(zero_segment);
+    handle_instructions(zero_segment, fsize);
     return EXIT_SUCCESS;
 }
