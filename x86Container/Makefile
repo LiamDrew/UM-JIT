@@ -2,7 +2,7 @@ src = $(wildcard *.c)
 obj = $(src:.c=.o)
 
 CC = gcc
-CFLAGS = -g -Wall -Wextra -Werror -O2
+CFLAGS = -g -Wall -Wextra -Werror -O1
 LDFLAGS = -g
 
 um: $(obj)

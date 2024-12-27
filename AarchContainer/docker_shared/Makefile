@@ -1,9 +1,8 @@
 src = $(wildcard *.c)
 obj = $(src:.c=.o)
 
-# NOTE: Clang is the only compiler available on the Mac
-CC = clang
-CFLAGS = -g -Wall -Wextra -Werror -O2
+CC = gcc
+CFLAGS = -g -Wall -Wextra -Werror -O1
 LDFLAGS = -g
 
 um: $(obj)
