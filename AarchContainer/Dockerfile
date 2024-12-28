@@ -122,8 +122,8 @@ CMD ["/bin/bash"]
 # # # Set up the entrypoint
 # # CMD ["/bin/bash"]
 
-# # # docker run -it \
-# # #     -e DISPLAY=host.docker.internal:0 \
-# # #     -v /tmp/.X11-unix:/tmp/.X11-unix \
-# # #     -v "$PWD/docker_shared:/home/developer/shared" \
-# # #     dev-tools
+# docker run -it \
+#     -e DISPLAY=host.docker.internal:0 \
+#     -v /tmp/.X11-unix:/tmp/.X11-unix \
+#     -v "$PWD/docker_shared:/home/developer/shared" \
+#     dev-tools

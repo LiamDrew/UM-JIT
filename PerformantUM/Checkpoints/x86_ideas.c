@@ -164,25 +164,25 @@ static inline Instruction get_instr(Instruction *cache, unsigned index)
     return cache[index];
 }
 
-static inline uint32_t decode_instruction(uint32_t word, uint32_t *a, uint32_t *b,
-                                          uint32_t *c, uint32_t *value_to_load)
-{
-    uint32_t opcode = (word >> 28) & 0xF;
+// static inline uint32_t decode_instruction(uint32_t word, uint32_t *a, uint32_t *b,
+//                                           uint32_t *c, uint32_t *value_to_load)
+// {
+//     uint32_t opcode = (word >> 28) & 0xF;
 
-    if (opcode == 13)
-    {
-        *a = (word >> 25) & 0x7;
-        *value_to_load = word & 0x1FFFFFF;
-    }
-    else
-    {
-        *c = word & 0x7;
-        *b = (word >> 3) & 0x7;
-        *a = (word >> 6) & 0x7;
-    }
+//     if (opcode == 13)
+//     {
+//         *a = (word >> 25) & 0x7;
+//         *value_to_load = word & 0x1FFFFFF;
+//     }
+//     else
+//     {
+//         *c = word & 0x7;
+//         *b = (word >> 3) & 0x7;
+//         *a = (word >> 6) & 0x7;
+//     }
 
-    return opcode;
-}
+//     return opcode;
+// }
 
 static inline void empty_cache(Instruction *cache, Instruction **pp, uint32_t *regs, uint32_t *zero)
 {
@@ -192,73 +192,88 @@ static inline void empty_cache(Instruction *cache, Instruction **pp, uint32_t *r
     for (unsigned i = 0; i < NUM_INSTRS; i++)
     {
         word = get_instr(cache, i);
-        uint32_t opcode = decode_instruction(word, &a, &b, &c, &val);
+        uint32_t opcode = (word >> 28) & 0xF;
 
         /* Load Value */
         if (opcode == 13)
+        {
+            a = (word >> 25) & 0x7;
+            val = word & 0x1FFFFFF;
             regs[a] = val;
+            return;
+        }
+
+        c = word & 0x7;
+        b = (word >> 3) & 0x7;
+        a = (word >> 6) & 0x7;
+
+        switch (opcode)
+        {
 
         /* Segmented Load (Memory Module) */
-        else if (opcode == 1)
+        case 1:
             regs[a] = segment_sequence[regs[b]][regs[c]];
+            break;
 
         /* Segmented Store (Memory Module) */
-        else if (opcode == 2)
+        case 2:
             segment_sequence[regs[a]][regs[b]] = regs[c];
+            break;
 
         /* Bitwise NAND */
-        else if (opcode == 6)
+        case 6:
             regs[a] = ~(regs[b] & regs[c]);
+            break;
 
         /* Load Segment (Memory Module) */
-        else if (opcode == 12)
-        {
+        case 12:
             load_segment(regs[b], zero);
             *pp = zero + regs[c];
             break;
-        }
 
         /* Addition */
-        else if (opcode == 3)
-        {
+        case 3: // Addition
             regs[a] = (regs[b] + regs[c]) % POWER;
-        }
+            break;
 
         /* Conditional Move */
-        else if (opcode == 0)
-        {
+        case 0:
             if (regs[c] != 0)
                 regs[a] = regs[b];
-        }
+            break;
 
         /* Map Segment (Memory Module) */
-        else if (opcode == 8)
+        case 8:
             regs[b] = map_segment(regs[c]);
+            break;
 
         /* Unmap Segment (Memory Module) */
-        else if (opcode == 9)
+        case 9:
             unmap_segment(regs[c]);
+            break;
 
         /* Division */
-        else if (opcode == 5)
+        case 5:
             regs[a] = regs[b] / regs[c];
+            break;
 
         /* Multiplication */
-        else if (opcode == 4)
-        {
+        case 4:
             regs[a] = (regs[b] * regs[c]) % POWER;
-        }
+            break;
 
         /* Output (IO) */
-        else if (opcode == 10)
+        case 10:
             putchar((unsigned char)regs[c]);
+            break;
 
         /* Input (IO) NOTE: intentionally omitted*/
         // else if (opcode == 11) regs[c] = getc(stdin);
 
         /* Halt or Invalid Opcode*/
-        else
+        default:
             handle_halt();
+        }
     }
 }
 
@@ -283,9 +298,9 @@ void handle_instructions(uint32_t *zero)
         asm volatile("marker_label: .word 0xDEADBEEF");
 #endif
 
-        fill_cache(cache, &pp);
-        // cache[0] = *pp;
-        // pp += NUM_INSTRS;
+        // fill_cache(cache, &pp);
+        cache[0] = *pp;
+        pp += NUM_INSTRS;
 
 #ifdef DEBUG
         asm volatile("marker_label2: .word 0xDEADBEEF");
@@ -315,11 +330,8 @@ int main(int argc, char *argv[])
     struct stat file_stat;
     if (stat(argv[1], &file_stat) == 0)
         fsize = file_stat.st_size;
-    else
-        assert(false);
 
     uint32_t *zero_segment = initialize_memory(fp, fsize + (NUM_INSTRS * sizeof(Instruction)));
-
     handle_instructions(zero_segment);
     return EXIT_SUCCESS;
 }

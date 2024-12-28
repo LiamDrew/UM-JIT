@@ -8,7 +8,7 @@
 #include <pthread.h>
 
 #define NUM_REGISTERS 8
-#define POWER ((uint64_t)1 << 32)
+#define POWER ((uint64_t)1 << 32);
 #define NUM_INSTRS 1
 
 typedef uint32_t Instruction;
@@ -192,88 +192,92 @@ static inline void empty_cache(Instruction *cache, Instruction **pp, uint32_t *r
     for (unsigned i = 0; i < NUM_INSTRS; i++)
     {
         word = get_instr(cache, i);
-        // uint32_t opcode = decode_instruction(word, &a, &b, &c, &val);
         uint32_t opcode = (word >> 28) & 0xF;
 
-        /* Load Value - most common */
-        if (__builtin_expect(opcode == 13, 1)) {
+        /* Load Value */
+        if (opcode == 13)
+        {
             a = (word >> 25) & 0x7;
             val = word & 0x1FFFFFF;
             regs[a] = val;
-        } else {
-            c = word & 0x7;
-            b = (word >> 3) & 0x7;
-            a = (word >> 6) & 0x7;
-
-            /* Segmented Load */
-            if (__builtin_expect(opcode == 1, 1))
-                regs[a] = segment_sequence[regs[b]][regs[c]];
-
-            /* Segmented Store */
-            else if (__builtin_expect(opcode == 2, 1))
-                segment_sequence[regs[a]][regs[b]] = regs[c];
-
-            /* Bitwise NAND */
-            else if (__builtin_expect(opcode == 6, 1))
-                regs[a] = ~(regs[b] & regs[c]);
-
-            /* Load Segment */
-            else if (__builtin_expect(opcode == 12, 1))
-            {
-                load_segment(regs[b], zero);
-                *pp = zero + regs[c];
-                break;
-            }
-
-            /* Addition */
-            else if (__builtin_expect(opcode == 3, 0))
-                regs[a] = (regs[b] + regs[c]) % POWER;
-
-            /* Conditional Move */
-            else if (__builtin_expect(opcode == 0, 0))
-            {
-                if (regs[c] != 0)
-                    regs[a] = regs[b];
-            }
-
-            /* Map Segment (Memory Module) */
-            else if (__builtin_expect(opcode == 8, 0))
-                regs[b] = map_segment(regs[c]);
-
-            /* Unmap Segment (Memory Module) */
-            else if (__builtin_expect(opcode == 9, 0))
-                unmap_segment(regs[c]);
-
-            /* Division */
-            else if (__builtin_expect(opcode == 5, 0))
-                regs[a] = regs[b] / regs[c];
-
-            /* Multiplication */
-            else if (__builtin_expect(opcode == 4, 0))
-                regs[a] = (regs[b] * regs[c]) % POWER;
-
-            /* Output (IO) */
-            else if (__builtin_expect(opcode == 10, 0))
-                putchar((unsigned char)regs[c]);
-
-            /* Input (IO) NOTE: intentionally omitted*/
-            // else if (opcode == 11) regs[c] = getc(stdin);
-
-            /* Halt or Invalid Opcode*/
-            else handle_halt();
+            return;
         }
 
+        c = word & 0x7;
+        b = (word >> 3) & 0x7;
+        a = (word >> 6) & 0x7;
 
+        /* Segmented Load (Memory Module) */
+        if (opcode == 1)
+            regs[a] = segment_sequence[regs[b]][regs[c]];
 
+        /* Segmented Store (Memory Module) */
+        else if (opcode == 2)
+            segment_sequence[regs[a]][regs[b]] = regs[c];
+
+        /* Bitwise NAND */
+        else if (opcode == 6)
+            regs[a] = ~(regs[b] & regs[c]);
+
+        /* Load Segment (Memory Module) */
+        else if (opcode == 12)
+        {
+            load_segment(regs[b], zero);
+            *pp = zero + regs[c];
+            break;
+        }
+
+        /* Addition */
+        else if (opcode == 3)
+        {
+            regs[a] = (regs[b] + regs[c]) % POWER;
+        }
+
+        /* Conditional Move */
+        else if (opcode == 0)
+        {
+            if (regs[c] != 0)
+                regs[a] = regs[b];
+        }
+
+        /* Map Segment (Memory Module) */
+        else if (opcode == 8)
+            regs[b] = map_segment(regs[c]);
+
+        /* Unmap Segment (Memory Module) */
+        else if (opcode == 9)
+            unmap_segment(regs[c]);
+
+        /* Division */
+        else if (opcode == 5)
+            regs[a] = regs[b] / regs[c];
+
+        /* Multiplication */
+        else if (opcode == 4)
+        {
+            regs[a] = (regs[b] * regs[c]) % POWER;
+        }
+
+        /* Output (IO) */
+        else if (opcode == 10)
+            putchar((unsigned char)regs[c]);
+
+        /* Input (IO) NOTE: intentionally omitted*/
+        else if (opcode == 11)
+            regs[c] = getc(stdin);
+
+        /* Halt or Invalid Opcode*/
+        else
+            handle_halt();
     }
 }
 
-static inline void fill_cache(Instruction *cache, Instruction **program_pointer)
-{
-    for (unsigned i = 0; i < NUM_INSTRS; i++)
-        cache[i] = (*program_pointer)[i];
-    *program_pointer += NUM_INSTRS;
-}
+// static inline void fill_cache(Instruction *cache, Instruction **program_pointer)
+// {
+//     for (unsigned i = 0; i < NUM_INSTRS; i++)
+//         cache[i] = (*program_pointer)[i];
+//     *program_pointer += NUM_INSTRS;
+// }
 
 // #define DEBUG true
 void handle_instructions(uint32_t *zero)
@@ -285,18 +289,17 @@ void handle_instructions(uint32_t *zero)
 
     while (true)
     {
-        #ifdef DEBUG
-            asm volatile("marker_label: .word 0xDEADBEEF");
-        #endif
+#ifdef DEBUG
+        asm volatile("marker_label: .word 0xDEADBEEF");
+#endif
 
+        // fill_cache(cache, &pp);
+        cache[0] = *pp;
+        pp += NUM_INSTRS;
 
-        fill_cache(cache, &pp);
-        // cache[0] = *pp;
-        // pp += NUM_INSTRS;
-
-        #ifdef DEBUG
-            asm volatile("marker_label2: .word 0xDEADBEEF");
-        #endif
+#ifdef DEBUG
+        asm volatile("marker_label2: .word 0xDEADBEEF");
+#endif
 
         empty_cache(cache, &pp, regs, zero);
     }
@@ -322,11 +325,8 @@ int main(int argc, char *argv[])
     struct stat file_stat;
     if (stat(argv[1], &file_stat) == 0)
         fsize = file_stat.st_size;
-    else
-        assert(false);
 
     uint32_t *zero_segment = initialize_memory(fp, fsize + (NUM_INSTRS * sizeof(Instruction)));
-
     handle_instructions(zero_segment);
     return EXIT_SUCCESS;
 }
