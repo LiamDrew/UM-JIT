@@ -2,8 +2,11 @@
 #define UM_UTILS_H
 #include <stdint.h>
 
+typedef uint32_t Instruction;
+
 struct GlobalState
 {
+    uint32_t pc; // program counter
     void **segment_sequence;
     uint32_t seq_size;
     uint32_t seq_capacity;
@@ -24,6 +27,15 @@ uint32_t map_segment(uint32_t size);
 
 __attribute__((visibility("default")))
 void unmap_segment(uint32_t segmentID);
+
+__attribute__((visibility("default")))
+uint32_t segmented_load(Instruction word);
+
+__attribute__((visibility("default")))
+void segmented_store(Instruction word);
+
+__attribute__((visibility("default")))
+void *load_program(uint32_t b_val, uint32_t c_val);
 
 // /* Ruh roh. This could potentially be another program if this function relies on accessing global memory*/
 // uint32_t segmented_load(uint32_t a_val, uint32_t b_val, uint32_t c_val, uint32_t word);

@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
     (void)argc;
     (void)argv;
 
-    const char *filename = "map.um";
+    const char *filename = "unmap.um";
 
     FILE *fp = fopen(filename, "wb");
     assert(fp != NULL);
@@ -33,14 +33,16 @@ int main(int argc, char *argv[])
 
     Instruction words[10] = {0};
 
-    size_t bw = 3;
+    size_t bw = 4;
 
     // load 3 into reg 1
     words[0] = load_val(13, 3, 1);
 
     words[1] = three_reg(8, 0, 2, 1);
 
-    words[2] = three_reg(7, 0, 0, 0);
+    words[2] = three_reg(9, 7, 7, 2);
+
+    words[3] = three_reg(7, 0, 0, 0);
 
 
     // NOTE: must write bytes to disk in big endian order

@@ -12,8 +12,7 @@
 
 #define RO 8
 
-typedef uint32_t Instruction;
-typedef int (*Function)(void);
+typedef void* (*Function)(void);
 
 struct GlobalState gs;
 
@@ -40,18 +39,10 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c);
 
 size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, Instruction word);
 
-size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
+size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, Instruction word);
 
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c);
 
-__attribute__((visibility("default")))
-uint32_t segmented_load(uint32_t a_val, uint32_t b_val, uint32_t c_val, uint32_t word);
-
-__attribute__((visibility("default")))
-void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val);
-
-__attribute__((visibility("default")))
-void load_program(uint32_t b_val, uint32_t c_val);
 
 int main(int argc, char *argv[])
 {
@@ -70,6 +61,7 @@ int main(int argc, char *argv[])
     }
 
     // Initialize the global state
+    gs.pc = 0;
     gs.segment_sequence = NULL;
     gs.seq_size = 0;
     gs.seq_capacity = 0;
@@ -88,9 +80,20 @@ int main(int argc, char *argv[])
 
     load_zero_segment(zero, fp, fsize);
 
-    Function func = (Function)zero;
-    int result = func();
-    (void)result;
+    // old method
+    // Function func = (Function)zero;
+    // int result = func();
+    // (void)result;
+
+    // new plan
+    void *curr_seg = zero;
+
+    // TODO: don't forget about offset (as in program counter!)
+
+    while (curr_seg != NULL) {
+        Function func = (Function)curr_seg;
+        curr_seg = func();
+    }
 
     printf("\nFinished Program.\n");
 
@@ -291,7 +294,7 @@ size_t compile_instruction(void *zero, uint32_t word, size_t offset)
 
     /* Segmented Store */
     else if (opcode == 2) {
-        offset += inject_seg_store(zero, offset, a + RO, b + RO, c + RO);
+        offset += inject_seg_store(zero, offset, a + RO, b + RO, c + RO, word);
     }
 
     /* Load Program */
@@ -423,10 +426,16 @@ size_t handle_halt(void *zero, size_t offset)
 {
     unsigned char *p = zero + offset;
 
+    // set RAX to 0 (NULL);
+    // xor rax,rax
+    *p++ = 0x48;
+    *p++ = 0x31;
+    *p++ = 0xc0;
+
     // ret
-    *p = 0xc3;
+    *p++ = 0xc3;
     
-    return 1;
+    return 4;
 }
 
 size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
@@ -622,19 +631,6 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     memcpy(p, &rel_offset, sizeof(rel_offset));
     p += sizeof(rel_offset);
 
-    // Old version
-    // ______________
-    // // mov rax, imm64 (function address)
-    // *p++ = 0x48;
-    // *p++ = 0xB8;
-    // memcpy(p, &map_segment_addr, sizeof(void *));
-    // p += sizeof(void *);
-
-    // // call rax
-    // *p++ = 0xFF;
-    // *p++ = 0xD0;
-    // ______________
-
     // store the result in register b
     // move return value from rax to reg b
     // mov rB, rax
@@ -648,6 +644,8 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 // size_t inject unmap segment
 size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
 {
+    if (c < 8 || c > 15)
+        assert(false);
     void *unmap_segment_addr = (void *)&unmap_segment;
 
     unsigned char *p = zero + offset;
@@ -661,101 +659,126 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
      * [7-6: Mod (2 bits)][5-3: Source Reg (3 bits)][2-0: Dest Reg (3 bits)] */
     *p++ = 0xc7 | ((c - 8) << 3); // ModR/M byte
 
-    // // mov rax, imm64 (function address)
-    // *p++ = 0x48;
-    // *p++ = 0xB8;
-    // memcpy(p, &unmap_segment_addr, sizeof(void *));
-    // p += sizeof(void *);
+    int32_t rel_offset = (int32_t)((uint64_t)unmap_segment_addr - ((uint64_t)p + 5));
 
-    // // call rax
-    // *p++ = 0xFF;
-    // *p++ = 0xD0;
+    *p++ = 0xe8;
+    memcpy(p, &rel_offset, sizeof(rel_offset));
+    p += sizeof(rel_offset);
 
     // no return value from the unmap segment function
-    return 15;
-}
-
-// segmented load 
-uint32_t segmented_load(uint32_t a_val, uint32_t b_val, uint32_t c_val, Instruction word)
-{
-    (void)a_val;
-    (void)b_val;
-    (void)c_val;
-    (void)word;
-
-    // load word into register
-
-    // call function
-
-    // return
-
-    // (my budget is 20 bytes)
-    assert(false);
+    return 8;
 }
 
 // inject segmented load
 size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, Instruction word)
 {
-    (void)zero;
-    (void)offset;
-    (void)a;
     (void)b;
     (void)c;
-    (void)word;
+    if (a < 8 || a > 15)
+        assert(false);
 
     /* the instruction needs to be passed as an argument and unpacked inline
      * because it's too space expensive to do it in assembly
      * This choice will majorly throttle the compiler speed, we can revisit later */
 
-    assert(false);
-    return 0;
-    // mov regs a, b, c into the right registers for the function call
+    void *seg_load_addr = (void *)&segmented_load;
 
-    // mov word into the right register
+    unsigned char *p = zero + offset;
 
-    // call the function (12 bytes)
-    
-    // move the result into the right register (3 bytes)
-    // return
-}
+    /* mov rdi, imm32 (where X is reg_num) */
+    *p++ = 0x40;           // Reg prefix for r8-r15
+    *p++ = 0xc7;           // mov immediate value to 32-bit register
+    *p++ = 0xc7;
 
-// segmented store (will have to compile r[C] to machine code inline)
-void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
-{
-    (void)a_val;
-    (void)b_val;
-    (void)c_val;
-    return;
+    *p++ = word & 0xFF;
+    *p++ = (word >> 8) & 0xFF;
+    *p++ = (word >> 16) & 0xFF;
+    *p++ = (word >> 24) & 0xFF;
+
+    int32_t rel_offset = (int32_t)((uint64_t)seg_load_addr - ((uint64_t)p + 5));
+
+    *p++ = 0xe8;
+    memcpy(p, & rel_offset, sizeof(rel_offset));
+    p += sizeof(rel_offset);
+
+    // return into correct register
+    // move return value from rax to reg q
+    // mov ra, rax
+    *p++ = 0x41;
+    *p++ = 0x89;
+    *p++ = 0xc0 | (a - 8);
+
+    return 15;
 }
 
 // inject segmented store
-size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, Instruction word)
 {
-    (void)zero;
-    (void)offset;
     (void)a;
     (void)b;
     (void)c;
-    assert(false);
-    return 0;
-}
 
-// load program
-void load_program(uint32_t b_val, uint32_t c_val)
-{
-    (void)b_val;
-    (void)c_val;
+    void *seg_store_addr = (void *)&segmented_store;
+
+    unsigned char *p = zero + offset;
+
+    /* mov rdi, imm32 (where X is reg_num) */
+    *p++ = 0x40; // Reg prefix for r8-r15
+    *p++ = 0xc7; // mov immediate value to 32-bit register
+    *p++ = 0xc7;
+
+    *p++ = word & 0xFF;
+    *p++ = (word >> 8) & 0xFF;
+    *p++ = (word >> 16) & 0xFF;
+    *p++ = (word >> 24) & 0xFF;
+
+    int32_t rel_offset = (int32_t)((uint64_t)seg_store_addr - ((uint64_t)p + 5));
+
+    *p++ = 0xe8;
+    memcpy(p, &rel_offset, sizeof(rel_offset));
+    p += sizeof(rel_offset);
+
+    return 12;
 }
 
 // inject load program
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 {
-    (void)zero;
-    (void)offset;
-    (void)b;
-    (void)c;
-    assert(false);
-    return 0;
+    if (b < 8 || b > 15)
+        assert(false);
+    if (c < 8 || c > 15)
+        assert(false);
+
+    void *load_program_addr = (void *)&load_program;
+
+    unsigned char *p = zero + offset;
+
+    // stash b in the right register (even if 0, need to update program pointer)
+    // move b to rdi
+    *p++ = 0x44;
+    *p++ = 0x89;
+    *p++ = 0xc7 | ((b - 8) << 3);
+
+
+    // stash c val in the right register
+    // move c to next one
+    *p++ = 0x44;
+    *p++ = 0x89;
+    *p++ = 0xc6 | ((c - 8) << 3);
+
+    // call function
+    int32_t rel_offset = (int32_t)((uint64_t)load_program_addr - ((uint64_t)p + 5));
+
+    *p++ = 0xe8;
+    memcpy(p, &rel_offset, sizeof(rel_offset));
+    p += sizeof(rel_offset);
+
+    // injected function needs to ret (rax should already be the right thing)
+    
+    // ret
+    *p++ = 0xc3;
+
+    return 12;
 }
 
 // have to compile the contents of c_val back into a UM instruction, and store in the right segment
