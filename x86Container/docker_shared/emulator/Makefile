@@ -2,11 +2,11 @@ src = $(wildcard *.c)
 obj = $(src:.c=.o)
 
 CC = gcc
-CFLAGS = -g -Wall -Wextra -Werror
+CFLAGS = -g -Wall -Wextra -Werror -O2
 LDFLAGS = -g
 
-jit: $(obj)
+um: $(obj)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) 
 
 clean:
-	rm -f *.o jit
+	rm -f *.o um

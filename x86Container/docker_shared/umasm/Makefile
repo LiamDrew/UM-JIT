@@ -5,8 +5,8 @@ CC = gcc
 CFLAGS = -g -Wall -Wextra -Werror
 LDFLAGS = -g
 
-jit: $(obj)
+maketest: $(obj)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) 
 
 clean:
-	rm -f *.o jit
+	rm -f *.o maketest
