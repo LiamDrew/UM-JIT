@@ -24,3 +24,16 @@ libum_utils.so: um_utils.o
 # Clean target
 clean:
 	rm -f *.o jit libum_utils.so
+
+# src = $(filter-out um_utils.c, $(wildcard *.c))
+# obj = $(src:.c=.o)
+
+# CC = gcc
+# CFLAGS = -g -Wall -Wextra -Werror -fPIC
+# LDFLAGS = -g
+
+# jit: $(obj)
+# 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# clean:
+# 	rm -f *.o jit

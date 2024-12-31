@@ -15,16 +15,7 @@
 typedef uint32_t Instruction;
 typedef int (*Function)(void);
 
-/* Sequence of program segments */
-void **segment_sequence = NULL;
-uint32_t seq_size = 0;
-uint32_t seq_capacity = 0;
-uint32_t *segment_lengths = NULL;
-
-/* Sequence of recycled segments */
-void *recycled_ids = NULL;
-uint32_t rec_size = 0;
-uint32_t rec_capacity = 0;
+struct GlobalState gs;
 
 void *initialize_zero_segment(size_t fsize);
 uint64_t assemble_word(uint64_t word, unsigned width, unsigned lsb,
@@ -41,59 +32,26 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
 size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
 size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
 
-// __attribute__((used, noinline, section(".text")))
-// unsigned char read_char(void);
-// static unsigned char (*read_char_ptr)(void) = read_char;
-
 size_t read_into_reg(void *zero, size_t offset, unsigned reg);
-uint32_t map_segment(uint32_t size);
+
 size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c);
-void unmap_segment(uint32_t segmentID);
+
 size_t inject_unmap_segment(void *zero, size_t offset, unsigned c);
-uint32_t segmented_load(uint32_t a_val, uint32_t b_val, uint32_t c_val, Instruction word);
+
 size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, Instruction word);
-void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val);
+
 size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
-void load_program(uint32_t b_val, uint32_t c_val);
+
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c);
 
-struct jit_runtime
-{
-    // Function pointers to relocated helpers
-    unsigned char (*read_char)(void);
-    // Add other helper functions as needed
-};
+__attribute__((visibility("default")))
+uint32_t segmented_load(uint32_t a_val, uint32_t b_val, uint32_t c_val, uint32_t word);
 
-struct jit_runtime *init_runtime(void)
-{
-    // Try to get memory in lower address space for shorter encodings
-    size_t runtime_size = 64 * 1024; // 64KB for runtime functions
-    void *runtime_region = mmap(
-        (void *)0x60000000, // Try a specific address
-        runtime_size,
-        PROT_READ | PROT_WRITE | PROT_EXEC,
-        MAP_PRIVATE | MAP_ANONYMOUS,
-        -1,
-        0);
+__attribute__((visibility("default")))
+void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val);
 
-    if (runtime_region == MAP_FAILED)
-    {
-        perror("Failed to allocate runtime region");
-        return NULL;
-    }
-
-    struct jit_runtime *rt = calloc(1, sizeof(struct jit_runtime));
-
-    // Copy read_char into our region
-    unsigned char *code_ptr = runtime_region;
-    rt->read_char = (unsigned char (*)(void))code_ptr;
-
-    // Copy the function (you'll need to know its size)
-    // TODO
-    memcpy(code_ptr, (void *)read_char, 1000);
-
-    return rt;
-}
+__attribute__((visibility("default")))
+void load_program(uint32_t b_val, uint32_t c_val);
 
 int main(int argc, char *argv[])
 {
@@ -111,6 +69,15 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    // Initialize the global state
+    gs.segment_sequence = NULL;
+    gs.seq_size = 0;
+    gs.seq_capacity = 0;
+    gs.segment_lengths = NULL;
+    gs.recycled_ids = NULL;
+    gs.rec_size = 0;
+    gs.rec_capacity = 0;
+
     size_t fsize = 0;
     struct stat file_stat;
     if (stat(argv[1], &file_stat) == 0)
@@ -120,11 +87,6 @@ int main(int argc, char *argv[])
     void *zero = initialize_zero_segment(fsize);
 
     load_zero_segment(zero, fp, fsize);
-    /* Counter of bytes written */
-    // size_t bw = 0;
-
-    // bw += load_reg(zero, bw, 8, 57);
-    // bw += print_edi(zero, bw, 8);
 
     Function func = (Function)zero;
     int result = func();
@@ -594,18 +556,6 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return 9;
 }
 
-// unsigned char read_char()
-// {
-//     printf("Function was called\n");
-//     int x = getc(stdin);
-//     assert(x != EOF);
-//     unsigned char c = (unsigned char)x;
-//     // putchar(c);
-//     // printf("\nDone printing\n");
-//     // printf("Returning char: %d ('%c')\n", c, c);
-//     return c;
-// }
-
 size_t read_into_reg(void *zero, size_t offset, unsigned reg)
 {
     // Remove this check when JIT is running
@@ -613,8 +563,8 @@ size_t read_into_reg(void *zero, size_t offset, unsigned reg)
         assert(false);
 
     unsigned char *p = zero + offset;
-    // void *func_ptr = (void *)&read_char_ptr;
 
+    // Old version
     //______________
     // // mov rax, imm64 (function address)
     // *p++ = 0x48;
@@ -628,10 +578,6 @@ size_t read_into_reg(void *zero, size_t offset, unsigned reg)
     //_________________
 
     void *read_char_addr = (void *)&read_char;
-
-    // Debug prints to understand our addressing
-    printf("read_char address: %p\n", read_char_addr);
-    printf("code location: %p\n", (void *)p);
 
     // Since we're using PIC, let's use a direct relative call
     // This will be a 5-byte instruction: E8 + 32-bit offset
@@ -647,95 +593,56 @@ size_t read_into_reg(void *zero, size_t offset, unsigned reg)
     *p++ = 0x89;
     *p++ = 0xC0 | (reg - 8);
     return 8;
-
-    // // Debug prints
-    // printf("read_char_ptr address: %p\n", (void *)read_char_ptr);
-    // printf("func_ptr location: %p\n", func_ptr);
-    // printf("code location: %p\n", (void *)p);
-    // // Let's try a slightly different approach for loading the function pointer
-    // // mov rax, QWORD PTR [rip + offset]
-    // *p++ = 0x48; // REX.W prefix
-    // *p++ = 0x8B; // mov r64, r/m64
-    // *p++ = 0x05; // ModR/M byte for RIP-relative addressing
-
-    // // Calculate RIP-relative offset to function pointer
-    // int32_t rel_offset = (int32_t)((uint64_t)func_ptr - ((uint64_t)p + 4));
-    // memcpy(p, &rel_offset, sizeof(rel_offset));
-    // p += sizeof(rel_offset);
-
-    // // call rax
-    // *p++ = 0xFF;
-    // *p++ = 0xD0;
-
-    // // mov rCd, eax
-    // *p++ = 0x41;
-    // *p++ = 0x89;
-    // *p++ = 0xC0 | (reg - 8);
-
-    // return 8;
-}
-
-
-// There may need to be two functions for segment mapping and unmapping
-// 
-// Returns the segment ID which will be stored in register b
-// That step will be done by the injected assembly, this function is pure C
-uint32_t map_segment(uint32_t size)
-{
-    (void)size;
-    // Size will be stored in register c
-    // it will be passed in as an argument to the function
-
-    // mmap something
-
-    // return the address of the mmaped memory
-    // return;
-
-    // the injected assembly will store the address in register b
-    // Store memory address in register b
-    assert(false);
 }
 
 size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 {
+    if (b < 8 || b > 15)
+        assert(false);
+    if (c < 8 || c > 15)
+        assert(false);
+    
     void *map_segment_addr = (void *)&map_segment;
 
     unsigned char *p = zero + offset;
 
     // move reg c to be the function call argument
     // mov rC, rdi
-    *p++ = 0x48; // Reg prefix for r8-r15
+    *p++ = 0x44; // Reg prefix for r8-r15
     *p++ = 0x89; // mov reg to reg
 
     /* ModR/M byte Format:
      * [7-6: Mod (2 bits)][5-3: Source Reg (3 bits)][2-0: Dest Reg (3 bits)] */
     *p++ = 0xc7 | ((c - 8) << 3); // ModR/M byte
 
-    // mov rax, imm64 (function address)
-    *p++ = 0x48;
-    *p++ = 0xB8;
-    memcpy(p, &map_segment_addr, sizeof(void *));
-    p += sizeof(void *);
+    int32_t rel_offset = (int32_t)((uint64_t)map_segment_addr - ((uint64_t)p + 5));
 
-    // call rax
-    *p++ = 0xFF;
-    *p++ = 0xD0;
+    // call rel32
+    *p++ = 0xE8; // Direct relative call
+    memcpy(p, &rel_offset, sizeof(rel_offset));
+    p += sizeof(rel_offset);
 
+    // Old version
+    // ______________
+    // // mov rax, imm64 (function address)
+    // *p++ = 0x48;
+    // *p++ = 0xB8;
+    // memcpy(p, &map_segment_addr, sizeof(void *));
+    // p += sizeof(void *);
+
+    // // call rax
+    // *p++ = 0xFF;
+    // *p++ = 0xD0;
+    // ______________
+
+    // store the result in register b
     // move return value from rax to reg b
     // mov rB, rax
     *p++ = 0x41;
     *p++ = 0x89;
     *p++ = 0xc0 | (b - 8);
 
-    // store the result in register b
-    return 18;
-}
-
-// void unmap segment(void *segmentId)
-void unmap_segment(uint32_t segmentID)
-{
-    (void)segmentID;
-    assert(false);
+    return 11;
 }
 
 // size_t inject unmap segment
@@ -747,22 +654,22 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
 
     // move reg c to be the function call argument
     // mov rC, rdi
-    *p++ = 0x48; // Reg prefix for r8-r15
+    *p++ = 0x44; // Reg prefix for r8-r15
     *p++ = 0x89; // mov reg to reg
 
     /* ModR/M byte Format:
      * [7-6: Mod (2 bits)][5-3: Source Reg (3 bits)][2-0: Dest Reg (3 bits)] */
     *p++ = 0xc7 | ((c - 8) << 3); // ModR/M byte
 
-    // mov rax, imm64 (function address)
-    *p++ = 0x48;
-    *p++ = 0xB8;
-    memcpy(p, &unmap_segment_addr, sizeof(void *));
-    p += sizeof(void *);
+    // // mov rax, imm64 (function address)
+    // *p++ = 0x48;
+    // *p++ = 0xB8;
+    // memcpy(p, &unmap_segment_addr, sizeof(void *));
+    // p += sizeof(void *);
 
-    // call rax
-    *p++ = 0xFF;
-    *p++ = 0xD0;
+    // // call rax
+    // *p++ = 0xFF;
+    // *p++ = 0xD0;
 
     // no return value from the unmap segment function
     return 15;

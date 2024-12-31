@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
     (void)argc;
     (void)argv;
 
-    const char *filename = "nand.um";
+    const char *filename = "map.um";
 
     FILE *fp = fopen(filename, "wb");
     assert(fp != NULL);
@@ -33,42 +33,15 @@ int main(int argc, char *argv[])
 
     Instruction words[10] = {0};
 
-    size_t bw = 9;
+    size_t bw = 3;
 
-    // load 0 into reg 1
-    words[0] = load_val(13, 0, 1);
+    // load 3 into reg 1
+    words[0] = load_val(13, 3, 1);
 
-    // load 7 into reg 2
-    words[1] = load_val(13, 7, 2);
+    words[1] = three_reg(8, 0, 2, 1);
 
-    // NAND should put all 1s in register 3
-    words[2] = three_reg(6, 3, 1, 1);
+    words[2] = three_reg(7, 0, 0, 0);
 
-    // NAND should put inverse of 7 in register 4
-    words[3] = three_reg(6, 4, 2, 2);
-
-    // NAND should put 7 in register 0
-    words[4] = three_reg(6, 0, 3, 4);
-
-    // should load 48 into reg 5
-    words[5] = load_val(13, 48, 5);
-
-    // should add 48 to register 0 and store output in reg 1
-    words[6] = three_reg(3, 1, 0, 5);
-
-    // shoud print 7
-    words[7] = three_reg(10, 0, 0, 1);
-
-    //should halt
-    words[8] = three_reg(7, 0, 0, 0);
-
-    // // // divide regs 0 by reg 1, put the result in 2
-    // // words[2] = three_reg(5, 2, 0, 1);
-
-    // // // This shoudl print out 7
-    // // words[4] = three_reg(10, 7, 6, 2); // print reg 2;
-
-    // words[4] = three_reg(7, 0, 0, 0);
 
     // NOTE: must write bytes to disk in big endian order
     for (size_t i = 0; i < bw; i++)
