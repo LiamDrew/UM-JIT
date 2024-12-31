@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "um_utils.h"
 
 // TODO: make assembly format consistent (capitalization, spacing, etc.)
 
@@ -39,20 +40,60 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
 size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
 size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
 size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
-unsigned char read_char();
-size_t read_into_reg(void *zero, size_t offset, unsigned reg);
 
+// __attribute__((used, noinline, section(".text")))
+// unsigned char read_char(void);
+// static unsigned char (*read_char_ptr)(void) = read_char;
+
+size_t read_into_reg(void *zero, size_t offset, unsigned reg);
 uint32_t map_segment(uint32_t size);
 size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c);
 void unmap_segment(uint32_t segmentID);
 size_t inject_unmap_segment(void *zero, size_t offset, unsigned c);
-void segmented_load(uint32_t a_val, uint32_t b_val, uint32_t c_val);
-size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
+uint32_t segmented_load(uint32_t a_val, uint32_t b_val, uint32_t c_val, Instruction word);
+size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, Instruction word);
 void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val);
 size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
 void load_program(uint32_t b_val, uint32_t c_val);
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c);
 
+struct jit_runtime
+{
+    // Function pointers to relocated helpers
+    unsigned char (*read_char)(void);
+    // Add other helper functions as needed
+};
+
+struct jit_runtime *init_runtime(void)
+{
+    // Try to get memory in lower address space for shorter encodings
+    size_t runtime_size = 64 * 1024; // 64KB for runtime functions
+    void *runtime_region = mmap(
+        (void *)0x60000000, // Try a specific address
+        runtime_size,
+        PROT_READ | PROT_WRITE | PROT_EXEC,
+        MAP_PRIVATE | MAP_ANONYMOUS,
+        -1,
+        0);
+
+    if (runtime_region == MAP_FAILED)
+    {
+        perror("Failed to allocate runtime region");
+        return NULL;
+    }
+
+    struct jit_runtime *rt = calloc(1, sizeof(struct jit_runtime));
+
+    // Copy read_char into our region
+    unsigned char *code_ptr = runtime_region;
+    rt->read_char = (unsigned char (*)(void))code_ptr;
+
+    // Copy the function (you'll need to know its size)
+    // TODO
+    memcpy(code_ptr, (void *)read_char, 1000);
+
+    return rt;
+}
 
 int main(int argc, char *argv[])
 {
@@ -283,7 +324,7 @@ size_t compile_instruction(void *zero, uint32_t word, size_t offset)
 
     /* Segmented Load */
     else if (opcode == 1) {
-        offset += inject_seg_load(zero, offset, a + RO, b + RO, c + RO);
+        offset += inject_seg_load(zero, offset, a + RO, b + RO, c + RO, word);
     }
 
     /* Segmented Store */
@@ -553,17 +594,17 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return 9;
 }
 
-unsigned char read_char()
-{
-    // printf("Function was called\n");
-    int x = getc(stdin);
-    assert(x != EOF);
-    unsigned char c = (unsigned char)x;
-    // putchar(c);
-    // printf("\nDone printing\n");
-    // printf("Returning char: %d ('%c')\n", c, c);
-    return c;
-}
+// unsigned char read_char()
+// {
+//     printf("Function was called\n");
+//     int x = getc(stdin);
+//     assert(x != EOF);
+//     unsigned char c = (unsigned char)x;
+//     // putchar(c);
+//     // printf("\nDone printing\n");
+//     // printf("Returning char: %d ('%c')\n", c, c);
+//     return c;
+// }
 
 size_t read_into_reg(void *zero, size_t offset, unsigned reg)
 {
@@ -572,26 +613,66 @@ size_t read_into_reg(void *zero, size_t offset, unsigned reg)
         assert(false);
 
     unsigned char *p = zero + offset;
+    // void *func_ptr = (void *)&read_char_ptr;
 
-    // void *putchar_addr = (void *)&putchar;
+    //______________
+    // // mov rax, imm64 (function address)
+    // *p++ = 0x48;
+    // *p++ = 0xB8;
+    // memcpy(p, &read_char_addr, sizeof(void *));
+    // p += sizeof(void *);
+
+    // // call rax
+    // *p++ = 0xFF;
+    // *p++ = 0xD0;
+    //_________________
+
     void *read_char_addr = (void *)&read_char;
 
-    // mov rax, imm64 (function address)
-    *p++ = 0x48;
-    *p++ = 0xB8;
-    memcpy(p, &read_char_addr, sizeof(void *));
-    p += sizeof(void *);
+    // Debug prints to understand our addressing
+    printf("read_char address: %p\n", read_char_addr);
+    printf("code location: %p\n", (void *)p);
 
-    // call rax
-    *p++ = 0xFF;
-    *p++ = 0xD0;
+    // Since we're using PIC, let's use a direct relative call
+    // This will be a 5-byte instruction: E8 + 32-bit offset
+    int32_t rel_offset = (int32_t)((uint64_t)read_char_addr - ((uint64_t)p + 5));
+
+    // call rel32
+    *p++ = 0xE8; // Direct relative call
+    memcpy(p, &rel_offset, sizeof(rel_offset));
+    p += sizeof(rel_offset);
 
     // mov rCd, eax
     *p++ = 0x41;
     *p++ = 0x89;
     *p++ = 0xC0 | (reg - 8);
+    return 8;
 
-    return 15;
+    // // Debug prints
+    // printf("read_char_ptr address: %p\n", (void *)read_char_ptr);
+    // printf("func_ptr location: %p\n", func_ptr);
+    // printf("code location: %p\n", (void *)p);
+    // // Let's try a slightly different approach for loading the function pointer
+    // // mov rax, QWORD PTR [rip + offset]
+    // *p++ = 0x48; // REX.W prefix
+    // *p++ = 0x8B; // mov r64, r/m64
+    // *p++ = 0x05; // ModR/M byte for RIP-relative addressing
+
+    // // Calculate RIP-relative offset to function pointer
+    // int32_t rel_offset = (int32_t)((uint64_t)func_ptr - ((uint64_t)p + 4));
+    // memcpy(p, &rel_offset, sizeof(rel_offset));
+    // p += sizeof(rel_offset);
+
+    // // call rax
+    // *p++ = 0xFF;
+    // *p++ = 0xD0;
+
+    // // mov rCd, eax
+    // *p++ = 0x41;
+    // *p++ = 0x89;
+    // *p++ = 0xC0 | (reg - 8);
+
+    // return 8;
 }
 
 
@@ -621,8 +702,6 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 
     unsigned char *p = zero + offset;
 
-    // TODO: the offset method will not work and needs to be fixed
-
     // move reg c to be the function call argument
     // mov rC, rdi
     *p++ = 0x48; // Reg prefix for r8-r15
@@ -649,7 +728,7 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0xc0 | (b - 8);
 
     // store the result in register b
-    return 19;
+    return 18;
 }
 
 // void unmap segment(void *segmentId)
@@ -690,59 +769,52 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
 }
 
 // segmented load 
-uint32_t segmented_load(uint32_t a_val, uint32_t b_val, uint32_t c_val)
+uint32_t segmented_load(uint32_t a_val, uint32_t b_val, uint32_t c_val, Instruction word)
 {
-
     (void)a_val;
     (void)b_val;
     (void)c_val;
+    (void)word;
+
+    // load word into register
+
+    // call function
+
+    // return
+
+    // (my budget is 20 bytes)
     assert(false);
 }
 
 // inject segmented load
-size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, Instruction word)
 {
     (void)zero;
     (void)offset;
     (void)a;
     (void)b;
     (void)c;
+    (void)word;
+
+    /* the instruction needs to be passed as an argument and unpacked inline
+     * because it's too space expensive to do it in assembly
+     * This choice will majorly throttle the compiler speed, we can revisit later */
+
     assert(false);
     return 0;
     // mov regs a, b, c into the right registers for the function call
 
-    // call the function
+    // mov word into the right register
 
+    // call the function (12 bytes)
+    
+    // move the result into the right register (3 bytes)
     // return
 }
 
 // segmented store (will have to compile r[C] to machine code inline)
 void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
 {
-    // have to compile the contents of c_val back into a UM instruction, and store in the right segment
-    // this is really tricky. Maybe this is just a number being saved that's going back into a register?
-    // or maybe it's secretely an instruction that's being encoded?
-    // or both? This is going to require serious thought, and could totally mess up the whole compile ahead
-    // of time plan. Idk what I'm going to do about this
-    /*
-     * the problem is that anything in a segment is fair game to be executed as an instruction if the segment is loaded
-     * The contents of the segment at that point could either be a value that's going to get loaded later, or
-     * an instruction that's about to be executed. How can we differentiate between values to load and instructions?
-     * You could concievably have a number that has a valid opcode and valid numbers for all registers, but that is not going to be executed as
-     * an instruction and is just going to be loaded from memory at a future point.
-     * Conversely, the very same number could be executed as a valid instruction. There is no way to know which is which. If you try to load an instruction that was compiled that shouldn't have been compiled, you're going to have major problems and things will make no sense.
-     * Conversely, if you encounter an instruction that was not compiled that should have been compiled, your program will just segfault.
-     * There's no way to tell until the instruction attempts to be executed.
-     * 
-     * Potential workaround: You both compile and store. The compiled code goes in mmap segment, and the stored value goes in the calloc'ed segment. 
-     * However, this would be enourmously space inefficient and be somewhat time inefficient with poor spatial locality
-     * 
-     * This might be the best option. I wonder if the 4 bits could be included in line with the instructions, but just be skipped over by the assembly.
-     * That way, if the segment was referenced, there would be a clear protocol for what bits the actual information would be encoded in. But if
-     * it came time for the actual instruction to be executed, the machine code would clearly indicate that the 4 bits would be garbage and not meant 
-     * for executing. This would be a really far out of the box solution, but is exactly the type of high speed hardware in the loop thinking we're
-     * going for here. Good talk.
-     */
     (void)a_val;
     (void)b_val;
     (void)c_val;
@@ -778,3 +850,36 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     assert(false);
     return 0;
 }
+
+// have to compile the contents of c_val back into a UM instruction, and store in the right segment
+// this is really tricky. Maybe this is just a number being saved that's going back into a register?
+// or maybe it's secretely an instruction that's being encoded?
+// or both? This is going to require serious thought, and could totally mess up the whole compile ahead
+// of time plan. Idk what I'm going to do about this
+/*
+ * the problem is that anything in a segment is fair game to be executed as an instruction if the segment is loaded
+ * The contents of the segment at that point could either be a value that's going to get loaded later, or
+ * an instruction that's about to be executed. How can we differentiate between values to load and instructions?
+ * You could concievably have a number that has a valid opcode and valid numbers for all registers, but that is not going to be executed as
+ * an instruction and is just going to be loaded from memory at a future point.
+ * Conversely, the very same number could be executed as a valid instruction. There is no way to know which is which. If you try to load an instruction that was compiled that shouldn't have been compiled, you're going to have major problems and things will make no sense.
+ * Conversely, if you encounter an instruction that was not compiled that should have been compiled, your program will just segfault.
+ * There's no way to tell until the instruction attempts to be executed.
+ *
+ * Potential workaround: You both compile and store. The compiled code goes in mmap segment, and the stored value goes in the calloc'ed segment.
+ * However, this would be enourmously space inefficient and be somewhat time inefficient with poor spatial locality
+ *
+ * This might be the best option. I wonder if the 4 bits could be included in line with the instructions, but just be skipped over by the assembly.
+ * That way, if the segment was referenced, there would be a clear protocol for what bits the actual information would be encoded in. But if
+ * it came time for the actual instruction to be executed, the machine code would clearly indicate that the 4 bits would be garbage and not meant
+ * for executing. This would be a really far out of the box solution, but is exactly the type of high speed hardware in the loop thinking we're
+ * going for here. Good talk.
+ *
+ * Big problem: putting this inline with the assembly will bloat the instruction number enourmously. This is already a big concern because we have
+ * to load 3 registers as function arguments, so adding another 6 assembly instruction will be enourmously space-expensive considering the current
+ * plan to pad everything so that memory is still chunk-addressable.
+ *
+ * If i really needed to save assembly instructions, I could send the bitpacked word in as one argument instead of 3, and then unpack it inside     the function. That would suck though.
+ *
+ * We're already signed up for 5x bloat. Let's try it with the bitpack plan and see what can be done.
+ */
