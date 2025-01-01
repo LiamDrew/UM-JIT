@@ -232,62 +232,90 @@ static inline bool exec_instr(Instruction word, Instruction **pp,
     a = (word >> 6) & 0x7;
 
     /* Segmented Load */
-    if (__builtin_expect(opcode == 1, 1))
+    if (__builtin_expect(opcode == 1, 1)) {
+        printf("Segmented load a: %u, b: %u, c: %u\n", a, b, c);
         regs[a] = segment_sequence[regs[b]][regs[c]];
+    }
 
     /* Segmented Store */
-    else if (__builtin_expect(opcode == 2, 1))
+    else if (__builtin_expect(opcode == 2, 1)) {
+        printf("Segmented store a: %u, b: %u, c: %u\n", a, b, c);
         segment_sequence[regs[a]][regs[b]] = regs[c];
+    }
 
     /* Bitwise NAND */
-    else if (__builtin_expect(opcode == 6, 1))
+    else if (__builtin_expect(opcode == 6, 1)) {
+        printf("Bitwise NAND a: %u, b: %u, c: %u\n", a, b, c);
         regs[a] = ~(regs[b] & regs[c]);
+
+    }
 
     /* Load Segment */
     else if (__builtin_expect(opcode == 12, 0))
     {
+        printf("Load progam a: %u, b: %u, c: %u\n", a, b, c);
         load_segment(regs[b], zero);
         *pp = zero + regs[c];
     }
 
     /* Addition */
-    else if (__builtin_expect(opcode == 3, 0))
+    else if (__builtin_expect(opcode == 3, 0)) {
+        printf("Addition a: %u, b: %u, c: %u\n", a, b, c);
         regs[a] = (regs[b] + regs[c]) % POWER;
+    }
 
     /* Conditional Move */
     else if (__builtin_expect(opcode == 0, 0))
     {
+        printf("Conditional move a: %u, b: %u, c: %u\n", a, b, c);
+
         if (regs[c] != 0)
             regs[a] = regs[b];
+        
+        printf("regs a is now: %u\n", regs[a]);
+
     }
 
     /* Map Segment */
-    else if (__builtin_expect(opcode == 8, 0))
+    else if (__builtin_expect(opcode == 8, 0)) {
+        printf("Map segment a: %u, b: %u, c: %u\n", a, b, c);
         regs[b] = map_segment(regs[c]);
+    }
 
     /* Unmap Segment */
-    else if (__builtin_expect(opcode == 9, 0))
+    else if (__builtin_expect(opcode == 9, 0)) {
+        printf("Unmap segment a: %u, b: %u, c: %u\n", a, b, c);
         unmap_segment(regs[c]);
+    }
 
     /* Division */
-    else if (__builtin_expect(opcode == 5, 0))
+    else if (__builtin_expect(opcode == 5, 0)) {
+        printf("Division a: %u, b: %u, c: %u\n", a, b, c);
         regs[a] = regs[b] / regs[c];
+    }
 
     /* Multiplication */
-    else if (__builtin_expect(opcode == 4, 0))
+    else if (__builtin_expect(opcode == 4, 0)) {
+        printf("Multiplication a: %u, b: %u, c: %u\n", a, b, c);
         regs[a] = (regs[b] * regs[c]) % POWER;
+    }
 
     /* Output */
-    else if (__builtin_expect(opcode == 10, 0))
+    else if (__builtin_expect(opcode == 10, 0)) {
+        printf("Output a: %u, b: %u, c: %u\n", a, b, c);
         putchar((unsigned char)regs[c]);
+    }
 
     /* Input */
-    else if (__builtin_expect(opcode == 11, 0))
+    else if (__builtin_expect(opcode == 11, 0)) {
+        printf("Input a: %u, b: %u, c: %u\n", a, b, c);
         regs[c] = getc(stdin);
+    }
 
     /* Stop or Invalid Instruction */
     else
     {
+        printf("Halt or other a: %u, b: %u, c: %u\n", a, b, c);
         handle_stop();
         return true;
     }

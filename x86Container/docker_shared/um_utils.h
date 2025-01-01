@@ -5,25 +5,33 @@
 
 #define RO 8
 
+// may experiement with making it 14, but for now keep it a power of 2
+#define CHUNK 16
+#define MULT 4
+
 typedef uint32_t Instruction;
 
 
 struct GlobalState
 {
     uint32_t pc; // program counter
-    void **segment_sequence;
+    void **program_seq;
+    uint32_t **val_seq;
+    uint32_t *seg_lens;
     uint32_t seq_size;
-    uint32_t seq_capacity;
-    uint32_t *segment_lengths;
-    void *recycled_ids;
+    uint32_t seq_cap;
+    
+    void *rec_ids;
     uint32_t rec_size;
-    uint32_t rec_capacity;
+    uint32_t rec_cap;
 } global_state;
 
 extern struct GlobalState gs;
 
 size_t compile_instruction(void *zero, uint32_t word, size_t offset);
 size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value);
+
+void print_out(uint32_t x);
 size_t print_reg(void *zero, size_t offset, unsigned reg);
 size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
 size_t handle_halt(void *zero, size_t offset);

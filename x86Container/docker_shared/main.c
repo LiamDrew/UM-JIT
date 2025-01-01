@@ -37,14 +37,19 @@ int main(int argc, char *argv[])
     }
 
     // Initialize the global state
+    // 128 chosen arbitrarily
     gs.pc = 0;
-    gs.segment_sequence = NULL;
     gs.seq_size = 0;
-    gs.seq_capacity = 0;
-    gs.segment_lengths = NULL;
-    gs.recycled_ids = NULL;
+    gs.seq_cap = 128;
+
+    // array of pointers to executable memory
+    gs.program_seq = calloc(gs.seq_cap, sizeof(void*));
+    gs.val_seq = calloc(gs.seq_cap, sizeof(uint32_t*));
+    gs.seg_lens = calloc(gs.seq_cap, sizeof(uint32_t));
+
     gs.rec_size = 0;
-    gs.rec_capacity = 0;
+    gs.rec_cap = 128;
+    gs.rec_ids = calloc(gs.rec_cap, sizeof(uint32_t));
 
     size_t fsize = 0;
     struct stat file_stat;
@@ -56,20 +61,34 @@ int main(int argc, char *argv[])
 
     load_zero_segment(zero, fp, fsize);
 
+    gs.program_seq[0] = zero;
+
     void *curr_seg = zero;
 
     // TODO: don't forget about offset (as in program counter!)
     while (curr_seg != NULL) {
-        Function func = (Function)curr_seg;
+        printf("counter is: %u\n", gs.pc);
+        Function func = (Function)((char *)curr_seg + gs.pc);
+        // Function func = (Function)curr_seg;
         curr_seg = func();
     }
 
     printf("\nFinished Program.\n");
 
-    /* Free zero segment */
+    // TODO: double check the way memory is freed
+    /* Free zero segment (has the extra register zeroing instructions)*/
     assert(munmap(zero, fsize) != -1);
 
-    // TODO: need to free all memory segments
+    /* Free all other memory */
+    for (uint32_t i = 1; i < gs.seq_size; i++) {
+        munmap(gs.program_seq[i], gs.seg_lens[i]); // TODO: double check this
+        free(gs.val_seq[i]);
+    }
+
+    free(gs.program_seq);
+    free(gs.val_seq);
+    free(gs.seg_lens);
+    free(gs.rec_ids);
 
     fclose(fp);
     return 0;
@@ -180,5 +199,15 @@ size_t zero_all_registers(void *zero, size_t offset)
     *p++ = 0x89;
     *p++ = 0xc7;
 
-    return 24;
+    // 8 NoOPs to align with a 32 byte boundary
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x90;
+    *p++ = 0x90;
+
+    return CHUNK * 2;
 }

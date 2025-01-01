@@ -51,12 +51,11 @@ uint32_t segmented_load(uint32_t b_val, uint32_t c_val)
 
     // get the segment we care about 
 
-    // In this case, we strictly get the value, since it would make no sense to load a bunch of assembly instruction into a register
+    // In this case, we strictly get the value, since it would make no sense to
+    // load a bunch of assembly instruction into a register
 
-    // TODO: unpack the word into the stuff
-
-    // assert(false);
-    return 6969;
+    // this gets loaded into a register on the assembly side
+    return gs.val_seq[b_val][c_val];
 }
 
 // segmented store (will have to compile r[C] to machine code inline)
@@ -80,6 +79,10 @@ void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
     // we have compile instruction available to us. We just need to give it a memory segment and an offset.
 
     // and of course it will be easy to load something straight into memory
+    gs.val_seq[a_val][b_val] = c_val;
+
+    // compile step
+    compile_instruction(gs.program_seq[a_val], c_val, b_val);
 
     return;
 }
@@ -95,16 +98,18 @@ void *load_program(uint32_t b_val, uint32_t c_val)
     printf("Reg c is %u\n", c_val);
 
     // set program counter to the contents of register c
-    gs.pc = c_val;
+    // gs.pc = c_val;
+    gs.pc = 4;
 
-    if (b_val == 0) {
-        // return the address of the 0 segment
-        return NULL;
-    }
+    // if (b_val == 0) {
+    //     // return the address of the 0 segment
+    //     return gs.program_seq[0];
+    // }
 
-    
+    return gs.program_seq[b_val];
+
     // return the address of the right memory segment
-    return NULL;
+    // return NULL;
 }
 
 size_t compile_instruction(void *zero, Instruction word, size_t offset)
@@ -145,24 +150,29 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     else if (opcode == 10)
     {
         // Load the rigther register and do the thing
+        printf("Output a: %u, b: %u, c: %u\n", a, b, c);
         offset += print_reg(zero, offset, c + RO);
     }
 
+    /* Addition */
     else if (opcode == 3)
     {
         // Load the right registers and do the thing
+        printf("Addition a: %u, b: %u, c: %u\n", a, b, c);
         offset += add_regs(zero, offset, a + RO, b + RO, c + RO);
     }
 
     /* Halt */
     else if (opcode == 7)
     {
+        printf("Halt a: %u, b: %u, c: %u\n", a, b, c);
         offset += handle_halt(zero, offset);
     }
 
     /* Bitwise NAND */
     else if (opcode == 6)
     {
+        printf("Bitwise NAND a: %u, b: %u, c: %u\n", a, b, c);
         offset += nand_regs(zero, offset, a + RO, b + RO, c + RO);
     }
 
@@ -175,54 +185,63 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     /* Multiplication */
     else if (opcode == 4)
     {
+        printf("Multiplication a: %u, b: %u, c: %u\n", a, b, c);
         offset += mult_regs(zero, offset, a + RO, b + RO, c + RO);
     }
 
     /* Division */
     else if (opcode == 5)
     {
+        printf("Division a: %u, b: %u, c: %u\n", a, b, c);
         offset += div_regs(zero, offset, a + RO, b + RO, c + RO);
     }
 
     /* Conditional Move */
     else if (opcode == 0)
     {
+        printf("Conditional move a: %u, b: %u, c: %u\n", a, b, c);
         offset += cond_move(zero, offset, a + RO, b + RO, c + RO);
     }
 
     /* Input */
     else if (opcode == 11)
     {
+        printf("Input a: %u, b: %u, c: %u\n", a, b, c);
         offset += read_into_reg(zero, offset, c + RO);
     }
 
     /* Segmented Load */
     else if (opcode == 1)
     {
+        printf("Segmented load a: %u, b: %u, c: %u\n", a, b, c);
         offset += inject_seg_load(zero, offset, a + RO, b + RO, c + RO, word);
     }
 
     /* Segmented Store */
     else if (opcode == 2)
     {
+        printf("Segmented store a: %u, b: %u, c: %u\n", a, b, c);
         offset += inject_seg_store(zero, offset, a + RO, b + RO, c + RO, word);
     }
 
     /* Load Program */
     else if (opcode == 12)
     {
+        printf("Load progam a: %u, b: %u, c: %u\n", a, b, c);
         offset += inject_load_program(zero, offset, b + RO, c + RO);
     }
 
     /* Map Segment */
     else if (opcode == 8)
     {
+        printf("Map segment a: %u, b: %u, c: %u\n", a, b, c);
         offset += inject_map_segment(zero, offset, b + RO, c + RO);
     }
 
     /* Unmap Segment */
     else if (opcode == 9)
     {
+        printf("Unmap segment a: %u, b: %u, c: %u\n", a, b, c);
         offset += inject_unmap_segment(zero, offset, c + RO);
     }
 
@@ -273,7 +292,28 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = (value >> 16) & 0xFF;
     *p++ = (value >> 24) & 0xFF;
 
-    return 7;
+    // 9 NoOps to align with chunk boundary
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    return CHUNK;
+    //return 7;
+}
+
+void print_out(uint32_t x)
+{
+    printf("x is %u\n", x);
+    unsigned char c = (unsigned char)x;
+    printf("Unsigned char is %c\n", c);
+
+    putchar(c);
 }
 
 size_t print_reg(void *zero, size_t offset, unsigned reg)
@@ -282,7 +322,9 @@ size_t print_reg(void *zero, size_t offset, unsigned reg)
     if (reg < 8 || reg > 15)
         assert(false);
 
-    void *putchar_addr = (void *)&putchar;
+    // void *putchar_addr = (void *)&putchar;
+    void *putchar_addr = (void *)&print_out;
+    
 
     unsigned char *p = zero + offset;
 
@@ -303,13 +345,25 @@ size_t print_reg(void *zero, size_t offset, unsigned reg)
     p += sizeof(int32_t);
 
     /* 3 to load reg into edi, 1 for call instruction, 4 for putchar addr */
-    return 8;
+
+    // 8 NoOPs to align with chunk boundary
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x90;
+    *p++ = 0x90;
+
+    return CHUNK;
+    // return 8;
 }
 
 size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     // Remove this check when JIT is running
-    printf("a: %u, b: %u, c: %u\n", a, b, c);
+    // printf("a: %u, b: %u, c: %u\n", a, b, c);
     if (a < 8 || a > 15)
         assert(false);
     if (b < 8 || b > 15)
@@ -334,7 +388,20 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x01;                            // add reg to reg
     *p++ = 0xc0 | ((c - 8) << 3) | (a - 8); // ModR/M byte
 
-    return 6;
+    // 10 NoOps
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x90;
+
+    return CHUNK;
+    // return 6;
 }
 
 size_t handle_halt(void *zero, size_t offset)
@@ -350,7 +417,21 @@ size_t handle_halt(void *zero, size_t offset)
     // ret
     *p++ = 0xc3;
 
-    return 4;
+    // 12 NoOps
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    return CHUNK;
 }
 
 size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
@@ -381,7 +462,18 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xC0 | (a - 8);
 
-    return 9;
+    // 7 No ops
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x90;
+
+    return CHUNK;
+
+    // return 9;
 }
 
 size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
@@ -415,7 +507,14 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xC0 | (a - 8);
 
-    return 12;
+    // 4 No ops
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x90;
+
+    return CHUNK;
+    // return 12;
 }
 
 size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
@@ -447,7 +546,17 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xC0 | ((b - 8) << 3) | (a - 8);
 
-    return 9;
+    // 7 No ops
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x90;
+
+    return CHUNK;
+    // return 9;
 }
 
 size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
@@ -477,7 +586,17 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0xf7;
     *p++ = 0xd0 | (a - 8);
 
-    return 9;
+    // 7 No ops
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x90;
+
+    return CHUNK;
+    // return 9;
 }
 
 size_t read_into_reg(void *zero, size_t offset, unsigned reg)
@@ -503,7 +622,19 @@ size_t read_into_reg(void *zero, size_t offset, unsigned reg)
     *p++ = 0x41;
     *p++ = 0x89;
     *p++ = 0xC0 | (reg - 8);
-    return 8;
+
+    // 8 No ops
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x90;
+    *p++ = 0x90;
+
+    return CHUNK;
+    // return 8;
 }
 
 size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
@@ -540,7 +671,15 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xc0 | (b - 8);
 
-    return 11;
+    // 5 No Ops
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x90;
+    *p++ = 0x90;
+
+    return CHUNK;
+    // return 11;
 }
 
 // size_t inject unmap segment
@@ -568,7 +707,19 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     p += sizeof(rel_offset);
 
     // no return value from the unmap segment function
-    return 8;
+
+    // 8 No Ops
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x90;
+    *p++ = 0x90;
+
+    return CHUNK;
+    // return 8;
 }
 
 // inject segmented load
@@ -613,7 +764,12 @@ size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsign
     *p++ = 0x89;
     *p++ = 0xc0 | (a - 8);
 
-    return 14;
+    // 2 No Ops
+    *p++ = 0x90;
+    *p++ = 0x90;
+
+    return CHUNK;
+    // return 14;
 }
 
 // inject segmented store
@@ -657,7 +813,12 @@ size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsig
     memcpy(p, &rel_offset, sizeof(rel_offset));
     p += sizeof(rel_offset);
 
-    return 14;
+    // 2 No Ops
+    *p++ = 0x90;
+    *p++ = 0x90;
+
+    return CHUNK;
+    // return 14;
 }
 
 // inject load program
@@ -696,7 +857,14 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     // ret
     *p++ = 0xc3;
 
-    return 12;
+    // 4 No ops
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+    *p++ = 0x90;
+
+    return CHUNK;
+    // return 12;
 }
 
 // have to compile the contents of c_val back into a UM instruction, and store in the right segment
