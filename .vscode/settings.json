@@ -4,6 +4,7 @@
         "atomic": "c",
         "cstring": "c",
         "string.h": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "stdlib.h": "c"
     }
 }

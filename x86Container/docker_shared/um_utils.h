@@ -1,8 +1,12 @@
 #ifndef UM_UTILS_H
 #define UM_UTILS_H
 #include <stdint.h>
+#include <stdlib.h>
+
+#define RO 8
 
 typedef uint32_t Instruction;
+
 
 struct GlobalState
 {
@@ -18,28 +22,28 @@ struct GlobalState
 
 extern struct GlobalState gs;
 
-__attribute__((visibility("default"))) 
+size_t compile_instruction(void *zero, uint32_t word, size_t offset);
+size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value);
+size_t print_reg(void *zero, size_t offset, unsigned reg);
+size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
+size_t handle_halt(void *zero, size_t offset);
+size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
+size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
+size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
+size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
+
+size_t read_into_reg(void *zero, size_t offset, unsigned reg);
+size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c);
+size_t inject_unmap_segment(void *zero, size_t offset, unsigned c);
+size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, Instruction word);
+size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, Instruction word);
+size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c);
+
 unsigned char read_char(void);
-
-__attribute__((visibility("default")))
 uint32_t map_segment(uint32_t size);
-
-
-__attribute__((visibility("default")))
 void unmap_segment(uint32_t segmentID);
-
-__attribute__((visibility("default")))
-uint32_t segmented_load(Instruction word);
-
-__attribute__((visibility("default")))
-void segmented_store(Instruction word);
-
-__attribute__((visibility("default")))
+uint32_t segmented_load(uint32_t b_val, uint32_t c_val);
+void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val);
 void *load_program(uint32_t b_val, uint32_t c_val);
-
-// /* Ruh roh. This could potentially be another program if this function relies on accessing global memory*/
-// uint32_t segmented_load(uint32_t a_val, uint32_t b_val, uint32_t c_val, uint32_t word);
-// void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val);
-// void load_program(uint32_t b_val, uint32_t c_val);
 
 #endif
