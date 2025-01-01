@@ -4,7 +4,7 @@ obj = $(src:.c=.o)
 
 # Compiler and flags
 CC = gcc
-CFLAGS = -g -Wall -Wextra -Werror -fPIC
+CFLAGS = -g -Wall -Wextra -Werror -fPIC -ffixed-r8 -ffixed-r9 -ffixed-r10 -ffixed-r11 -ffixed-r12 -ffixed-r13 -ffixed-r14 -ffixed-r15
 LDFLAGS = -g
 
 # Add the library path to runtime path

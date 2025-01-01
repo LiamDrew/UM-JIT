@@ -24,25 +24,54 @@ int main(int argc, char *argv[])
     (void)argc;
     (void)argv;
 
-    const char *filename = "unmap.um";
+    const char *filename = "tuff.um";
 
     FILE *fp = fopen(filename, "wb");
     assert(fp != NULL);
 
     // use fwrite()
 
-    Instruction words[10] = {0};
+    Instruction words[15] = {0};
 
-    size_t bw = 4;
+    size_t bw = 12;
 
-    // load 3 into reg 1
-    words[0] = load_val(13, 3, 1);
+    // load the value 49 into reg 7
+    words[0] = load_val(13, 49, 7);
 
-    words[1] = three_reg(8, 0, 2, 1);
+    // the 0 reg will remain 0
+    // the 1 reg will contain 1
+    words[1] = load_val(13, 1, 1);
 
-    words[2] = three_reg(9, 7, 7, 2);
+    // reg 5 contains the index of the first instruction getting loaded
+    words[2] = load_val(13, 10, 5);
 
-    words[3] = three_reg(7, 0, 0, 0);
+    // map segment of size 48, result gets put in r2
+    words[3] = three_reg(8, 0, 2, 7);
+
+    // seg load into r6
+    words[4] = three_reg(1, 6, 0, 5);
+
+    // seg store r6 into segment 1 @index 0
+    words[5] = three_reg(2, 1, 0, 6);
+
+    // add one to r5, the instruction loaded index
+    words[6] = three_reg(3, 5, 5, 1);
+
+    // seg load into r6 again
+    words[7] = three_reg(1, 6, 0, 5);
+
+    // seg store r6 into seg 1 @ index 1
+    words[8] = three_reg(2, 1, 1, 6);
+
+    // load program
+    words[9] = three_reg(12, 0, 1, 0);
+    // this code is only for getting mapped and not getting executed
+
+    // print reg 7
+    words[10] = three_reg(10, 0, 0, 7);
+
+    //halt
+    words[11] = three_reg(7, 0, 0, 0);
 
 
     // NOTE: must write bytes to disk in big endian order

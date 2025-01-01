@@ -21,12 +21,14 @@ struct GlobalState
     uint32_t seq_size;
     uint32_t seq_cap;
     
-    void *rec_ids;
+    uint32_t *rec_ids;
     uint32_t rec_size;
     uint32_t rec_cap;
 } global_state;
 
 extern struct GlobalState gs;
+
+void print_registers();
 
 size_t compile_instruction(void *zero, uint32_t word, size_t offset);
 size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value);
