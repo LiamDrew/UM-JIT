@@ -30,25 +30,8 @@ void print_registers()
            r8, r9, r10, r11, r12, r13, r14, r15);
 }
 
-unsigned char read_char(void)
-{
-    int x = getc(stdin);
-    assert(x != EOF);
-    return (unsigned char)x;
-}
-
 uint32_t map_segment(uint32_t size)
 {
-    // Inline assembly to save r8, r9, r10, r11 (Necessary?)
-    __asm__ __volatile__(
-        "pushq %%r8\n\t"
-        "pushq %%r9\n\t"
-        "pushq %%r10\n\t"
-        "pushq %%r11\n\t"
-        :
-        :
-        : "r8", "r9", "r10", "r11", "memory");
-
     // printf("Mapping segment, Raw value is %u (0x%x)\n", size, size);
 
     uint32_t new_seg_id;
@@ -77,6 +60,7 @@ uint32_t map_segment(uint32_t size)
         }
 
         new_seg_id = gs.seq_size++;
+        // printf("Making a new segment with id %u\n", new_seg_id);
     }
 
     /* Otherwise, reuse an old one */
@@ -86,12 +70,16 @@ uint32_t map_segment(uint32_t size)
 
     /* If the segment didn't previously exist or wasn't large enought for us*/
     if (gs.program_seq[new_seg_id] == NULL || size > gs.seg_lens[new_seg_id]) {
+        // printf("Memory getting allocated in here\n");
+    
 
         // TODO: this step needs to get done with an mmap call
         // gs.program_seq[new_seg_id] = realloc(gs.program_seq[new_seg_id], size * CHUNK);
 
         gs.program_seq[new_seg_id] = mmap(gs.program_seq[new_seg_id], size * CHUNK, 
             PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+        // printf("The address we want is %p\n", gs.program_seq[new_seg_id]);
         
         gs.val_seq[new_seg_id] = realloc(gs.val_seq[new_seg_id], size * sizeof(uint32_t*));
 
@@ -102,69 +90,21 @@ uint32_t map_segment(uint32_t size)
     memset(gs.program_seq[new_seg_id], 0, size * CHUNK);
     memset(gs.val_seq[new_seg_id], 0, size * sizeof(uint32_t));
 
-    // Inline assembly to restore r8, r9, r10, r11
-    __asm__ __volatile__(
-        "popq %%r11\n\t"
-        "popq %%r10\n\t"
-        "popq %%r9\n\t"
-        "popq %%r8\n\t"
-        :
-        :
-        : "r8", "r9", "r10", "r11");
- 
     return new_seg_id;
 }
 
 void unmap_segment(uint32_t segmentId)
 {
-    __asm__ __volatile__(
-        "pushq %%r8\n\t"
-        "pushq %%r9\n\t"
-        "pushq %%r10\n\t"
-        "pushq %%r11\n\t"
-        :
-        :
-        : "r8", "r9", "r10", "r11", "memory");
-    
     if (gs.rec_size == gs.rec_cap) {
         gs.rec_cap *= 2;
         gs.rec_ids = realloc(gs.rec_ids, gs.rec_cap * sizeof(uint32_t));
     }
 
     gs.rec_ids[gs.rec_size++] = segmentId;
-
-    __asm__ __volatile__(
-        "popq %%r11\n\t"
-        "popq %%r10\n\t"
-        "popq %%r9\n\t"
-        "popq %%r8\n\t"
-        :
-        :
-        : "r8", "r9", "r10", "r11");
 }
 
 uint32_t segmented_load(uint32_t b_val, uint32_t c_val)
 {
-    __asm__ __volatile__(
-        "pushq %%r8\n\t"
-        "pushq %%r9\n\t"
-        "pushq %%r10\n\t"
-        "pushq %%r11\n\t"
-        :
-        :
-        : "r8", "r9", "r10", "r11", "memory");
-    
-    // Debugging goes in here
-
-    __asm__ __volatile__(
-        "popq %%r11\n\t"
-        "popq %%r10\n\t"
-        "popq %%r9\n\t"
-        "popq %%r8\n\t"
-        :
-        :
-        : "r8", "r9", "r10", "r11");
-
     /* For a segmented load, we only get the relevant value from the value 
      * segment, since it makes no sense to put compiled instructions in a 
      * register. This value can be compiled when it comes time to put it back
@@ -172,56 +112,163 @@ uint32_t segmented_load(uint32_t b_val, uint32_t c_val)
 
     /* The return value gets loaded into the correct register by the calling 
      * assembly */
-    return gs.val_seq[b_val][c_val];
+    uint32_t x = gs.val_seq[b_val][c_val];
+
+    // printf("The seg loaded word is %u\n", x);
+    return x;
 }
 
 void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
 {
-    __asm__ __volatile__(
-        "pushq %%r8\n\t"
-        "pushq %%r9\n\t"
-        "pushq %%r10\n\t"
-        "pushq %%r11\n\t"
-        :
-        :
-        : "r8", "r9", "r10", "r11", "memory");
-    
     // printf("Segmented store: storing cval: %u in segment %u at index %u\n", c_val, a_val, b_val);
+    assert(a_val == 1);
+
+    // printf("The seg stored word is %u\n", c_val);
 
     /* Load the inputted word into value memory */
     gs.val_seq[a_val][b_val] = c_val;
 
     /* Compile the inputted word as if it were an instruction (in case it is)
      * and put it in executable memory*/
-    compile_instruction(gs.program_seq[a_val], c_val, b_val);
+    // printf("B val should be 0 or 1 %u\n", b_val);
+    assert(gs.program_seq[a_val] != NULL);
+    // printf("size of the segment is %u\n", gs.seg_lens[a_val]);
 
-    __asm__ __volatile__(
-        "popq %%r11\n\t"
-        "popq %%r10\n\t"
-        "popq %%r9\n\t"
-        "popq %%r8\n\t"
-        :
-        :
-        : "r8", "r9", "r10", "r11");
+    // unsigned char *p = gs.program_seq[a_val] + (b_val * CHUNK);
+
+    // For now let's just hardcode the injection
+
+    // printf("We want to inject at %p\n", gs.program_seq[a_val] + (b_val * CHUNK));
+
+    // compile_instruction(gs.program_seq[a_val], c_val, b_val * CHUNK);
+
+    if (b_val == 0) {
+
+        uint32_t c = c_val & 0x7;
+        void *putchar_addr = (void *)&print_out;
+        unsigned char *p = gs.program_seq[a_val];
+
+        // mov edi, rXd (where X is reg_num)
+        *p++ = 0x44; // Reg prefix for r8-r15
+        *p++ = 0x89;
+        *p++ = (0xc7 | (c << 3)); // ModR/M byte: edi(111) with reg number
+
+        // // // push r8 - r11 onto the stack
+        // *p++ = 0x41;
+        // *p++ = 0x50;
+        
+
+        // *p++ = 0x41;
+        // *p++ = 0x51;
+
+        // *p++ = 0x41;
+        // *p++ = 0x52;
+
+        // *p++ = 0x41;
+        // *p++ = 0x53;
+
+
+        /* NOTE: This was the way it was supposed to be, but it didn't work */
+        // printf("Base address: %p\n", gs.program_seq[a_val]);
+        // printf("Current p: %p\n", p);
+        // printf("Target function address: %p\n", putchar_addr);
+        // call print_out
+
+        // int32_t call_offset = (int32_t)((uint64_t)putchar_addr - ((uint64_t)p + 5));
+        // *p++ = 0xe8;
+        // memcpy(p, &call_offset, sizeof(call_offset));
+        // p += sizeof(call_offset);
+
+        // mov rax, immediate_address
+        *p++ = 0x48; // REX.W prefix
+        *p++ = 0xb8; // mov rax, imm64
+        memcpy(p, &putchar_addr, sizeof(putchar_addr));
+        p += sizeof(putchar_addr);
+
+        // call rax
+        *p++ = 0xff;
+        *p++ = 0xd0; // ModR/M byte for call rax
+
+        // // set RAX to 0 (NULL);
+        // // xor rax,rax
+        *p++ = 0x48;
+        *p++ = 0x31;
+        *p++ = 0xc0;
+
+        // ret
+        *p++ = 0xc3;
+
+        // printf("Putchar addr is%p\n", putchar_addr);
+        // printf("Call offset is %d\n", call_offset);
+
+        // // set RAX to 0 (NULL);
+        // xor rax,rax
+        // *p++ = 0x48;
+        // *p++ = 0x31;
+        // *p++ = 0xc0;
+
+        // // ret
+        // *p++ = 0xc3;
+
+        // pop r8 - r11 off the stack
+        // *p++ = 0x41;
+        // *p++ = 0x5B;
+
+        // *p++ = 0x41;
+        // *p++ = 0x5A;
+
+        // *p++ = 0x41;
+        // *p++ = 0x59;
+
+        // *p++ = 0x41;
+        // *p++ = 0x58; 
+
+        // xor rax,rax
+        // *p++ = 0x48;
+        // *p++ = 0x31;
+        // *p++ = 0xc0;
+
+        // // ret
+        // *p++ = 0xc3;
+
+        // 32 - 24 = 8 NoOps
+        *p++ = 0x0F;
+        *p++ = 0x1F;
+        *p++ = 0x00;
+
+        // *p++ = 0x0F;
+        // *p++ = 0x1F;
+        // *p++ = 0x00;
+
+        // *p++ = 0x90;
+        *p++ = 0x90;
+    }
+
+    if (b_val == 1) {
+            // printf("Doing the halt injection\n");
+            unsigned char *p = gs.program_seq[a_val] + (1 * CHUNK);
+
+            // // set RAX to 0 (NULL);
+            // // xor rax,rax
+            *p++ = 0x48;
+            *p++ = 0x31;
+            *p++ = 0xc0;
+
+            // ret
+            *p++ = 0xc3;
+    }
 }
 
 void *load_program(uint32_t b_val, uint32_t c_val)
 {
-    __asm__ __volatile__(
-        "pushq %%r8\n\t"
-        "pushq %%r9\n\t"
-        "pushq %%r10\n\t"
-        "pushq %%r11\n\t"
-        :
-        :
-        : "r8", "r9", "r10", "r11", "memory");
-
     /* Set the program counter to be the contents of register c */
     gs.pc = c_val;
 
     if (b_val == 0) {
         return gs.program_seq[0];
     }
+
+    // return NULL;
 
     // the right way to do it:
     // void *new_zero = mmap(gs.program_seq[0], gs.seg_lens[b_val] * CHUNK, 
@@ -236,15 +283,6 @@ void *load_program(uint32_t b_val, uint32_t c_val)
 
     /* Update the existing memory segment */
     gs.program_seq[0] = new_zero;
-    __asm__ __volatile__(
-        "popq %%r11\n\t"
-        "popq %%r10\n\t"
-        "popq %%r9\n\t"
-        "popq %%r8\n\t"
-        :
-        :
-        : "r8", "r9", "r10", "r11");
-
     return new_zero;
 }
 
@@ -285,7 +323,7 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     else if (opcode == 10)
     {
         // Load the rigther register and do the thing
-        // printf("Output a: %u, b: %u, c: %u\n", a, b, c);
+        printf("Output a: %u, b: %u, c: %u\n", a, b, c);
         offset += print_reg(zero, offset, c + RO);
     }
 
@@ -300,7 +338,7 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     /* Halt */
     else if (opcode == 7)
     {
-        // printf("Halt a: %u, b: %u, c: %u\n", a, b, c);
+        printf("Halt a: %u, b: %u, c: %u\n", a, b, c);
         offset += handle_halt(zero, offset);
     }
 
@@ -350,14 +388,14 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     else if (opcode == 1)
     {
         // printf("Segmented load a: %u, b: %u, c: %u\n", a, b, c);
-        offset += inject_seg_load(zero, offset, a + RO, b + RO, c + RO, word);
+        offset += inject_seg_load(zero, offset, a + RO, b + RO, c + RO);
     }
 
     /* Segmented Store */
     else if (opcode == 2)
     {
         // printf("Segmented store a: %u, b: %u, c: %u\n", a, b, c);
-        offset += inject_seg_store(zero, offset, a + RO, b + RO, c + RO, word);
+        offset += inject_seg_store(zero, offset, a + RO, b + RO, c + RO);
     }
 
     /* Load Program */
@@ -410,83 +448,43 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = (value >> 16) & 0xFF;
     *p++ = (value >> 24) & 0xFF;
 
-    // 9 NoOps to align with chunk boundary
+    // 32 - 7 = 25 NoOps;
+
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
+
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
+
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x90;
 
     return CHUNK;
-}
-
-void print_out(uint32_t x)
-{
-    /* Registers MUST be saved in the inline assembly */
-    unsigned char c = (unsigned char)x;
-    // printf("Printing out x is %u\n", x);
-    // printf("Unsigned char is %c\n", c);
-    putchar(c);
-}
-
-size_t print_reg(void *zero, size_t offset, unsigned c)
-{
-    // Remove this check when JIT is running
-    if (c < 8 || c > 15)
-        assert(false);
-
-    // void *putchar_addr = (void *)&putchar;
-    void *putchar_addr = (void *)&print_out;
-    
-    unsigned char *p = zero + offset;
-
-    // mov edi, rXd (where X is reg_num)
-    *p++ = 0x44; // Reg prefix for r8-r15
-    *p++ = 0x89;
-    *p++ = (0xc7 | ((c - 8) << 3)); // ModR/M byte: edi(111) with reg number
-
-    // push r8 - r11 onto the stack
-    *p++ = 0x41;
-    *p++ = 0x50;
-
-    *p++ = 0x41;
-    *p++ = 0x51;
-
-    *p++ = 0x41;
-    *p++ = 0x52;
-
-    *p++ = 0x41;
-    *p++ = 0x53;
-
-
-    // call putchar
-    *p = 0xe8;
-    p++;
-
-    int32_t call_offset = (int32_t)((unsigned char *)putchar_addr - (p + 4));
-    memcpy(p, &call_offset, sizeof(int32_t));
-    p += sizeof(int32_t);
-
-    // pop r8 - r11 off the stack
-    *p++ = 0x41;
-    *p++ = 0x58;
-
-    *p++ = 0x41;
-    *p++ = 0x59;
-
-    *p++ = 0x41;
-    *p++ = 0x5A;
-
-    *p++ = 0x41;
-    *p++ = 0x5B;
-
-    // 24
-    return CHUNK;
-    // return 8;
 }
 
 size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
@@ -517,20 +515,42 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x01;                            // add reg to reg
     *p++ = 0xc0 | ((c - 8) << 3) | (a - 8); // ModR/M byte
 
-    // 10 NoOps
+    // 32 - 6 = 26 No Ops
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x90;
 
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x90;
+    *p++ = 0x90;
     return CHUNK;
-    // return 6;
 }
 
 size_t handle_halt(void *zero, size_t offset)
@@ -543,23 +563,10 @@ size_t handle_halt(void *zero, size_t offset)
     *p++ = 0x31;
     *p++ = 0xc0;
 
-
-    // 12 NoOps
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
     // ret
     *p++ = 0xc3;
+
+    // 28 No Ops (but we return first so it's no biggie)
 
     return CHUNK;
 }
@@ -574,7 +581,6 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     if (c < 8 || c > 15)
         assert(false);
 
-    // TODO: verify this works correctly with large numbers
     unsigned char *p = zero + offset;
 
     // mov eax, rBd
@@ -592,18 +598,38 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xC0 | (a - 8);
 
-    // 7 No ops
+    // 32 - 9 = 23 No Ops
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
+
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
     *p++ = 0x90;
-
+    *p++ = 0x90;
     return CHUNK;
-
-    // return 9;
 }
 
 size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
@@ -637,14 +663,34 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xC0 | (a - 8);
 
-    // 4 No ops
+    // 32 - 12 = 20 No ops
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x90;
 
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x90;
+    *p++ = 0x90;
     return CHUNK;
-    // return 12;
 }
 
 size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
@@ -676,17 +722,42 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xC0 | ((b - 8) << 3) | (a - 8);
 
-    // 7 No ops
+    // 32 - 9 = 23 NoOps
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
+
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x90;
     *p++ = 0x90;
 
+    // intentional early return;
+    // *p++ = 0xc3;
+
     return CHUNK;
-    // return 9;
 }
 
 size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
@@ -716,17 +787,123 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0xf7;
     *p++ = 0xd0 | (a - 8);
 
-    // 7 No ops
+    // 32 - 9 = 23 NoOps
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
+
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x90;
+    *p++ = 0x90;
+
+    //     *p++ = 0xc3;
+    return CHUNK;
+}
+
+void print_out(uint32_t x)
+{
+    /* Registers MUST be saved in the inline assembly */
+    unsigned char c = (unsigned char)x;
+    // printf("Printing out x is %u\n", x);
+    // printf("Unsigned char is %c\n", c);
+    putchar(c);
+}
+
+size_t print_reg(void *zero, size_t offset, unsigned c)
+{
+    // Remove this check when JIT is running
+    if (c < 8 || c > 15)
+        assert(false);
+
+    // void *putchar_addr = (void *)&putchar;
+    void *putchar_addr = (void *)&print_out;
+
+    unsigned char *p = zero + offset;
+
+    // mov edi, rXd (where X is reg_num)
+    *p++ = 0x44; // Reg prefix for r8-r15
+    *p++ = 0x89;
+    *p++ = (0xc7 | ((c - 8) << 3)); // ModR/M byte: edi(111) with reg number
+
+    // push r8 - r11 onto the stack
+    *p++ = 0x41;
+    *p++ = 0x50;
+
+    *p++ = 0x41;
+    *p++ = 0x51;
+
+    *p++ = 0x41;
+    *p++ = 0x52;
+
+    *p++ = 0x41;
+    *p++ = 0x53;
+    
+    // call print_out
+    int32_t call_offset = (int32_t)((uint64_t)putchar_addr - ((uint64_t)p + 5));
+    *p++ = 0xe8;
+    memcpy(p, &call_offset, sizeof(call_offset));
+    p += sizeof(call_offset);
+
+    // pop r8 - r11 off the stack
+    *p++ = 0x41;
+    *p++ = 0x5B;
+
+    *p++ = 0x41;
+    *p++ = 0x5A;
+
+    *p++ = 0x41;
+    *p++ = 0x59;
+
+    *p++ = 0x41;
+    *p++ = 0x58;
+
+    // 32 - 24 = 8 NoOps
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x90;
     *p++ = 0x90;
 
     return CHUNK;
-    // return 9;
+}
+
+unsigned char read_char(void)
+{
+    int x = getc(stdin);
+    assert(x != EOF);
+    unsigned char c = (unsigned char)x;
+    // printf("X is %u\n", x);
+    // printf("c is this %c\n", c);
+    // print_regis
+    return c;
 }
 
 size_t read_into_reg(void *zero, size_t offset, unsigned reg)
@@ -739,14 +916,18 @@ size_t read_into_reg(void *zero, size_t offset, unsigned reg)
 
     void *read_char_addr = (void *)&read_char;
 
-    // // xor rax, rax
-    // *p++ = 0x48;
-    // *p++ = 0x31;
-    // *p++ = 0xC0;
+    // push r8 - r11 onto the stack
+    *p++ = 0x41;
+    *p++ = 0x50;
 
-    // // Push r8 before calling getc/read_char
-    // *p++ = 0x41; // REX.B prefix for r8
-    // *p++ = 0x50; // PUSH r8
+    *p++ = 0x41;
+    *p++ = 0x51;
+
+    *p++ = 0x41;
+    *p++ = 0x52;
+
+    *p++ = 0x41;
+    *p++ = 0x53;
 
     // Since we're using PIC, let's use a direct relative call
     // This will be a 5-byte instruction: E8 + 32-bit offset
@@ -757,29 +938,38 @@ size_t read_into_reg(void *zero, size_t offset, unsigned reg)
     memcpy(p, &rel_offset, sizeof(rel_offset));
     p += sizeof(rel_offset);
 
+    // pop r8 - r11 off the stack
+    *p++ = 0x41;
+    *p++ = 0x5B;
+
+    *p++ = 0x41;
+    *p++ = 0x5A;
+
+    *p++ = 0x41;
+    *p++ = 0x59;
+
+    *p++ = 0x41;
+    *p++ = 0x58;
+
     // mov rCd, eax
     *p++ = 0x49;
     *p++ = 0x89;
     *p++ = 0xC0 | (reg - 8);
 
-    // // Pop r8 after read_char returns
-    // *p++ = 0x41; // REX.B prefix for r8
-    // *p++ = 0x58; // POP r8
-
-    // TODO: very surpised this isn't crashing
+    // 32 - 24 = 8 No Ops
 
     // 8 No ops
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x90;
-    *p++ = 0x90;
-    *p++ = 0x90;
-    *p++ = 0x90;
-    *p++ = 0x90;
 
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
+    *p++ = 0x90;
+    *p++ = 0x90;
     return CHUNK;
-    // return 8;
 }
 
 size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
@@ -797,15 +987,20 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     // mov rC, rdi
     *p++ = 0x44; // Reg prefix for r8-r15
     *p++ = 0x89; // mov reg to reg
-
-    /* ModR/M byte Format:
-     * [7-6: Mod (2 bits)][5-3: Source Reg (3 bits)][2-0: Dest Reg (3 bits)] */
     *p++ = 0xc7 | ((c - 8) << 3); // ModR/M byte
 
+    // push r8 - r11 onto the stack
+    *p++ = 0x41;
+    *p++ = 0x50;
 
-    // // push r8
-    // *p++ = 0x41; // REX.B prefix for r8
-    // *p++ = 0x50; // PUSH r8
+    *p++ = 0x41;
+    *p++ = 0x51;
+
+    *p++ = 0x41;
+    *p++ = 0x52;
+
+    *p++ = 0x41;
+    *p++ = 0x53;
 
     int32_t rel_offset = (int32_t)((uint64_t)map_segment_addr - ((uint64_t)p + 5));
 
@@ -814,6 +1009,19 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     memcpy(p, &rel_offset, sizeof(rel_offset));
     p += sizeof(rel_offset);
 
+    // pop r8 - r11 off the stack
+    *p++ = 0x41;
+    *p++ = 0x5B;
+
+    *p++ = 0x41;
+    *p++ = 0x5A;
+
+    *p++ = 0x41;
+    *p++ = 0x59;
+
+    *p++ = 0x41;
+    *p++ = 0x58;
+
     // store the result in register b
     // move return value from rax to reg b
     // mov rB, rax
@@ -821,11 +1029,7 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xc0 | (b - 8);
 
-    // //pop r8
-    // *p++ = 0x41; // REX.B prefix for r8
-    // *p++ = 0x58; // POP r8
-
-    // 1 No Ops
+    // 32 - 27 = 5 No Ops
     *p++ = 0x90;
     *p++ = 0x90;
     *p++ = 0x90;
@@ -833,7 +1037,6 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x90;
 
     return CHUNK;
-    // return 11;
 }
 
 // size_t inject unmap segment
@@ -849,14 +1052,20 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     // mov rC, rdi
     *p++ = 0x44; // Reg prefix for r8-r15
     *p++ = 0x89; // mov reg to reg
-
-    /* ModR/M byte Format:
-     * [7-6: Mod (2 bits)][5-3: Source Reg (3 bits)][2-0: Dest Reg (3 bits)] */
     *p++ = 0xc7 | ((c - 8) << 3); // ModR/M byte
 
-    // push r8
-    *p++ = 0x41; // REX.B prefix for r8
-    *p++ = 0x50; // PUSH r8
+    // push r8 - r11 onto the stack
+    *p++ = 0x41;
+    *p++ = 0x50;
+
+    *p++ = 0x41;
+    *p++ = 0x51;
+
+    *p++ = 0x41;
+    *p++ = 0x52;
+
+    *p++ = 0x41;
+    *p++ = 0x53;
 
     int32_t rel_offset = (int32_t)((uint64_t)unmap_segment_addr - ((uint64_t)p + 5));
 
@@ -864,37 +1073,43 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     memcpy(p, &rel_offset, sizeof(rel_offset));
     p += sizeof(rel_offset);
 
-    // no return value from the unmap segment function
+    // pop r8 - r11 off the stack
+    *p++ = 0x41;
+    *p++ = 0x5B;
 
-    // pop r8
-    *p++ = 0x41; // REX.B prefix for r8
-    *p++ = 0x58; // POP r8
+    *p++ = 0x41;
+    *p++ = 0x5A;
 
-    // 4 No Ops
+    *p++ = 0x41;
+    *p++ = 0x59;
+
+    *p++ = 0x41;
+    *p++ = 0x58;
+
+    // 32 - 24 = 8 NoOps
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
 
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
+
+    *p++ = 0x90;
     *p++ = 0x90;
 
     return CHUNK;
-    // return 8;
 }
 
 // inject segmented load
-size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, Instruction word)
+size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
-    (void)word;
     if (a < 8 || a > 15)
         assert(false);
     if (b < 8 || b > 15)
         assert(false);
     if (c < 8 || c > 15)
         assert(false);
-
-    /* the instruction needs to be passed as an argument and unpacked inline
-     * because it's too space expensive to do it in assembly
-     * This choice will majorly throttle the compiler speed, we can revisit later */
 
     void *seg_load_addr = (void *)&segmented_load;
 
@@ -910,11 +1125,37 @@ size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsign
     *p++ = 0x89;
     *p++ = 0xc6 | ((c - 8) << 3);
 
+    // push r8 - r11 onto the stack
+    *p++ = 0x41;
+    *p++ = 0x50;
+
+    *p++ = 0x41;
+    *p++ = 0x51;
+
+    *p++ = 0x41;
+    *p++ = 0x52;
+
+    *p++ = 0x41;
+    *p++ = 0x53;
+
     int32_t rel_offset = (int32_t)((uint64_t)seg_load_addr - ((uint64_t)p + 5));
 
     *p++ = 0xe8;
     memcpy(p, &rel_offset, sizeof(rel_offset));
     p += sizeof(rel_offset);
+
+    // pop r8 - r11 off the stack
+    *p++ = 0x41;
+    *p++ = 0x5B;
+
+    *p++ = 0x41;
+    *p++ = 0x5A;
+
+    *p++ = 0x41;
+    *p++ = 0x59;
+
+    *p++ = 0x41;
+    *p++ = 0x58;
 
     // return into correct register
     // move return value from rax to reg q
@@ -923,33 +1164,25 @@ size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsign
     *p++ = 0x89;
     *p++ = 0xc0 | (a - 8);
 
-    // 2 No Ops
+    // 32 - 30 = 2 No Ops
     *p++ = 0x90;
     *p++ = 0x90;
-
     return CHUNK;
-    // return 14;
 }
 
 // inject segmented store
-size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, Instruction word)
+size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
-    (void)word;
+    if (a < 8 || a > 15)
+        assert(false);
+    if (b < 8 || b > 15)
+        assert(false);
+    if (c < 8 || c > 15)
+        assert(false);
+    
     void *seg_store_addr = (void *)&segmented_store;
 
     unsigned char *p = zero + offset;
-
-    // This takes way too many assembly instructions
-
-    // /* mov rdi, imm32 (where X is reg_num) */
-    // *p++ = 0x40; // Reg prefix for r8-r15
-    // *p++ = 0xc7; // mov immediate value to 32-bit register
-    // *p++ = 0xc7;
-
-    // *p++ = word & 0xFF;
-    // *p++ = (word >> 8) & 0xFF;
-    // *p++ = (word >> 16) & 0xFF;
-    // *p++ = (word >> 24) & 0xFF;
 
     // mov rsi, rad
     *p++ = 0x44;
@@ -966,18 +1199,42 @@ size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsig
     *p++ = 0x89;
     *p++ = 0xc2 | ((c - 8) << 3);
 
+    // push r8 - r11 onto the stack
+    *p++ = 0x41;
+    *p++ = 0x50;
+
+    *p++ = 0x41;
+    *p++ = 0x51;
+
+    *p++ = 0x41;
+    *p++ = 0x52;
+
+    *p++ = 0x41;
+    *p++ = 0x53;
+
     int32_t rel_offset = (int32_t)((uint64_t)seg_store_addr - ((uint64_t)p + 5));
 
     *p++ = 0xe8;
     memcpy(p, &rel_offset, sizeof(rel_offset));
     p += sizeof(rel_offset);
 
-    // 2 No Ops
-    *p++ = 0x90;
-    *p++ = 0x90;
+    // pop r8 - r11 off the stack
+    *p++ = 0x41;
+    *p++ = 0x5B;
 
+    *p++ = 0x41;
+    *p++ = 0x5A;
+
+    *p++ = 0x41;
+    *p++ = 0x59;
+
+    *p++ = 0x41;
+    *p++ = 0x58;
+
+    // 32 - 30 = 2 no ops
+    *p++ = 0x90;
+    *p++ = 0x90;
     return CHUNK;
-    // return 14;
 }
 
 // inject load program
@@ -988,15 +1245,16 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     if (c < 8 || c > 15)
         assert(false);
 
-    // assert(b == 8);
-
     void *load_program_addr = (void *)&load_program;
 
     unsigned char *p = zero + offset;
 
-    *p++ = 0x48;
-    *p++ = 0x31;
-    *p++ = 0xFF;
+    // I forget if this does anything.
+    // *p++ = 0x48;
+    // *p++ = 0x31;
+    // *p++ = 0xFF;
+
+    // *p++ = 0xc3;
 
     // stash b in the right register (even if 0, need to update program pointer)
     // move b to rdi
@@ -1004,15 +1262,24 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xc7 | ((b - 8) << 3);
 
-    // *p++ = 0x4C;
-    // *p++ = 0x89;
-    // *p++ = 0xc7;
-
     // stash c val in the right register
     // move c to rsi
     *p++ = 0x44;
     *p++ = 0x89;
     *p++ = 0xc6 | ((c - 8) << 3);
+
+    // push r8 - r11 onto the stack
+    *p++ = 0x41;
+    *p++ = 0x50;
+
+    *p++ = 0x41;
+    *p++ = 0x51;
+
+    *p++ = 0x41;
+    *p++ = 0x52;
+
+    *p++ = 0x41;
+    *p++ = 0x53;
 
     // call function
     int32_t rel_offset = (int32_t)((uint64_t)load_program_addr - ((uint64_t)p + 5));
@@ -1023,18 +1290,28 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 
     // injected function needs to ret (rax should already be the right thing)
 
+    // pop r8 - r11 off the stack
+    *p++ = 0x41;
+    *p++ = 0x5B;
 
-    // 1 No ops
-    // *p++ = 0x90;
-    // *p++ = 0x90;
-    // *p++ = 0x90;
+    *p++ = 0x41;
+    *p++ = 0x5A;
+
+    *p++ = 0x41;
+    *p++ = 0x59;
+
+    *p++ = 0x41;
+    *p++ = 0x58;
+
+    // 32 - 31 = 1 no op
+    *p++ = 0x90;
+    *p++ = 0x90;
+    *p++ = 0x90;
     *p++ = 0x90;
 
     // ret
     *p++ = 0xc3;
-
     return CHUNK;
-    // return 12;
 }
 
 

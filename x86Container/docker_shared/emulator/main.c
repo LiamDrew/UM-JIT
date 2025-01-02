@@ -273,7 +273,7 @@ static inline bool exec_instr(Instruction word, Instruction **pp,
         if (regs[c] != 0)
             regs[a] = regs[b];
         
-        printf("regs a is now: %u\n", regs[a]);
+        printf("Cond move: regs a is now: %u\n", regs[a]);
 
     }
 

@@ -66,8 +66,6 @@ int main(int argc, char *argv[])
         assert((fsize % 4) == 0);
     }
 
-    printf("Starting program.\n");
-
     /* Initialize executable and non-executable memory for the zero segment
      * fsize gives the space for UM words, multiply by 4 for machine 
      * instructions */
@@ -99,9 +97,8 @@ int main(int argc, char *argv[])
     while (curr_seg != NULL) {
         Function func = (Function)(curr_seg + (gs.pc * CHUNK));
         curr_seg = func();
+        // print_registers();
     }
-
-    printf("\nFinished Program.\n");
 
     /* Free all program segments */
     for (uint32_t i = 0; i < gs.seq_size; i++) {
