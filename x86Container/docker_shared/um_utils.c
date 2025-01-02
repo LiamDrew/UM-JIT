@@ -6,6 +6,16 @@
 #include <string.h>
 #include <sys/mman.h>
 
+unsigned char read_char(void)
+{
+    int x = getc(stdin);
+    assert(x != EOF);
+    unsigned char c = (unsigned char)x;
+    // printf("X is %u\n", x);
+    // printf("c is this %c\n", c);
+    // print_regis
+    return c;
+}
 
 void print_registers()
 {
@@ -153,20 +163,18 @@ void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
         *p++ = 0x89;
         *p++ = (0xc7 | (c << 3)); // ModR/M byte: edi(111) with reg number
 
-        // // // push r8 - r11 onto the stack
-        // *p++ = 0x41;
-        // *p++ = 0x50;
+        // push r8 - r11 onto the stack
+        *p++ = 0x41;
+        *p++ = 0x50;
         
+        *p++ = 0x41;
+        *p++ = 0x51;
 
-        // *p++ = 0x41;
-        // *p++ = 0x51;
+        *p++ = 0x41;
+        *p++ = 0x52;
 
-        // *p++ = 0x41;
-        // *p++ = 0x52;
-
-        // *p++ = 0x41;
-        // *p++ = 0x53;
-
+        *p++ = 0x41;
+        *p++ = 0x53;
 
         /* NOTE: This was the way it was supposed to be, but it didn't work */
         // printf("Base address: %p\n", gs.program_seq[a_val]);
@@ -174,10 +182,14 @@ void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
         // printf("Target function address: %p\n", putchar_addr);
         // call print_out
 
-        // int32_t call_offset = (int32_t)((uint64_t)putchar_addr - ((uint64_t)p + 5));
+        int32_t call_offset = (int32_t)((uint64_t)putchar_addr - ((uint64_t)p));
         // *p++ = 0xe8;
         // memcpy(p, &call_offset, sizeof(call_offset));
         // p += sizeof(call_offset);
+        // printf("Putchar addr is%p\n", putchar_addr);
+        // printf("Call offset is %d\n", call_offset);
+
+        printf("Address should be %p\n", p + call_offset);
 
         // mov rax, immediate_address
         *p++ = 0x48; // REX.W prefix
@@ -185,56 +197,29 @@ void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
         memcpy(p, &putchar_addr, sizeof(putchar_addr));
         p += sizeof(putchar_addr);
 
+        printf("Address actually is %p\n", putchar_addr);
+
         // call rax
         *p++ = 0xff;
         *p++ = 0xd0; // ModR/M byte for call rax
 
-        // // set RAX to 0 (NULL);
-        // // xor rax,rax
-        *p++ = 0x48;
-        *p++ = 0x31;
-        *p++ = 0xc0;
-
-        // ret
-        *p++ = 0xc3;
-
-        // printf("Putchar addr is%p\n", putchar_addr);
-        // printf("Call offset is %d\n", call_offset);
-
-        // // set RAX to 0 (NULL);
-        // xor rax,rax
-        // *p++ = 0x48;
-        // *p++ = 0x31;
-        // *p++ = 0xc0;
-
-        // // ret
-        // *p++ = 0xc3;
-
         // pop r8 - r11 off the stack
-        // *p++ = 0x41;
-        // *p++ = 0x5B;
+        *p++ = 0x41;
+        *p++ = 0x5B;
 
-        // *p++ = 0x41;
-        // *p++ = 0x5A;
+        *p++ = 0x41;
+        *p++ = 0x5A;
 
-        // *p++ = 0x41;
-        // *p++ = 0x59;
+        *p++ = 0x41;
+        *p++ = 0x59;
 
-        // *p++ = 0x41;
-        // *p++ = 0x58; 
-
-        // xor rax,rax
-        // *p++ = 0x48;
-        // *p++ = 0x31;
-        // *p++ = 0xc0;
-
-        // // ret
-        // *p++ = 0xc3;
+        *p++ = 0x41;
+        *p++ = 0x58; 
 
         // 32 - 24 = 8 NoOps
-        *p++ = 0x0F;
-        *p++ = 0x1F;
-        *p++ = 0x00;
+        // *p++ = 0x0F;
+        // *p++ = 0x1F;
+        // *p++ = 0x00;
 
         // *p++ = 0x0F;
         // *p++ = 0x1F;
@@ -242,6 +227,15 @@ void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
 
         // *p++ = 0x90;
         *p++ = 0x90;
+
+        // // // set RAX to 0 (NULL);
+        // // // xor rax,rax
+        // *p++ = 0x48;
+        // *p++ = 0x31;
+        // *p++ = 0xc0;
+
+        // // ret
+        // *p++ = 0xc3;
     }
 
     if (b_val == 1) {
@@ -893,17 +887,6 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x90;
 
     return CHUNK;
-}
-
-unsigned char read_char(void)
-{
-    int x = getc(stdin);
-    assert(x != EOF);
-    unsigned char c = (unsigned char)x;
-    // printf("X is %u\n", x);
-    // printf("c is this %c\n", c);
-    // print_regis
-    return c;
 }
 
 size_t read_into_reg(void *zero, size_t offset, unsigned reg)
