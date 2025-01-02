@@ -84,9 +84,12 @@ uint32_t map_segment(uint32_t size)
     
 
         // TODO: this step needs to get done with an mmap call
-        // gs.program_seq[new_seg_id] = realloc(gs.program_seq[new_seg_id], size * CHUNK);
 
-        gs.program_seq[new_seg_id] = mmap(gs.program_seq[new_seg_id], size * CHUNK, 
+        // Intentionally leaking memory
+        // gs.program_seq[new_seg_id] = mmap(gs.program_seq[new_seg_id], size * CHUNK,
+        //                                   PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+        gs.program_seq[new_seg_id] = mmap(NULL, size * CHUNK, 
             PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
         // printf("The address we want is %p\n", gs.program_seq[new_seg_id]);
@@ -128,129 +131,141 @@ uint32_t segmented_load(uint32_t b_val, uint32_t c_val)
     return x;
 }
 
+void do_the_thing()
+{
+    printf("hello\n");
+}
+
 void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
 {
     // printf("Segmented store: storing cval: %u in segment %u at index %u\n", c_val, a_val, b_val);
-    assert(a_val == 1);
-
-    // printf("The seg stored word is %u\n", c_val);
-
+    // assert(a_val == 1);
     /* Load the inputted word into value memory */
     gs.val_seq[a_val][b_val] = c_val;
 
     /* Compile the inputted word as if it were an instruction (in case it is)
      * and put it in executable memory*/
-    // printf("B val should be 0 or 1 %u\n", b_val);
     assert(gs.program_seq[a_val] != NULL);
-    // printf("size of the segment is %u\n", gs.seg_lens[a_val]);
 
-    // unsigned char *p = gs.program_seq[a_val] + (b_val * CHUNK);
+    // This is what it should be, but for some reason the call offset isn't working
+    compile_instruction(gs.program_seq[a_val] + (b_val * CHUNK), c_val, 0);
 
-    // For now let's just hardcode the injection
 
-    // printf("We want to inject at %p\n", gs.program_seq[a_val] + (b_val * CHUNK));
+    // if (b_val == 0) {
 
-    // compile_instruction(gs.program_seq[a_val], c_val, b_val * CHUNK);
+    //     uint32_t c = c_val & 0x7;
+    //     // void *putchar_addr = (void *)&print_out;
+    //     void *putchar_addr = (void *)&do_the_thing;
+    //     (void)putchar_addr;
+    //     unsigned char *p = gs.program_seq[a_val];
 
-    if (b_val == 0) {
+    //     // mov edi, rXd (where X is reg_num)
+    //     *p++ = 0x44; // Reg prefix for r8-r15
+    //     *p++ = 0x89;
+    //     *p++ = 0xc7 | (c << 3); // ModR/M byte: edi(111) with reg number
 
-        uint32_t c = c_val & 0x7;
-        void *putchar_addr = (void *)&print_out;
-        unsigned char *p = gs.program_seq[a_val];
-
-        // mov edi, rXd (where X is reg_num)
-        *p++ = 0x44; // Reg prefix for r8-r15
-        *p++ = 0x89;
-        *p++ = (0xc7 | (c << 3)); // ModR/M byte: edi(111) with reg number
-
-        // push r8 - r11 onto the stack
-        *p++ = 0x41;
-        *p++ = 0x50;
+    //     // push r8 - r11 onto the stack
+    //     *p++ = 0x41;
+    //     *p++ = 0x50;
         
-        *p++ = 0x41;
-        *p++ = 0x51;
+    //     *p++ = 0x41;
+    //     *p++ = 0x51;
 
-        *p++ = 0x41;
-        *p++ = 0x52;
+    //     *p++ = 0x41;
+    //     *p++ = 0x52;
 
-        *p++ = 0x41;
-        *p++ = 0x53;
+    //     *p++ = 0x41;
+    //     *p++ = 0x53;
 
-        /* NOTE: This was the way it was supposed to be, but it didn't work */
-        // printf("Base address: %p\n", gs.program_seq[a_val]);
-        // printf("Current p: %p\n", p);
-        // printf("Target function address: %p\n", putchar_addr);
-        // call print_out
+    //     /* NOTE: This was the way it was supposed to be, but it didn't work */
+    //     // printf("Base address: %p\n", gs.program_seq[a_val]);
+    //     // printf("Current p: %p\n", p);
+    //     // printf("Target function address: %p\n", putchar_addr);
+    //     // call print_out
 
-        int32_t call_offset = (int32_t)((uint64_t)putchar_addr - ((uint64_t)p));
-        // *p++ = 0xe8;
-        // memcpy(p, &call_offset, sizeof(call_offset));
-        // p += sizeof(call_offset);
-        // printf("Putchar addr is%p\n", putchar_addr);
-        // printf("Call offset is %d\n", call_offset);
+    //     // int32_t call_offset = (int32_t)((uintptr_t)putchar_addr - ((uintptr_t)p));
 
-        printf("Address should be %p\n", p + call_offset);
+    //     uintptr_t func_addr = (uintptr_t)putchar;
+    //     uintptr_t call_addr = (uintptr_t)p + 5;
+    //     int32_t call_offset = (int32_t)(func_addr - call_addr);
 
-        // mov rax, immediate_address
-        *p++ = 0x48; // REX.W prefix
-        *p++ = 0xb8; // mov rax, imm64
-        memcpy(p, &putchar_addr, sizeof(putchar_addr));
-        p += sizeof(putchar_addr);
+    //     // *p++ = 0xE8;
+    //     // memcpy(p, &call_offset, sizeof(call_offset));
+    //     // p += sizeof(call_offset);
 
-        printf("Address actually is %p\n", putchar_addr);
+    //     // int32_t call_offset = (int32_t)((uint64_t)putchar_addr - ((uint64_t)p + 5));
+    //     // // (void)call_offset;
+    //     *p++ = 0xe8;
+    //     memcpy(p, &call_offset, sizeof(call_offset));
+    //     p += sizeof(call_offset);
+    //     // printf("Putchar addr is%p\n", putchar_addr);
+    //     // printf("Call offset is %d\n", call_offset);
 
-        // call rax
-        *p++ = 0xff;
-        *p++ = 0xd0; // ModR/M byte for call rax
+    //     // printf("Address should be %p\n", p + call_offset);
+    //     // printf("Address actually is %p\n", putchar_addr);
 
-        // pop r8 - r11 off the stack
-        *p++ = 0x41;
-        *p++ = 0x5B;
+    //     // NOTE: This works, but takes up 12 bytes 
+    //     // mov rax, immediate_address
+    //     // *p++ = 0x48; // REX.W prefix
+    //     // *p++ = 0xb8; // mov rax, imm64
+    //     // memcpy(p, &putchar_addr, sizeof(putchar_addr));
+    //     // p += sizeof(putchar_addr);
 
-        *p++ = 0x41;
-        *p++ = 0x5A;
+    //     // // call rax
+    //     // *p++ = 0xff;
+    //     // *p++ = 0xd0; // ModR/M byte for call rax
 
-        *p++ = 0x41;
-        *p++ = 0x59;
 
-        *p++ = 0x41;
-        *p++ = 0x58; 
 
-        // 32 - 24 = 8 NoOps
-        // *p++ = 0x0F;
-        // *p++ = 0x1F;
-        // *p++ = 0x00;
+    //     // pop r8 - r11 off the stack
+    //     *p++ = 0x41;
+    //     *p++ = 0x5B;
 
-        // *p++ = 0x0F;
-        // *p++ = 0x1F;
-        // *p++ = 0x00;
+    //     *p++ = 0x41;
+    //     *p++ = 0x5A;
 
-        // *p++ = 0x90;
-        *p++ = 0x90;
+    //     *p++ = 0x41;
+    //     *p++ = 0x59;
 
-        // // // set RAX to 0 (NULL);
-        // // // xor rax,rax
-        // *p++ = 0x48;
-        // *p++ = 0x31;
-        // *p++ = 0xc0;
+    //     *p++ = 0x41;
+    //     *p++ = 0x58; 
 
-        // // ret
-        // *p++ = 0xc3;
-    }
+    //     // 32 - 24 = 8 NoOps
+    //     // *p++ = 0x0F;
+    //     // *p++ = 0x1F;
+    //     // *p++ = 0x00;
 
-    if (b_val == 1) {
-            // printf("Doing the halt injection\n");
-            unsigned char *p = gs.program_seq[a_val] + (1 * CHUNK);
+    //     // *p++ = 0x0F;
+    //     // *p++ = 0x1F;
+    //     // *p++ = 0x00;
 
-            // // set RAX to 0 (NULL);
-            // // xor rax,rax
-            *p++ = 0x48;
-            *p++ = 0x31;
-            *p++ = 0xc0;
+    //     // *p++ = 0x90;
 
-            // ret
-            *p++ = 0xc3;
-    }
+    //     *p++ = 0x90;
+
+    //     // // // set RAX to 0 (NULL);
+    //     // // // xor rax,rax
+    //     // *p++ = 0x48;
+    //     // *p++ = 0x31;
+    //     // *p++ = 0xc0;
+
+    //     // // ret
+    //     // *p++ = 0xc3;
+    // }
+
+    // if (b_val == 1) {
+    //         // printf("Doing the halt injection\n");
+    //         unsigned char *p = gs.program_seq[a_val] + (1 * CHUNK);
+
+    //         // // set RAX to 0 (NULL);
+    //         // // xor rax,rax
+    //         *p++ = 0x48;
+    //         *p++ = 0x31;
+    //         *p++ = 0xc0;
+
+    //         // ret
+    //         *p++ = 0xc3;
+    // }
 }
 
 void *load_program(uint32_t b_val, uint32_t c_val)
@@ -310,15 +325,15 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     {
         // printf("Load value a: %u, b: %u, c: %u\n", a, b, c);
         // Load the right register and do the thing
-        offset += load_reg(zero, offset, a + RO, val);
+        offset += load_reg(zero, offset, a, val);
     }
 
     /* Output */
     else if (opcode == 10)
     {
         // Load the rigther register and do the thing
-        printf("Output a: %u, b: %u, c: %u\n", a, b, c);
-        offset += print_reg(zero, offset, c + RO);
+        // printf("Output a: %u, b: %u, c: %u\n", a, b, c);
+        offset += print_reg(zero, offset, c);
     }
 
     /* Addition */
@@ -326,13 +341,13 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     {
         // Load the right registers and do the thing
         // printf("Addition a: %u, b: %u, c: %u\n", a, b, c);
-        offset += add_regs(zero, offset, a + RO, b + RO, c + RO);
+        offset += add_regs(zero, offset, a, b, c);
     }
 
     /* Halt */
     else if (opcode == 7)
     {
-        printf("Halt a: %u, b: %u, c: %u\n", a, b, c);
+        // printf("Haslt a: %u, b: %u, c: %u\n", a, b, c);
         offset += handle_halt(zero, offset);
     }
 
@@ -340,77 +355,77 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     else if (opcode == 6)
     {
         // printf("Bitwise NAND a: %u, b: %u, c: %u\n", a, b, c);
-        offset += nand_regs(zero, offset, a + RO, b + RO, c + RO);
+        offset += nand_regs(zero, offset, a, b, c);
     }
 
     /* Addition */
     else if (opcode == 3)
     {
         // printf("Addtion a: %u, b: %u, c: %u\n", a, b, c);
-        offset += add_regs(zero, offset, a + RO, b + RO, c + RO);
+        offset += add_regs(zero, offset, a, b, c);
     }
 
     /* Multiplication */
     else if (opcode == 4)
     {
         // printf("Multiplication a: %u, b: %u, c: %u\n", a, b, c);
-        offset += mult_regs(zero, offset, a + RO, b + RO, c + RO);
+        offset += mult_regs(zero, offset, a, b, c);
     }
 
     /* Division */
     else if (opcode == 5)
     {
         // printf("Division a: %u, b: %u, c: %u\n", a, b, c);
-        offset += div_regs(zero, offset, a + RO, b + RO, c + RO);
+        offset += div_regs(zero, offset, a, b, c);
     }
 
     /* Conditional Move */
     else if (opcode == 0)
     {
         // printf("Conditional move a: %u, b: %u, c: %u\n", a, b, c);
-        offset += cond_move(zero, offset, a + RO, b + RO, c + RO);
+        offset += cond_move(zero, offset, a, b, c);
     }
 
     /* Input */
     else if (opcode == 11)
     {
         // printf("Input a: %u, b: %u, c: %u\n", a, b, c);
-        offset += read_into_reg(zero, offset, c + RO);
+        offset += read_into_reg(zero, offset, c);
     }
 
     /* Segmented Load */
     else if (opcode == 1)
     {
         // printf("Segmented load a: %u, b: %u, c: %u\n", a, b, c);
-        offset += inject_seg_load(zero, offset, a + RO, b + RO, c + RO);
+        offset += inject_seg_load(zero, offset, a, b, c);
     }
 
     /* Segmented Store */
     else if (opcode == 2)
     {
         // printf("Segmented store a: %u, b: %u, c: %u\n", a, b, c);
-        offset += inject_seg_store(zero, offset, a + RO, b + RO, c + RO);
+        offset += inject_seg_store(zero, offset, a, b, c);
     }
 
     /* Load Program */
     else if (opcode == 12)
     {
         // printf("Load progam a: %u, b: %u, c: %u\n", a, b, c);
-        offset += inject_load_program(zero, offset, b + RO, c + RO);
+        offset += inject_load_program(zero, offset, b, c);
     }
 
     /* Map Segment */
     else if (opcode == 8)
     {
         // printf("Map segment a: %u, b: %u, c: %u\n", a, b, c);
-        offset += inject_map_segment(zero, offset, b + RO, c + RO);
+        offset += inject_map_segment(zero, offset, b, c);
     }
 
     /* Unmap Segment */
     else if (opcode == 9)
     {
         // printf("Unmap segment a: %u, b: %u, c: %u\n", a, b, c);
-        offset += inject_unmap_segment(zero, offset, c + RO);
+        offset += inject_unmap_segment(zero, offset, c);
     }
 
     /* Invalid Opcode*/
@@ -426,16 +441,12 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
 
 size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 {
-    // Remove this check when JIT is running
-    if (a < 8 || a > 15)
-        assert(false);
-
     unsigned char *p = zero + offset;
 
     /* mov rXd, imm32 (where X is reg_num) */
     *p++ = 0x41;           // Reg prefix for r8-r15
     *p++ = 0xc7;           // mov immediate value to 32-bit register
-    *p++ = 0xc0 | (a - 8); // ModR/M byte for target register
+    *p++ = 0xc0 | a; // ModR/M byte for target register
 
     *p++ = value & 0xFF;
     *p++ = (value >> 8) & 0xFF;
@@ -483,17 +494,6 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 
 size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
-    // Remove this check when JIT is running
-    // printf("a: %u, b: %u, c: %u\n", a, b, c);
-    if (a < 8 || a > 15)
-        assert(false);
-    if (b < 8 || b > 15)
-        assert(false);
-    if (c < 8 || c > 15)
-        assert(false);
-
-    // TODO: verify that this works correctly for large numbers
-
     unsigned char *p = zero + offset;
 
     // mov rAd, rBd (move b to a)
@@ -502,12 +502,12 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
     /* ModR/M byte Format:
      * [7-6: Mod (2 bits)][5-3: Source Reg (3 bits)][2-0: Dest Reg (3 bits)] */
-    *p++ = 0xc0 | ((b - 8) << 3) | (a - 8); // ModR/M byte
+    *p++ = 0xc0 | (b << 3) | a; // ModR/M byte
 
     // add rAd, rCd (add c to a)
     *p++ = 0x45;                            // Reg prefix for r8-r15
     *p++ = 0x01;                            // add reg to reg
-    *p++ = 0xc0 | ((c - 8) << 3) | (a - 8); // ModR/M byte
+    *p++ = 0xc0 | (c << 3) | a; // ModR/M byte
 
     // 32 - 6 = 26 No Ops
     *p++ = 0x0F;
@@ -567,30 +567,22 @@ size_t handle_halt(void *zero, size_t offset)
 
 size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
-    // Remove this check when JIT is running
-    if (a < 8 || a > 15)
-        assert(false);
-    if (b < 8 || b > 15)
-        assert(false);
-    if (c < 8 || c > 15)
-        assert(false);
-
     unsigned char *p = zero + offset;
 
     // mov eax, rBd
     *p++ = 0x44;
     *p++ = 0x89;
-    *p++ = 0xC0 | ((b - 8) << 3);
+    *p++ = 0xC0 | (b << 3);
 
     // mul rCd
     *p++ = 0x41;
     *p++ = 0xF7;
-    *p++ = 0xE0 | (c - 8);
+    *p++ = 0xE0 | c;
 
     // mov rAd, eax
     *p++ = 0x41;
     *p++ = 0x89;
-    *p++ = 0xC0 | (a - 8);
+    *p++ = 0xC0 | a;
 
     // 32 - 9 = 23 No Ops
     *p++ = 0x0F;
@@ -628,14 +620,6 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
 size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
-    // Remove this check when JIT is running
-    if (a < 8 || a > 15)
-        assert(false);
-    if (b < 8 || b > 15)
-        assert(false);
-    if (c < 8 || c > 15)
-        assert(false);
-
     unsigned char *p = zero + offset;
 
     *p++ = 0x48; // REX.W prefix for 64-bit operation
@@ -645,17 +629,17 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     // put the dividend (reg b) in eax
     *p++ = 0x44;
     *p++ = 0x89;
-    *p++ = 0xC0 | ((b - 8) << 3);
+    *p++ = 0xC0 | (b << 3);
 
     // div rC
     *p++ = 0x49;
     *p++ = 0xF7;
-    *p++ = 0xF0 | (c - 8);
+    *p++ = 0xF0 | c;
 
     // mov rA, rax
     *p++ = 0x49;
     *p++ = 0x89;
-    *p++ = 0xC0 | (a - 8);
+    *p++ = 0xC0 | a;
 
     // 32 - 12 = 20 No ops
     *p++ = 0x0F;
@@ -689,22 +673,13 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
 size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
-    // Remove this check when JIT is running
-    if (a < 8 || a > 15)
-        assert(false);
-    if (b < 8 || b > 15)
-        assert(false);
-    if (c < 8 || c > 15)
-        assert(false);
-
     unsigned char *p = zero + offset;
 
     // if rC != 0, Ra = Rb
-
     // cmp rC, 0
     *p++ = 0x41;           // REX.B
     *p++ = 0x83;           // CMP r/m32, imm8
-    *p++ = 0xF8 | (c - 8); // ModR/M for CMP
+    *p++ = 0xF8 | c; // ModR/M for CMP
     *p++ = 0x00;           // immediate 0
 
     // jz skip (over 3 bytes)
@@ -714,7 +689,7 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     // mov rAd, rAd
     *p++ = 0x45;
     *p++ = 0x89;
-    *p++ = 0xC0 | ((b - 8) << 3) | (a - 8);
+    *p++ = 0xC0 | (b << 3) | a;
 
     // 32 - 9 = 23 NoOps
     *p++ = 0x0F;
@@ -756,30 +731,22 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
 size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
-    // Remove this check when JIT is running
-    if (a < 8 || a > 15)
-        assert(false);
-    if (b < 8 || b > 15)
-        assert(false);
-    if (c < 8 || c > 15)
-        assert(false);
-
     unsigned char *p = zero + offset;
 
     // mov rAd, rBd (move b to a)
     *p++ = 0x45;
     *p++ = 0x89;
-    *p++ = 0xc0 | ((b - 8) << 3) | (a - 8);
+    *p++ = 0xc0 | (b << 3) | a;
 
     // and rAd, rCd (and c to a)
     *p++ = 0x45;
     *p++ = 0x21;
-    *p++ = 0xc0 | ((c - 8) << 3) | (a - 8);
+    *p++ = 0xc0 | (c << 3) | a;
 
     // not rAd (not a)
     *p++ = 0x41;
     *p++ = 0xf7;
-    *p++ = 0xd0 | (a - 8);
+    *p++ = 0xd0 | a;
 
     // 32 - 9 = 23 NoOps
     *p++ = 0x0F;
@@ -813,7 +780,6 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x90;
     *p++ = 0x90;
 
-    //     *p++ = 0xc3;
     return CHUNK;
 }
 
@@ -828,10 +794,6 @@ void print_out(uint32_t x)
 
 size_t print_reg(void *zero, size_t offset, unsigned c)
 {
-    // Remove this check when JIT is running
-    if (c < 8 || c > 15)
-        assert(false);
-
     // void *putchar_addr = (void *)&putchar;
     void *putchar_addr = (void *)&print_out;
 
@@ -840,7 +802,7 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     // mov edi, rXd (where X is reg_num)
     *p++ = 0x44; // Reg prefix for r8-r15
     *p++ = 0x89;
-    *p++ = (0xc7 | ((c - 8) << 3)); // ModR/M byte: edi(111) with reg number
+    *p++ = 0xc7 | (c << 3); // ModR/M byte: edi(111) with reg number
 
     // push r8 - r11 onto the stack
     *p++ = 0x41;
@@ -855,11 +817,20 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x41;
     *p++ = 0x53;
     
-    // call print_out
-    int32_t call_offset = (int32_t)((uint64_t)putchar_addr - ((uint64_t)p + 5));
-    *p++ = 0xe8;
-    memcpy(p, &call_offset, sizeof(call_offset));
-    p += sizeof(call_offset);
+    // // call print_out
+    // int32_t call_offset = (int32_t)((uint64_t)putchar_addr - ((uint64_t)p + 5));
+    // *p++ = 0xe8;
+    // memcpy(p, &call_offset, sizeof(call_offset));
+    // p += sizeof(call_offset);
+
+    *p++ = 0x48; // REX.W prefix
+    *p++ = 0xb8; // mov rax, imm64
+    memcpy(p, &putchar_addr, sizeof(putchar_addr));
+    p += sizeof(putchar_addr);
+
+    // call rax
+    *p++ = 0xff;
+    *p++ = 0xd0; // ModR/M byte for call rax
 
     // pop r8 - r11 off the stack
     *p++ = 0x41;
@@ -875,26 +846,22 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x58;
 
     // 32 - 24 = 8 NoOps
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
-    *p++ = 0x90;
+    // *p++ = 0x90;
     *p++ = 0x90;
 
     return CHUNK;
 }
 
-size_t read_into_reg(void *zero, size_t offset, unsigned reg)
+size_t read_into_reg(void *zero, size_t offset, unsigned c)
 {
-    // Remove this check when JIT is running
-    if (reg < 8 || reg > 15)
-        assert(false);
-
     unsigned char *p = zero + offset;
 
     void *read_char_addr = (void *)&read_char;
@@ -912,14 +879,23 @@ size_t read_into_reg(void *zero, size_t offset, unsigned reg)
     *p++ = 0x41;
     *p++ = 0x53;
 
-    // Since we're using PIC, let's use a direct relative call
-    // This will be a 5-byte instruction: E8 + 32-bit offset
-    int32_t rel_offset = (int32_t)((uint64_t)read_char_addr - ((uint64_t)p + 5));
+    *p++ = 0x48;
+    *p++ = 0xb8;
 
-    // call rel32
-    *p++ = 0xE8; // Direct relative call
-    memcpy(p, &rel_offset, sizeof(rel_offset));
-    p += sizeof(rel_offset);
+    memcpy(p, &read_char_addr, sizeof(read_char_addr));
+    p += sizeof(read_char_addr);
+
+    *p++ = 0xff;
+    *p++ = 0xd0;
+
+    // // Since we're using PIC, let's use a direct relative call
+    // // This will be a 5-byte instruction: E8 + 32-bit offset
+    // int32_t rel_offset = (int32_t)((uint64_t)read_char_addr - ((uint64_t)p + 5));
+
+    // // call rel32
+    // *p++ = 0xE8; // Direct relative call
+    // memcpy(p, &rel_offset, sizeof(rel_offset));
+    // p += sizeof(rel_offset);
 
     // pop r8 - r11 off the stack
     *p++ = 0x41;
@@ -937,7 +913,7 @@ size_t read_into_reg(void *zero, size_t offset, unsigned reg)
     // mov rCd, eax
     *p++ = 0x49;
     *p++ = 0x89;
-    *p++ = 0xC0 | (reg - 8);
+    *p++ = 0xC0 | c;
 
     // 32 - 24 = 8 No Ops
 
@@ -957,11 +933,6 @@ size_t read_into_reg(void *zero, size_t offset, unsigned reg)
 
 size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 {
-    if (b < 8 || b > 15)
-        assert(false);
-    if (c < 8 || c > 15)
-        assert(false);
-
     void *map_segment_addr = (void *)&map_segment;
 
     unsigned char *p = zero + offset;
@@ -970,7 +941,7 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     // mov rC, rdi
     *p++ = 0x44; // Reg prefix for r8-r15
     *p++ = 0x89; // mov reg to reg
-    *p++ = 0xc7 | ((c - 8) << 3); // ModR/M byte
+    *p++ = 0xc7 | (c << 3); // ModR/M byte
 
     // push r8 - r11 onto the stack
     *p++ = 0x41;
@@ -1010,7 +981,7 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     // mov rB, rax
     *p++ = 0x41;
     *p++ = 0x89;
-    *p++ = 0xc0 | (b - 8);
+    *p++ = 0xc0 | b;
 
     // 32 - 27 = 5 No Ops
     *p++ = 0x90;
@@ -1025,8 +996,6 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 // size_t inject unmap segment
 size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
 {
-    if (c < 8 || c > 15)
-        assert(false);
     void *unmap_segment_addr = (void *)&unmap_segment;
 
     unsigned char *p = zero + offset;
@@ -1035,7 +1004,7 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     // mov rC, rdi
     *p++ = 0x44; // Reg prefix for r8-r15
     *p++ = 0x89; // mov reg to reg
-    *p++ = 0xc7 | ((c - 8) << 3); // ModR/M byte
+    *p++ = 0xc7 | (c << 3); // ModR/M byte
 
     // push r8 - r11 onto the stack
     *p++ = 0x41;
@@ -1087,13 +1056,6 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
 // inject segmented load
 size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
-    if (a < 8 || a > 15)
-        assert(false);
-    if (b < 8 || b > 15)
-        assert(false);
-    if (c < 8 || c > 15)
-        assert(false);
-
     void *seg_load_addr = (void *)&segmented_load;
 
     unsigned char *p = zero + offset;
@@ -1101,12 +1063,12 @@ size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsign
     // mov rsi, rBd
     *p++ = 0x44;
     *p++ = 0x89;
-    *p++ = 0xc7 | ((b - 8) << 3);
+    *p++ = 0xc7 | (b << 3);
 
     // mov rdi, rCd
     *p++ = 0x44;
     *p++ = 0x89;
-    *p++ = 0xc6 | ((c - 8) << 3);
+    *p++ = 0xc6 | (c << 3);
 
     // push r8 - r11 onto the stack
     *p++ = 0x41;
@@ -1145,7 +1107,7 @@ size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsign
     // mov ra, rax
     *p++ = 0x41;
     *p++ = 0x89;
-    *p++ = 0xc0 | (a - 8);
+    *p++ = 0xc0 | a;
 
     // 32 - 30 = 2 No Ops
     *p++ = 0x90;
@@ -1155,14 +1117,7 @@ size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsign
 
 // inject segmented store
 size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
-{
-    if (a < 8 || a > 15)
-        assert(false);
-    if (b < 8 || b > 15)
-        assert(false);
-    if (c < 8 || c > 15)
-        assert(false);
-    
+{   
     void *seg_store_addr = (void *)&segmented_store;
 
     unsigned char *p = zero + offset;
@@ -1170,17 +1125,17 @@ size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsig
     // mov rsi, rad
     *p++ = 0x44;
     *p++ = 0x89;
-    *p++ = 0xc7 | ((a - 8) << 3);
+    *p++ = 0xc7 | (a << 3);
 
     // mov rdx, rbd
     *p++ = 0x44;
     *p++ = 0x89;
-    *p++ = 0xc6 | ((b - 8) << 3);
+    *p++ = 0xc6 | (b << 3);
 
     // mov rcx, rcd
     *p++ = 0x44;
     *p++ = 0x89;
-    *p++ = 0xc2 | ((c - 8) << 3);
+    *p++ = 0xc2 | (c << 3);
 
     // push r8 - r11 onto the stack
     *p++ = 0x41;
@@ -1223,11 +1178,6 @@ size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsig
 // inject load program
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 {
-    if (b < 8 || b > 15)
-        assert(false);
-    if (c < 8 || c > 15)
-        assert(false);
-
     void *load_program_addr = (void *)&load_program;
 
     unsigned char *p = zero + offset;
@@ -1243,13 +1193,13 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     // move b to rdi
     *p++ = 0x4C;
     *p++ = 0x89;
-    *p++ = 0xc7 | ((b - 8) << 3);
+    *p++ = 0xc7 | (b << 3);
 
     // stash c val in the right register
     // move c to rsi
     *p++ = 0x44;
     *p++ = 0x89;
-    *p++ = 0xc6 | ((c - 8) << 3);
+    *p++ = 0xc6 | (c << 3);
 
     // push r8 - r11 onto the stack
     *p++ = 0x41;
