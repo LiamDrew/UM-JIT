@@ -223,6 +223,7 @@ static inline bool exec_instr(Instruction word, Instruction **pp,
     if (__builtin_expect(opcode == 13, 1)) {
         a = (word >> 25) & 0x7;
         val = word & 0x1FFFFFF;
+        printf("Load value %u into reg %u\n", val, a);
         regs[a] = val;
         return false;
     }

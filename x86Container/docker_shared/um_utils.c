@@ -6,7 +6,6 @@
 #include <string.h>
 #include <sys/mman.h>
 
-// __attribute__((target("no-r8,no-r9,no-r10,no-r11,no-r12,no-r13,no-r14,no-r15"))) 
 void print_registers()
 {
     uint64_t r8, r9, r10, r11, r12, r13, r14, r15;
@@ -32,19 +31,14 @@ void print_registers()
 
 unsigned char read_char(void)
 {
-    // printf("Reading in char\n");
-    // printf("Global state seq size: %d\n", gs.seq_size);
     int x = getc(stdin);
     assert(x != EOF);
     return (unsigned char)x;
 }
 
-// 100% have to push some registers when this function gets called.. be ready
-// plus will have to test
 uint32_t map_segment(uint32_t size)
 {
-    // Not absolutely positive if these are necessary
-    // Inline assembly to save r8, r9, r10, r11
+    // Inline assembly to save r8, r9, r10, r11 (Necessary?)
     __asm__ __volatile__(
         "pushq %%r8\n\t"
         "pushq %%r9\n\t"
@@ -54,9 +48,7 @@ uint32_t map_segment(uint32_t size)
         :
         : "r8", "r9", "r10", "r11", "memory");
 
-    // print_registers();
-    // printf("Mapping segment\n");
-    printf("Mapping segment, Raw value is %u (0x%x)\n", size, size);
+    // printf("Mapping segment, Raw value is %u (0x%x)\n", size, size);
 
     uint32_t new_seg_id;
 
@@ -75,9 +67,7 @@ uint32_t map_segment(uint32_t size)
             // also need to init the memory segment
             gs.val_seq = realloc(gs.val_seq, gs.seq_cap * sizeof(uint32_t*));
 
-
             // Initializing all reallocated memory
-            // this may not be strictly necessary
             for (uint32_t i = gs.seq_size; i < gs.seq_cap; i++) {
                 gs.program_seq[i] = NULL;
                 gs.val_seq[i] = NULL;
@@ -124,13 +114,8 @@ uint32_t map_segment(uint32_t size)
     return new_seg_id;
 }
 
-// void unmap segment(void *segmentId)
 void unmap_segment(uint32_t segmentId)
 {
-    // printf("Unmapping segment\n");
-    // printf("Seg id is: %u\n", segmentId);
-    // TODO: do the unmapping
-
     __asm__ __volatile__(
         "pushq %%r8\n\t"
         "pushq %%r9\n\t"
@@ -157,30 +142,38 @@ void unmap_segment(uint32_t segmentId)
         : "r8", "r9", "r10", "r11");
 }
 
-// segmented load
 uint32_t segmented_load(uint32_t b_val, uint32_t c_val)
 {
-    // printf("Segmented load\n");
-    // printf("Reg b is %u\n", b_val);
-    // printf("Reg c is %u\n", c_val);
+    __asm__ __volatile__(
+        "pushq %%r8\n\t"
+        "pushq %%r9\n\t"
+        "pushq %%r10\n\t"
+        "pushq %%r11\n\t"
+        :
+        :
+        : "r8", "r9", "r10", "r11", "memory");
+    
+    // Debugging goes in here
 
-    // get the segment we care about 
+    __asm__ __volatile__(
+        "popq %%r11\n\t"
+        "popq %%r10\n\t"
+        "popq %%r9\n\t"
+        "popq %%r8\n\t"
+        :
+        :
+        : "r8", "r9", "r10", "r11");
 
-    // In this case, we strictly get the value, since it would make no sense to
-    // load a bunch of assembly instruction into a register
+    /* For a segmented load, we only get the relevant value from the value 
+     * segment, since it makes no sense to put compiled instructions in a 
+     * register. This value can be compiled when it comes time to put it back
+     * into a memory segment */
 
-    // this gets loaded into a register on the assembly side
+    /* The return value gets loaded into the correct register by the calling 
+     * assembly */
     return gs.val_seq[b_val][c_val];
 }
 
-// segmented store (will have to compile r[C] to machine code inline)
-/*
- * Since this function may have to compile assembly inline, it may have to be
- * called by 8 byte function pointer instead of 4 byte offset (if it wants to live in main
- * and have access to all the functions that can access the other functions)
- * 
- * Alternatively, everything could get moved into this utils file except the main function.
- */
 void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
 {
     __asm__ __volatile__(
@@ -192,24 +185,13 @@ void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
         :
         : "r8", "r9", "r10", "r11", "memory");
     
-    printf("Segmented store: storing cval: %u in segment %u at index %u\n", c_val, a_val, b_val);
+    // printf("Segmented store: storing cval: %u in segment %u at index %u\n", c_val, a_val, b_val);
 
-    // Midmark makes it to the execution of this before anything goes wrong.
-    // A segmented store is happening. this is absolutely crucial for this to go right
-    // assert(false);
-    // In this case, we have to both compile to machine code and store the native UM word
-    // we have compile instruction available to us. We just need to give it a memory segment and an offset.
-
-    // and of course it will be easy to load something straight into memory
+    /* Load the inputted word into value memory */
     gs.val_seq[a_val][b_val] = c_val;
 
-    // compile step
-
-
-    // need to be able to handle the case where the instuction we are trying to
-    // compile is actually garbage
-
-    // TODO: this is likely to be a pain point for the program.
+    /* Compile the inputted word as if it were an instruction (in case it is)
+     * and put it in executable memory*/
     compile_instruction(gs.program_seq[a_val], c_val, b_val);
 
     __asm__ __volatile__(
@@ -220,18 +202,8 @@ void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
         :
         :
         : "r8", "r9", "r10", "r11");
-
-    // print_registers();
-
-    // assert(false);
-
-    return;
 }
 
-// load program
-/* Load program needs to do something rather important:
- * update the memory address of the new segment being executed
- */
 void *load_program(uint32_t b_val, uint32_t c_val)
 {
     __asm__ __volatile__(
@@ -243,11 +215,9 @@ void *load_program(uint32_t b_val, uint32_t c_val)
         :
         : "r8", "r9", "r10", "r11", "memory");
 
-    // printf("Loading segment %u, setting program counter to %u\n", b_val, c_val);
-    // set program counter to the contents of register c
+    /* Set the program counter to be the contents of register c */
     gs.pc = c_val;
 
-    // This is a huge benefit of the jit. This step is insanely fast
     if (b_val == 0) {
         return gs.program_seq[0];
     }
@@ -256,12 +226,15 @@ void *load_program(uint32_t b_val, uint32_t c_val)
     // void *new_zero = mmap(gs.program_seq[0], gs.seg_lens[b_val] * CHUNK, 
     //     PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
-    // try this first
+    /* Free the existing zero segment */
+
     void *new_zero = mmap(NULL, gs.seg_lens[b_val] * CHUNK,
                           PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
     memcpy(new_zero, gs.program_seq[b_val], gs.seg_lens[b_val] * CHUNK);
 
+    /* Update the existing memory segment */
+    gs.program_seq[0] = new_zero;
     __asm__ __volatile__(
         "popq %%r11\n\t"
         "popq %%r10\n\t"
@@ -272,35 +245,11 @@ void *load_program(uint32_t b_val, uint32_t c_val)
         : "r8", "r9", "r10", "r11");
 
     return new_zero;
-
-    // return gs.program_seq[b_val];
-    // something is not right with b_val
-    // return gs.program_seq[0];
 }
 
 size_t compile_instruction(void *zero, Instruction word, size_t offset)
 {
-
-    // register long r8 asm("r8");
-    // register long r9 asm("r9");
-    // register long r10 asm("r10");
-    // register long r11 asm("r11");
-    // register long r12 asm("r12");
-    // register long r13 asm("r13");
-    // register long r14 asm("r14");
-    // register long r15 asm("r15");
-
-    // (void)r8;
-    // (void)r9;
-    // (void)r10;
-    // (void)r11;
-    // (void)r12;
-    // (void)r13;
-    // (void)r14;
-    // (void)r15;
     uint32_t opcode = (word >> 28) & 0xF;
-
-    // printf("Opcode: %d\n", opcode);
     uint32_t a = 0, b = 0, c = 0, val = 0;
 
     if (opcode == 13)
@@ -434,9 +383,9 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     /* Invalid Opcode*/
     else
     {
-        // printf("Just a number\n");
-        // printf("Opcode: %d\n", opcode);
-        // assert(false);
+        /* This value is not an instruction that is meant to be executed */
+        /* Nothing is being written, but we still need a valid offset */
+        offset += CHUNK;
     }
 
     return offset;
@@ -450,29 +399,10 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 
     unsigned char *p = zero + offset;
 
-    /* To avoid a jump table to determine what register to load the value into,
-     * I'm going to use a dirty little trick to load value into the correct
-     * register.
-     * I'm Bitwise ORing the machine code for the mov instruction with the
-     * register number to load the register I want.
-     * This is only possible by breaking the machine code abstraction and
-     * is not possible in assembly (that I know of).
-     * Here, the contents of the machine code are determined at runtime and not
-     * compile time
-     */
-
     /* mov rXd, imm32 (where X is reg_num) */
     *p++ = 0x41;           // Reg prefix for r8-r15
     *p++ = 0xc7;           // mov immediate value to 32-bit register
     *p++ = 0xc0 | (a - 8); // ModR/M byte for target register
-
-    /* It's important to remember that this code doesn't get executed as it is
-     * written. It was tempting to optimize this by moving the register that
-     * [value] is stored in into the target register, but I had to keep in mind
-     * that when this code gets executed, [value] will no longer be in the
-     * target register. The safest move is to hardcode the 32-bit value in
-     * little endian order to be loaded into the register.
-     */
 
     *p++ = value & 0xFF;
     *p++ = (value >> 8) & 0xFF;
@@ -491,15 +421,14 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = 0x00;
 
     return CHUNK;
-    //return 7;
 }
 
 void print_out(uint32_t x)
 {
-    // printf("Printing out x is %u\n", x);
+    /* Registers MUST be saved in the inline assembly */
     unsigned char c = (unsigned char)x;
+    // printf("Printing out x is %u\n", x);
     // printf("Unsigned char is %c\n", c);
-
     putchar(c);
 }
 
@@ -509,10 +438,9 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     if (c < 8 || c > 15)
         assert(false);
 
-    void *putchar_addr = (void *)&putchar;
-    // void *putchar_addr = (void *)&print_out;
+    // void *putchar_addr = (void *)&putchar;
+    void *putchar_addr = (void *)&print_out;
     
-
     unsigned char *p = zero + offset;
 
     // xor rdi, rdi
@@ -530,7 +458,7 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = (0xc7 | ((c - 8) << 3)); // ModR/M byte: edi(111) with reg number
 
     /* This was a nightmare bug*/
-    // // push r8 onto the stack
+    // // // push r8 onto the stack
     *p++ = 0x41; // REX.B prefix for r8
     *p++ = 0x50; // PUSH r8
 
@@ -1139,4 +1067,23 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
  * If i really needed to save assembly instructions, I could send the bitpacked word in as one argument instead of 3, and then unpack it inside     the function. That would suck though.
  *
  * We're already signed up for 5x bloat. Let's try it with the bitpack plan and see what can be done.
+ */
+
+/* To avoid a jump table to determine what register to load the value into,
+ * I'm going to use a dirty little trick to load value into the correct
+ * register.
+ * I'm Bitwise ORing the machine code for the mov instruction with the
+ * register number to load the register I want.
+ * This is only possible by breaking the machine code abstraction and
+ * is not possible in assembly (that I know of).
+ * Here, the contents of the machine code are determined at runtime and not
+ * compile time
+ */
+
+/* It's important to remember that this code doesn't get executed as it is
+ * written. It was tempting to optimize this by moving the register that
+ * [value] is stored in into the target register, but I had to keep in mind
+ * that when this code gets executed, [value] will no longer be in the
+ * target register. The safest move is to hardcode the 32-bit value in
+ * little endian order to be loaded into the register.
  */
