@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/mman.h>
 
+
 void print_registers()
 {
     uint64_t r8, r9, r10, r11, r12, r13, r14, r15;
@@ -443,24 +444,24 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     
     unsigned char *p = zero + offset;
 
-    // xor rdi, rdi
-    *p++ = 0x48;
-    *p++ = 0x31;
-    *p++ = 0xC7;
-
     // mov edi, rXd (where X is reg_num)
     *p++ = 0x44; // Reg prefix for r8-r15
-    // *p++ = 0x89; // mov reg to reg
     *p++ = 0x89;
-
-    /* ModR/M byte Format:
-     * [7-6: Mod (2 bits)][5-3: Source Reg (3 bits)][2-0: Dest Reg (3 bits)] */
     *p++ = (0xc7 | ((c - 8) << 3)); // ModR/M byte: edi(111) with reg number
 
-    /* This was a nightmare bug*/
-    // // // push r8 onto the stack
-    *p++ = 0x41; // REX.B prefix for r8
-    *p++ = 0x50; // PUSH r8
+    // push r8 - r11 onto the stack
+    *p++ = 0x41;
+    *p++ = 0x50;
+
+    *p++ = 0x41;
+    *p++ = 0x51;
+
+    *p++ = 0x41;
+    *p++ = 0x52;
+
+    *p++ = 0x41;
+    *p++ = 0x53;
+
 
     // call putchar
     *p = 0xe8;
@@ -470,19 +471,20 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     memcpy(p, &call_offset, sizeof(int32_t));
     p += sizeof(int32_t);
 
-    // // Pop r8 after putchar returns
-    *p++ = 0x41; // REX.B prefix for r8
-    *p++ = 0x58; // POP r8
+    // pop r8 - r11 off the stack
+    *p++ = 0x41;
+    *p++ = 0x58;
 
-    /* 3 to load reg into edi, 1 for call instruction, 4 for putchar addr */
+    *p++ = 0x41;
+    *p++ = 0x59;
 
-    // 5 NoOPs to align with chunk boundary
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-    // *p++ = 0x90;
-    *p++ = 0x90;
+    *p++ = 0x41;
+    *p++ = 0x5A;
 
+    *p++ = 0x41;
+    *p++ = 0x5B;
+
+    // 24
     return CHUNK;
     // return 8;
 }
@@ -1036,6 +1038,7 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 }
 
 
+// NOTEs for readme:
 // have to compile the contents of c_val back into a UM instruction, and store in the right segment
 // this is really tricky. Maybe this is just a number being saved that's going back into a register?
 // or maybe it's secretely an instruction that's being encoded?
@@ -1087,3 +1090,6 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
  * target register. The safest move is to hardcode the 32-bit value in
  * little endian order to be loaded into the register.
  */
+
+/* ModR/M byte Format:
+ * [7-6: Mod (2 bits)][5-3: Source Reg (3 bits)][2-0: Dest Reg (3 bits)] */
