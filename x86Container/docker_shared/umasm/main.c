@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 
     Instruction words[15] = {0};
 
-    size_t bw = 12;
+    size_t bw = 13;
 
     // load the value 49 into reg 7
     words[0] = load_val(13, 49, 7);
@@ -43,35 +43,38 @@ int main(int argc, char *argv[])
     words[1] = load_val(13, 1, 1);
 
     // reg 5 contains the index of the first instruction getting loaded
-    words[2] = load_val(13, 10, 5);
+    words[2] = load_val(13, 11, 5);
 
     // map segment of size 48, result gets put in r2
     words[3] = three_reg(8, 0, 2, 7);
 
+    //output r7
+    words[4] = three_reg(10, 0, 0, 7);
+
     // seg load into r6
-    words[4] = three_reg(1, 6, 0, 5);
+    words[5] = three_reg(1, 6, 0, 5);
 
     // seg store r6 into segment 1 @index 0
-    words[5] = three_reg(2, 1, 0, 6);
+    words[6] = three_reg(2, 1, 0, 6);
 
     // add one to r5, the instruction loaded index
-    words[6] = three_reg(3, 5, 5, 1);
+    words[7] = three_reg(3, 5, 5, 1);
 
     // seg load into r6 again
-    words[7] = three_reg(1, 6, 0, 5);
+    words[8] = three_reg(1, 6, 0, 5);
 
     // seg store r6 into seg 1 @ index 1
-    words[8] = three_reg(2, 1, 1, 6);
+    words[9] = three_reg(2, 1, 1, 6);
 
     // load program
-    words[9] = three_reg(12, 0, 1, 0);
+    words[10] = three_reg(12, 0, 1, 0);
     // this code is only for getting mapped and not getting executed
 
     // print reg 7
-    words[10] = three_reg(10, 0, 0, 7);
+    words[11] = three_reg(10, 0, 0, 7);
 
     //halt
-    words[11] = three_reg(7, 0, 0, 0);
+    words[12] = three_reg(7, 0, 0, 0);
 
 
     // NOTE: must write bytes to disk in big endian order

@@ -78,6 +78,8 @@ uint32_t map_segment(uint32_t size)
         new_seg_id = gs.rec_ids[--gs.rec_size];
     }
 
+
+
     /* If the segment didn't previously exist or wasn't large enought for us*/
     if (gs.program_seq[new_seg_id] == NULL || size > gs.seg_lens[new_seg_id]) {
         // printf("Memory getting allocated in here\n");
@@ -98,6 +100,12 @@ uint32_t map_segment(uint32_t size)
 
         gs.seg_lens[new_seg_id] = size;
     }
+
+    // gs.program_seq[new_seg_id] = mmap(NULL, size * CHUNK,
+    //     PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    // // printf("New executable memory is at address %p\n", gs.program_seq[new_seg_id]);
+    // gs.val_seq[new_seg_id] = malloc(size * sizeof(uint32_t *));
+    // gs.seg_lens[new_seg_id] = size;
 
     /* zero out the segment */
     memset(gs.program_seq[new_seg_id], 0, size * CHUNK);
@@ -131,11 +139,6 @@ uint32_t segmented_load(uint32_t b_val, uint32_t c_val)
     return x;
 }
 
-void do_the_thing()
-{
-    printf("hello\n");
-}
-
 void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
 {
     // printf("Segmented store: storing cval: %u in segment %u at index %u\n", c_val, a_val, b_val);
@@ -154,8 +157,8 @@ void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
     // if (b_val == 0) {
 
     //     uint32_t c = c_val & 0x7;
-    //     // void *putchar_addr = (void *)&print_out;
-    //     void *putchar_addr = (void *)&do_the_thing;
+    //     void *putchar_addr = (void *)&print_out;
+    //     // void *putchar_addr = (void *)&do_the_thing;
     //     (void)putchar_addr;
     //     unsigned char *p = gs.program_seq[a_val];
 
@@ -179,15 +182,25 @@ void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
 
     //     /* NOTE: This was the way it was supposed to be, but it didn't work */
     //     // printf("Base address: %p\n", gs.program_seq[a_val]);
+    //     // int32_t call_offset = (int32_t)((uintptr_t)putchar_addr - ((uintptr_t)p));
     //     // printf("Current p: %p\n", p);
     //     // printf("Target function address: %p\n", putchar_addr);
-    //     // call print_out
 
-    //     // int32_t call_offset = (int32_t)((uintptr_t)putchar_addr - ((uintptr_t)p));
+    //     *p++ = 0x48; // REX.W prefix
+    //     *p++ = 0xb8; // mov rax, imm64
+    //     memcpy(p, &putchar_addr, sizeof(putchar_addr));
+    //     p += sizeof(putchar_addr);
 
-    //     uintptr_t func_addr = (uintptr_t)putchar;
-    //     uintptr_t call_addr = (uintptr_t)p + 5;
-    //     int32_t call_offset = (int32_t)(func_addr - call_addr);
+    //     // call rax
+    //     *p++ = 0xff;
+    //     *p++ = 0xd0; // ModR/M byte for call rax
+
+    //     // uintptr_t func_addr = (uintptr_t)putchar_addr;
+    //     // uintptr_t call_addr = (uintptr_t)p;
+    //     // int32_t call_offset = (int32_t)(func_addr - call_addr);
+
+    //     // printf("The offset value is %d\n", call_offset);
+    //     // printf("Looking for function at %p\n", p + call_offset);
 
     //     // *p++ = 0xE8;
     //     // memcpy(p, &call_offset, sizeof(call_offset));
@@ -195,9 +208,11 @@ void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
 
     //     // int32_t call_offset = (int32_t)((uint64_t)putchar_addr - ((uint64_t)p + 5));
     //     // // (void)call_offset;
-    //     *p++ = 0xe8;
-    //     memcpy(p, &call_offset, sizeof(call_offset));
-    //     p += sizeof(call_offset);
+
+    //     // *p++ = 0xe8;
+    //     // memcpy(p, &call_offset, sizeof(call_offset));
+    //     // p += sizeof(call_offset);
+        
     //     // printf("Putchar addr is%p\n", putchar_addr);
     //     // printf("Call offset is %d\n", call_offset);
 
@@ -206,14 +221,6 @@ void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
 
     //     // NOTE: This works, but takes up 12 bytes 
     //     // mov rax, immediate_address
-    //     // *p++ = 0x48; // REX.W prefix
-    //     // *p++ = 0xb8; // mov rax, imm64
-    //     // memcpy(p, &putchar_addr, sizeof(putchar_addr));
-    //     // p += sizeof(putchar_addr);
-
-    //     // // call rax
-    //     // *p++ = 0xff;
-    //     // *p++ = 0xd0; // ModR/M byte for call rax
 
 
 
@@ -256,7 +263,7 @@ void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
     // if (b_val == 1) {
     //         // printf("Doing the halt injection\n");
     //         unsigned char *p = gs.program_seq[a_val] + (1 * CHUNK);
-
+    //         (void)p;
     //         // // set RAX to 0 (NULL);
     //         // // xor rax,rax
     //         *p++ = 0x48;
@@ -278,6 +285,7 @@ void *load_program(uint32_t b_val, uint32_t c_val)
     }
 
     // return NULL;
+    // printf("Load program is getting executed\n");
 
     // the right way to do it:
     // void *new_zero = mmap(gs.program_seq[0], gs.seg_lens[b_val] * CHUNK, 
@@ -293,6 +301,9 @@ void *load_program(uint32_t b_val, uint32_t c_val)
     /* Update the existing memory segment */
     gs.program_seq[0] = new_zero;
     return new_zero;
+
+    // memcpy(gs.program_seq[0], gs.program_seq[b_val], gs.seg_lens[b_val] * CHUNK);
+    // return gs.program_seq[0];
 }
 
 size_t compile_instruction(void *zero, Instruction word, size_t offset)
@@ -817,7 +828,7 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x41;
     *p++ = 0x53;
     
-    // // call print_out
+    /* This calling method has been a nightmare*/
     // int32_t call_offset = (int32_t)((uint64_t)putchar_addr - ((uint64_t)p + 5));
     // *p++ = 0xe8;
     // memcpy(p, &call_offset, sizeof(call_offset));
@@ -831,6 +842,7 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     // call rax
     *p++ = 0xff;
     *p++ = 0xd0; // ModR/M byte for call rax
+
 
     // pop r8 - r11 off the stack
     *p++ = 0x41;
@@ -855,6 +867,7 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     // *p++ = 0x00;
 
     // *p++ = 0x90;
+
     *p++ = 0x90;
 
     return CHUNK;

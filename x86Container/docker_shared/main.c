@@ -70,6 +70,7 @@ int main(int argc, char *argv[])
      * fsize gives the space for UM words, multiply by 4 for machine 
      * instructions */
     void *zero = initialize_zero_segment(fsize * MULT);
+    // printf("The address of the zero executable segment is %p\n", zero);
     uint32_t *zero_vals = calloc(fsize, sizeof(uint32_t));
     load_zero_segment(zero, zero_vals, fp, fsize);
 
