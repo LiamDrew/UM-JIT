@@ -66,6 +66,8 @@ int main(int argc, char *argv[])
         assert((fsize % 4) == 0);
     }
 
+    // printf("fsize is %lu\n", fsize);
+
     /* Initialize executable and non-executable memory for the zero segment
      * fsize gives the space for UM words, multiply by 4 for machine 
      * instructions */
@@ -76,6 +78,7 @@ int main(int argc, char *argv[])
 
     gs.program_seq[0] = zero;
     gs.val_seq[0] = zero_vals;
+    gs.seg_lens[0] = (fsize / 4);
     gs.seq_size++;
 
     void *curr_seg = zero;
@@ -98,7 +101,34 @@ int main(int argc, char *argv[])
     while (curr_seg != NULL) {
         Function func = (Function)(curr_seg + (gs.pc * CHUNK));
         curr_seg = func();
-        // print_registers();
+        asm volatile(
+            "pushq %%rdi\n\t"
+            "pushq %%rsi\n\t"
+            "pushq %%rdx\n\t"
+            "pushq %%rcx\n\t"
+            "pushq %%r8\n\t"
+            "pushq %%r9\n\t"
+            "pushq %%rax\n\t"
+            "pushq %%r10\n\t"
+            "pushq %%r11\n\t"
+            :
+            :
+            : "memory");
+        print_registers();
+
+        asm volatile(
+            "popq %%r11\n\t"
+            "popq %%r10\n\t"
+            "popq %%rax\n\t"
+            "popq %%r9\n\t"
+            "popq %%r8\n\t"
+            "popq %%rcx\n\t"
+            "popq %%rdx\n\t"
+            "popq %%rsi\n\t"
+            "popq %%rdi\n\t"
+            :
+            :
+            : "memory");
     }
 
     /* Free all program segments */

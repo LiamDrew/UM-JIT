@@ -6,8 +6,9 @@
 
 // may experiement with making it 14, but for now keep it a power of 2
 // due to unforseen circumstances, we have to make it a disgusting 32. ugh
-#define CHUNK 32
-#define MULT 8
+// due to more terrible things, the chunk is now 40 and the MULT is 10
+#define CHUNK 40
+#define MULT 10
 
 typedef uint32_t Instruction;
 
@@ -24,7 +25,7 @@ struct GlobalState
     uint32_t *rec_ids;
     uint32_t rec_size;
     uint32_t rec_cap;
-} global_state;
+};
 
 extern struct GlobalState gs;
 
