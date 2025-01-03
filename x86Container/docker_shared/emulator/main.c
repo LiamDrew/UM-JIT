@@ -58,30 +58,7 @@ uint32_t map_segment(uint32_t size);
 void unmap_segment(uint32_t segment);
 void load_segment(uint32_t index, uint32_t *zero);
 
-void print_registers();
-
-void print_registers()
-{
-    uint64_t r8, r9, r10, r11, r12, r13, r14, r15;
-
-    asm volatile(
-        "movq %%r8, %0\n\t"
-        "movq %%r9, %1\n\t"
-        "movq %%r10, %2\n\t"
-        "movq %%r11, %3\n\t"
-        "movq %%r12, %4\n\t"
-        "movq %%r13, %5\n\t"
-        "movq %%r14, %6\n\t"
-        "movq %%r15, %7\n\t"
-        : "=m"(r8), "=m"(r9), "=m"(r10), "=m"(r11),
-          "=m"(r12), "=m"(r13), "=m"(r14), "=m"(r15)
-        :
-        :);
-
-    printf("R8: %lu\nR9: %lu\nR10: %lu\nR11: %lu\n"
-           "R12: %lu\nR13: %lu\nR14: %lu\nR15: %lu\n",
-           r8, r9, r10, r11, r12, r13, r14, r15);
-}
+void print_registers(uint32_t *regs);
 
 int main(int argc, char *argv[])
 {
@@ -240,6 +217,13 @@ void load_segment(uint32_t index, uint32_t *zero)
     
 }
 
+void print_regs(uint32_t *regs)
+{
+    for (unsigned i = 0; i < 8; i++) {
+        printf("R%u: %u\n", i + 8, regs[i]);
+    }
+}
+
 static inline bool exec_instr(Instruction word, Instruction **pp, 
                                uint32_t *regs, uint32_t *zero)
 {
@@ -282,6 +266,9 @@ static inline bool exec_instr(Instruction word, Instruction **pp,
     else if (__builtin_expect(opcode == 12, 0))
     {
         // printf("Load progam a: %u, b: %u, c: %u\n", a, b, c);
+
+        printf("Program %u getting loaded at counter %u\n", regs[b], regs[c]);
+        print_regs(regs);
         load_segment(regs[b], zero);
         *pp = zero + regs[c];
     }

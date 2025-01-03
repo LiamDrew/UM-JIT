@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
             :
             :
             : "memory");
-        print_registers();
+        // print_registers();
 
         asm volatile(
             "popq %%r11\n\t"

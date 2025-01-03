@@ -80,32 +80,26 @@ uint32_t map_segment(uint32_t size)
 
 
 
-    // /* If the segment didn't previously exist or wasn't large enought for us*/
-    // if (gs.program_seq[new_seg_id] == NULL || size > gs.seg_lens[new_seg_id]) {
-    //     // printf("Memory getting allocated in here\n");
+    /* If the segment didn't previously exist or wasn't large enought for us*/
+    if (gs.program_seq[new_seg_id] == NULL || size > gs.seg_lens[new_seg_id]) {
+        // printf("Memory getting allocated in here\n");
     
 
-    //     // TODO: this step needs to get done with an mmap call
+        // TODO: this step needs to get done with an mmap call
 
-    //     // Intentionally leaking memory
-    //     // gs.program_seq[new_seg_id] = mmap(gs.program_seq[new_seg_id], size * CHUNK,
-    //     //                                   PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        // Intentionally leaking memory
+        // gs.program_seq[new_seg_id] = mmap(gs.program_seq[new_seg_id], size * CHUNK,
+        //                                   PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
-    //     gs.program_seq[new_seg_id] = mmap(NULL, size * CHUNK, 
-    //         PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        gs.program_seq[new_seg_id] = mmap(NULL, size * CHUNK, 
+            PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
-    //     // printf("The address we want is %p\n", gs.program_seq[new_seg_id]);
+        // printf("The address we want is %p\n", gs.program_seq[new_seg_id]);
         
-    //     gs.val_seq[new_seg_id] = realloc(gs.val_seq[new_seg_id], size * sizeof(uint32_t*));
+        gs.val_seq[new_seg_id] = realloc(gs.val_seq[new_seg_id], size * sizeof(uint32_t*));
 
-    //     gs.seg_lens[new_seg_id] = size;
-    // }
-
-    gs.program_seq[new_seg_id] = mmap(NULL, size * CHUNK,
-        PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    // printf("New executable memory is at address %p\n", gs.program_seq[new_seg_id]);
-    gs.val_seq[new_seg_id] = calloc(size, sizeof(uint32_t*));
-    gs.seg_lens[new_seg_id] = size;
+        gs.seg_lens[new_seg_id] = size;
+    }
 
     // /* zero out the segment */
     memset(gs.program_seq[new_seg_id], 0, size * CHUNK);
@@ -148,8 +142,8 @@ void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
     // assert(a_val == 1);
     /* Load the inputted word into value memory */
     if (b_val > gs.seg_lens[a_val]) {
-        printf("A val is %u, ", a_val);
-        printf("B val is %u\n", b_val);
+        // printf("A val is %u, ", a_val);
+        // printf("B val is %u\n", b_val);
     }
 
     assert(b_val < gs.seg_lens[a_val]);
@@ -168,6 +162,8 @@ void *load_program(uint32_t b_val, uint32_t c_val)
 {
     /* Set the program counter to be the contents of register c */
     gs.pc = c_val;
+
+    // printf("Program %u getting loaded at counter %u\n", b_val, c_val);
 
     if (b_val == 0) {
         return gs.program_seq[0];
@@ -195,6 +191,7 @@ void *load_program(uint32_t b_val, uint32_t c_val)
     gs.val_seq[0] = new_vals;
     gs.program_seq[0] = new_zero;
     gs.seg_lens[0] = new_seg_size;
+
     return new_zero;
 }
 
@@ -409,28 +406,27 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     unsigned char *p = zero + offset;
 
-    // mov rAd, rBd (move b to a)
-    *p++ = 0x45; // Reg prefix for r8-r15
-    *p++ = 0x89; // mov reg to reg
+    // xor rax, rax
+    *p++ = 0x48;
+    *p++ = 0x31;  
+    *p++ = 0xc0;
 
-    /* ModR/M byte Format:
-     * [7-6: Mod (2 bits)][5-3: Source Reg (3 bits)][2-0: Dest Reg (3 bits)] */
-    *p++ = 0xc0 | (b << 3) | a; // ModR/M byte
+    // move first source to eax
+    *p++ = 0x44;
+    *p++ = 0x89;
+    *p++ = 0xc0 | (b << 3);
 
-    // add rAd, rCd (add c to a)
-    *p++ = 0x45;                            // Reg prefix for r8-r15
-    *p++ = 0x01;                            // add reg to reg
-    *p++ = 0xc0 | (c << 3) | a; // ModR/M byte
+    // add second source to eax
+    *p++ = 0x44;
+    *p++ = 0x01;
+    *p++ = 0xc0 | (c << 3);
 
-    // 40 - 6 = 34 No Ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // move eax back to Rad
+    *p++ = 0x41;
+    *p++ = 0x89;
+    *p++ = 0xc0 | a;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
+    // 40 - 12 = 28 No Ops;
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -520,6 +516,12 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x48;
     *p++ = 0x31;
     *p++ = 0xc0;
+
+    // After any arithmetic/logical operation
+    // mov rAd, rAd (zero-extend)
+    *p++ = 0x45;
+    *p++ = 0x89;
+    *p++ = 0xc0 | (a << 3) | a;
     // *p++ = 0x0F;
     // *p++ = 0x1F;
     // *p++ = 0x00;
@@ -529,9 +531,9 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     // *p++ = 0x00;
 
     // 40 - 15 = 25 No Ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
     *p++ = 0x0F;
     *p++ = 0x1F;
@@ -609,9 +611,15 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
     // 40 - 18 = 22 No Ops
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // After any arithmetic/logical operation
+    // mov rAd, rAd (zero-extend)
+    *p++ = 0x45;
+    *p++ = 0x89;
+    *p++ = 0xc0 | (a << 3) | a;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
     *p++ = 0x0F;
     *p++ = 0x1F;
@@ -656,6 +664,7 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x74;
     *p++ = 0x03;
 
+    // Note: I think this comment is wrong
     // mov rAd, rAd
     *p++ = 0x45;
     *p++ = 0x89;
@@ -710,22 +719,65 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     unsigned char *p = zero + offset;
 
-    // mov rAd, rBd (move b to a)
-    *p++ = 0x45;
+    // xor rax, rax
+    *p++ = 0x48;
+    *p++ = 0x31;
+    *p++ = 0xc0;
+
+    // move b to rax
+    *p++ = 0x44;
     *p++ = 0x89;
-    *p++ = 0xc0 | (b << 3) | a;
+    *p++ = 0xc0 | (b << 3);
 
-    // and rAd, rCd (and c to a)
-    *p++ = 0x45;
+    // and rcd with rax
+    // and c with rax
+    *p++ = 0x44;
     *p++ = 0x21;
-    *p++ = 0xc0 | (c << 3) | a;
+    *p++ = 0xc0 | (c << 3);
 
-    // not rAd (not a)
-    *p++ = 0x41;
+    // not the whole thing
+    *p++ = 0x40;
     *p++ = 0xf7;
-    *p++ = 0xd0 | a;
+    *p++ = 0xd0;
 
-    // 40 - 9 = 31 No Ops
+    // move to rad
+    *p++ = 0x41;
+    *p++ = 0x89;
+    *p++ = 0xc0 | a;
+
+    // // Problems below
+    // // mov rAd, rBd (move b to a)
+    // *p++ = 0x45;
+    // *p++ = 0x89;
+    // *p++ = 0xc0 | (b << 3) | a;
+
+    // // and rAd, rCd (and c to a)
+    // *p++ = 0x45;
+    // *p++ = 0x21;
+    // *p++ = 0xc0 | (c << 3) | a;
+
+    // // not rAd (not a)
+    // *p++ = 0x41;
+    // *p++ = 0xf7;
+    // *p++ = 0xd0 | a;
+
+    // // After any arithmetic/logical operation
+    // // mov rAd, rAd (zero-extend)
+    // *p++ = 0x45;
+    // *p++ = 0x89;
+    // *p++ = 0xc0 | (a << 3) | a;
+
+    // // 40 - 9 = 31 Nso Ops
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // // 40 - 15 = 25 No Ops
+
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
+
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -754,17 +806,9 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
     *p++ = 0x90;
 
@@ -773,10 +817,13 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
 void print_out(uint32_t x)
 {
+
+
     /* Registers MUST be saved in the inline assembly */
     unsigned char c = (unsigned char)x;
     // printf("Printing out x is %u\n", x);
     // printf("Unsigned char is %c\n", c);
+    (void)c;
     putchar(c);
 }
 
