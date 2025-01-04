@@ -42,8 +42,6 @@ void print_registers()
 
 uint32_t map_segment(uint32_t size)
 {
-    // printf("Mapping segment, Raw value is %u (0x%x)\n", size, size);
-
     uint32_t new_seg_id;
 
     /* If there are no available recycled segment ids, make a new one */
@@ -70,7 +68,6 @@ uint32_t map_segment(uint32_t size)
         }
 
         new_seg_id = gs.seq_size++;
-        // printf("Making a new segment with id %u\n", new_seg_id);
     }
 
     /* Otherwise, reuse an old one */
@@ -78,30 +75,19 @@ uint32_t map_segment(uint32_t size)
         new_seg_id = gs.rec_ids[--gs.rec_size];
     }
 
-
-
     /* If the segment didn't previously exist or wasn't large enought for us*/
     if (gs.program_seq[new_seg_id] == NULL || size > gs.seg_lens[new_seg_id]) {
-        // printf("Memory getting allocated in here\n");
-    
-
-        // TODO: this step needs to get done with an mmap call
-
-        // Intentionally leaking memory
-        // gs.program_seq[new_seg_id] = mmap(gs.program_seq[new_seg_id], size * CHUNK,
-        //                                   PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-        gs.program_seq[new_seg_id] = mmap(NULL, size * CHUNK, 
-            PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-        // printf("The address we want is %p\n", gs.program_seq[new_seg_id]);
         
+        // TODO: Ensure this doesn't leak memory
+        gs.program_seq[new_seg_id] = mmap(gs.program_seq[new_seg_id], size * CHUNK,
+                                          PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
         gs.val_seq[new_seg_id] = realloc(gs.val_seq[new_seg_id], size * sizeof(uint32_t*));
 
         gs.seg_lens[new_seg_id] = size;
     }
 
-    // /* zero out the segment */
+    /* zero out the segment */
     memset(gs.program_seq[new_seg_id], 0, size * CHUNK);
     memset(gs.val_seq[new_seg_id], 0, size * sizeof(uint32_t));
 
@@ -138,23 +124,13 @@ uint32_t segmented_load(uint32_t b_val, uint32_t c_val)
 
 void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
 {
-    // printf("Segmented store: storing cval: %u in segment %u at index %u\n", c_val, a_val, b_val);
-    // assert(a_val == 1);
     /* Load the inputted word into value memory */
-    if (b_val > gs.seg_lens[a_val]) {
-        // printf("A val is %u, ", a_val);
-        // printf("B val is %u\n", b_val);
-    }
 
-    assert(b_val < gs.seg_lens[a_val]);
-    assert(gs.val_seq[a_val] != NULL);
     gs.val_seq[a_val][b_val] = c_val;
 
     /* Compile the inputted word as if it were an instruction (in case it is)
      * and put it in executable memory*/
-    assert(gs.program_seq[a_val] != NULL);
 
-    // This is what it should be, but for some reason the call offset isn't working
     compile_instruction(gs.program_seq[a_val], c_val, b_val * CHUNK);
 }
 
@@ -163,25 +139,15 @@ void *load_program(uint32_t b_val, uint32_t c_val)
     /* Set the program counter to be the contents of register c */
     gs.pc = c_val;
 
-    // printf("Program %u getting loaded at counter %u\n", b_val, c_val);
-
     if (b_val == 0) {
         return gs.program_seq[0];
     }
 
-    // return NULL;
-    // printf("Load program is getting executed\n");
-
-    // the right way to do it:
-    // void *new_zero = mmap(gs.program_seq[0], gs.seg_lens[b_val] * CHUNK, 
-    //     PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-    /* Free the existing zero segment */
+    // TODO: Free the existing zero segment
 
     uint32_t new_seg_size = gs.seg_lens[b_val];
-
-    void *new_zero = mmap(NULL, new_seg_size * CHUNK,
-                          PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    void *new_zero = mmap(gs.program_seq[0], new_seg_size * CHUNK, 
+        PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     memcpy(new_zero, gs.program_seq[b_val], new_seg_size * CHUNK);
 
     uint32_t *new_vals = calloc(new_seg_size, sizeof(uint32_t));
@@ -745,33 +711,6 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xc0 | a;
 
-    // // Problems below
-    // // mov rAd, rBd (move b to a)
-    // *p++ = 0x45;
-    // *p++ = 0x89;
-    // *p++ = 0xc0 | (b << 3) | a;
-
-    // // and rAd, rCd (and c to a)
-    // *p++ = 0x45;
-    // *p++ = 0x21;
-    // *p++ = 0xc0 | (c << 3) | a;
-
-    // // not rAd (not a)
-    // *p++ = 0x41;
-    // *p++ = 0xf7;
-    // *p++ = 0xd0 | a;
-
-    // // After any arithmetic/logical operation
-    // // mov rAd, rAd (zero-extend)
-    // *p++ = 0x45;
-    // *p++ = 0x89;
-    // *p++ = 0xc0 | (a << 3) | a;
-
-    // // 40 - 9 = 31 Nso Ops
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
     // // 40 - 15 = 25 No Ops
 
     *p++ = 0x0F;
@@ -806,10 +745,6 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
     *p++ = 0x90;
 
     return CHUNK;
@@ -817,19 +752,13 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
 void print_out(uint32_t x)
 {
-
-
     /* Registers MUST be saved in the inline assembly */
     unsigned char c = (unsigned char)x;
-    // printf("Printing out x is %u\n", x);
-    // printf("Unsigned char is %c\n", c);
-    (void)c;
     putchar(c);
 }
 
 size_t print_reg(void *zero, size_t offset, unsigned c)
 {
-    // void *putchar_addr = (void *)&putchar;
     void *putchar_addr = (void *)&print_out;
 
     unsigned char *p = zero + offset;
