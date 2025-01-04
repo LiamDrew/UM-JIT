@@ -267,8 +267,8 @@ static inline bool exec_instr(Instruction word, Instruction **pp,
     {
         // printf("Load progam a: %u, b: %u, c: %u\n", a, b, c);
 
-        printf("Program %u getting loaded at counter %u\n", regs[b], regs[c]);
-        print_regs(regs);
+        // printf("Program %u getting loaded at counter %u\n", regs[b], regs[c]);
+        // print_regs(regs);
         load_segment(regs[b], zero);
         *pp = zero + regs[c];
     }

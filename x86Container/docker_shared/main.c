@@ -1,22 +1,50 @@
+/**
+ * @file main.c
+ * @author Liam Drew
+ * @date 2024-12-27
+ * @brief
+ *
+ *
+ */
+
 #include <stdio.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <string.h>
-#include <assert.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "um_utils.h"
+#include <assert.h>
+#include <sys/stat.h>
+#include <string.h>
 
-#define ICAP 128
-typedef void* (*Function)(void);
-struct GlobalState gs;
+#define NUM_REGISTERS 8
+#define POWER ((uint64_t)1 << 32)
 
+typedef uint32_t Instruction;
+
+/* Sequence of program segments */
+uint32_t **segment_sequence = NULL;
+uint32_t seq_size = 0;
+uint32_t seq_capacity = 0;
+uint32_t *segment_lengths = NULL;
+
+/* Sequence of recycled segments */
+uint32_t *recycled_ids = NULL;
+uint32_t rec_size = 0;
+uint32_t rec_capacity = 0;
+
+uint32_t *initialize_memory(FILE *fp, size_t fsize);
 uint64_t assemble_word(uint64_t word, unsigned width, unsigned lsb,
                        uint64_t value);
-void *initialize_zero_segment(size_t fsize);
-size_t zero_all_registers(void *zero, size_t offset);
-void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t fsize);
-void *init_registers();
+
+void handle_instructions(uint32_t *zero);
+void handle_stop();
+static inline bool exec_instr(Instruction word, Instruction **pp,
+                              uint32_t *regs, uint32_t *zero);
+uint32_t map_segment(uint32_t size);
+void unmap_segment(uint32_t segment);
+void load_segment(uint32_t index, uint32_t *zero);
+
+void print_registers(uint32_t *regs);
+
 
 int main(int argc, char *argv[])
 {
@@ -34,158 +62,227 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    /* Initializing the global state variables */
-
-    // Setting the program counter to 0
-    gs.pc = 0;
-
-    /* Initializing the size and capacity of the memory segment array */
-    gs.seq_size = 0;
-    gs.seq_cap = ICAP;
-
-    /* Sequence of executable memory segments */
-    gs.program_seq = calloc(gs.seq_cap, sizeof(void*));
-
-    /* Sequence of UM words segments (needed for loading and storing) */
-    gs.val_seq = calloc(gs.seq_cap, sizeof(uint32_t*));
-
-    /* Array of segment sizes */
-    gs.seg_lens = calloc(gs.seq_cap, sizeof(uint32_t));
-
-    /* Initializing the size and capacity of the recycled segments array */
-    gs.rec_size = 0;
-    gs.rec_cap = ICAP;
-
-    /* Sequence of recycled segment IDs */
-    gs.rec_ids = calloc(gs.rec_cap, sizeof(uint32_t));
-
     size_t fsize = 0;
     struct stat file_stat;
     if (stat(argv[1], &file_stat) == 0) {
         fsize = file_stat.st_size;
-        assert((fsize % 4) == 0);
+        assert(fsize % 4 == 0);
     }
 
-    /* Initialize executable and non-executable memory for the zero segment
-     * fsize gives the space for UM words, multiply by 4 for machine 
-     * instructions */
-    void *zero = initialize_zero_segment(fsize * MULT);
-    // printf("The address of the zero executable segment is %p\n", zero);
-    uint32_t *zero_vals = calloc(fsize, sizeof(uint32_t));
-    load_zero_segment(zero, zero_vals, fp, fsize);
+    uint32_t zero_seg_num_words = fsize / 4;
+    uint32_t *zero_segment = initialize_memory(fp, zero_seg_num_words);
 
-    gs.program_seq[0] = zero;
-    gs.val_seq[0] = zero_vals;
-    gs.seg_lens[0] = (fsize / 4);
-    gs.seq_size++;
+    handle_instructions(zero_segment);
 
-    void *curr_seg = zero;
-
-    /* Zero out all registers r8-r15 for JIT use */
-    asm volatile(
-        "movq $0, %%r8\n\t"
-        "movq $0, %%r9\n\t"
-        "movq $0, %%r10\n\t"
-        "movq $0, %%r11\n\t"
-        "movq $0, %%r12\n\t"
-        "movq $0, %%r13\n\t"
-        "movq $0, %%r14\n\t"
-        "movq $0, %%r15\n\t"
-        :
-        :
-        : "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15" // Clobber list
-    );
-
-    while (curr_seg != NULL) {
-        Function func = (Function)(curr_seg + (gs.pc * CHUNK));
-        curr_seg = func();
-        // asm volatile(
-        //     "pushq %%rdi\n\t"
-        //     "pushq %%rsi\n\t"
-        //     "pushq %%rdx\n\t"
-        //     "pushq %%rcx\n\t"
-        //     "pushq %%r8\n\t"
-        //     "pushq %%r9\n\t"
-        //     "pushq %%rax\n\t"
-        //     "pushq %%r10\n\t"
-        //     "pushq %%r11\n\t"
-        //     :
-        //     :
-        //     : "memory");
-        // // print_registers();
-
-        // asm volatile(
-        //     "popq %%r11\n\t"
-        //     "popq %%r10\n\t"
-        //     "popq %%rax\n\t"
-        //     "popq %%r9\n\t"
-        //     "popq %%r8\n\t"
-        //     "popq %%rcx\n\t"
-        //     "popq %%rdx\n\t"
-        //     "popq %%rsi\n\t"
-        //     "popq %%rdi\n\t"
-        //     :
-        //     :
-        //     : "memory");
-    }
-
-    /* Free all program segments */
-    for (uint32_t i = 0; i < gs.seq_size; i++) {
-        munmap(gs.program_seq[i], gs.seg_lens[i] * CHUNK);
-        free(gs.val_seq[i]);
-    }
-
-    free(gs.program_seq);
-    free(gs.val_seq);
-    free(gs.seg_lens);
-    free(gs.rec_ids);
-
-    fclose(fp);
-    return 0;
+    handle_stop();
+    return EXIT_SUCCESS;
 }
 
-void *initialize_zero_segment(size_t asmbytes)
+void handle_instructions(uint32_t *zero)
 {
-    void *zero = mmap(NULL, asmbytes, PROT_READ | PROT_WRITE | PROT_EXEC,
-                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    assert(zero != MAP_FAILED);
+    uint32_t regs[NUM_REGISTERS] = {0};
+    Instruction *pp = zero;
+    Instruction word;
 
-    memset(zero, 0, asmbytes);
-    return zero;
-}
+    bool exit = false;
 
-void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t fsize)
-{
-    (void)fsize;
-    uint32_t word = 0;
-    int c;
-    int i = 0;
-    unsigned char c_char;
-    size_t offset = 0;
-
-    for (c = getc(fp); c != EOF; c = getc(fp))
+    while (!exit)
     {
-        c_char = (unsigned char)c;
-        if (i % 4 == 0)
-            word = assemble_word(word, 8, 24, c_char);
-        else if (i % 4 == 1)
-            word = assemble_word(word, 8, 16, c_char);
-        else if (i % 4 == 2)
-            word = assemble_word(word, 8, 8, c_char);
-        else if (i % 4 == 3)
-        {
-            word = assemble_word(word, 8, 0, c_char);
-            zero_vals[i / 4] = word;
-
-            /* At this point, the word is assembled and ready to be compiled
-             * into assembly */
-            offset = compile_instruction(zero, word, offset);
-            word = 0;
-        }
-        i++;
+        word = *pp;
+        pp++;
+        exit = exec_instr(word, &pp, regs, zero);
     }
 }
 
+static inline bool exec_instr(Instruction word, Instruction **pp,
+                              uint32_t *regs, uint32_t *zero)
+{
+    uint32_t a = 0, b = 0, c = 0, val = 0;
+    uint32_t opcode = word >> 28;
+
+    /* Load Value */
+    if (__builtin_expect(opcode == 13, 1))
+    {
+        a = (word >> 25) & 0x7;
+        val = word & 0x1FFFFFF;
+        // printf("Load value %u into reg %u\n", val, a);
+        regs[a] = val;
+        return false;
+    }
+
+    c = word & 0x7;
+    b = (word >> 3) & 0x7;
+    a = (word >> 6) & 0x7;
+
+    /* Segmented Load */
+    if (__builtin_expect(opcode == 1, 1))
+    {
+        // printf("Segmented load a: %u, b: %u, c: %u\n", a, b, c);
+        regs[a] = segment_sequence[regs[b]][regs[c]];
+    }
+
+    /* Segmented Store */
+    else if (__builtin_expect(opcode == 2, 1))
+    {
+        // printf("Segmented store a: %u, b: %u, c: %u\n", a, b, c);
+        segment_sequence[regs[a]][regs[b]] = regs[c];
+    }
+
+    /* Bitwise NAND */
+    else if (__builtin_expect(opcode == 6, 1))
+    {
+        // printf("Bitwise NAND a: %u, b: %u, c: %u\n", a, b, c);
+        regs[a] = ~(regs[b] & regs[c]);
+    }
+
+    /* Load Segment */
+    else if (__builtin_expect(opcode == 12, 0))
+    {
+        // printf("Load progam a: %u, b: %u, c: %u\n", a, b, c);
+
+        // printf("Program %u getting loaded at counter %u\n", regs[b], regs[c]);
+        // print_regs(regs);
+        load_segment(regs[b], zero);
+        *pp = zero + regs[c];
+    }
+
+    /* Addition */
+    else if (__builtin_expect(opcode == 3, 0))
+    {
+        // printf("Addition a: %u, b: %u, c: %u\n", a, b, c);
+        regs[a] = (regs[b] + regs[c]) % POWER;
+    }
+
+    /* Conditional Move */
+    else if (__builtin_expect(opcode == 0, 0))
+    {
+        // printf("Conditional move a: %u, b: %u, c: %u\n", a, b, c);
+
+        if (regs[c] != 0)
+            regs[a] = regs[b];
+
+        // printf("Cond move: regs a is now: %u\n", regs[a]);
+    }
+
+    /* Map Segment */
+    else if (__builtin_expect(opcode == 8, 0))
+    {
+        // printf("Map segment a: %u, b: %u, c: %u\n", a, b, c);
+        regs[b] = map_segment(regs[c]);
+    }
+
+    /* Unmap Segment */
+    else if (__builtin_expect(opcode == 9, 0))
+    {
+        // printf("Unmap segment a: %u, b: %u, c: %u\n", a, b, c);
+        unmap_segment(regs[c]);
+    }
+
+    /* Division */
+    else if (__builtin_expect(opcode == 5, 0))
+    {
+        // printf("Division a: %u, b: %u, c: %u\n", a, b, c);
+        regs[a] = regs[b] / regs[c];
+    }
+
+    /* Multiplication */
+    else if (__builtin_expect(opcode == 4, 0))
+    {
+        // printf("Multiplication a: %u, b: %u, c: %u\n", a, b, c);
+        regs[a] = (regs[b] * regs[c]) % POWER;
+    }
+
+    /* Output */
+    else if (__builtin_expect(opcode == 10, 0))
+    {
+        // printf("Output a: %u, b: %u, c: %u\n", a, b, c);
+        putchar((unsigned char)regs[c]);
+    }
+
+    /* Input */
+    else if (__builtin_expect(opcode == 11, 0))
+    {
+        // printf("Input a: %u, b: %u, c: %u\n", a, b, c);
+        regs[c] = getc(stdin);
+    }
+
+    /* Stop or Invalid Instruction */
+    else
+    {
+        // printf("Halt or other a: %u, b: %u, c: %u\n", a, b, c);
+        handle_stop();
+        return true;
+    }
+
+    return false;
+}
+
+uint32_t map_segment(uint32_t size)
+{
+    uint32_t new_seg_id;
+
+    /* If there are no available recycled segment ids, make a new one */
+    if (rec_size == 0)
+    {
+        if (seq_size == seq_capacity)
+        {
+            /* Expand the sequence if necessary */
+            seq_capacity = seq_capacity * 2 + 2;
+            segment_lengths = (uint32_t *)realloc(segment_lengths,
+                                                  (seq_capacity) * sizeof(uint32_t));
+            segment_sequence = (uint32_t **)realloc(segment_sequence,
+                                                    (seq_capacity) * sizeof(uint32_t *));
+
+            for (uint32_t i = seq_size; i < seq_capacity; i++)
+            {
+                segment_sequence[i] = NULL;
+                segment_lengths[i] = 0;
+            }
+        }
+
+        new_seg_id = seq_size++;
+    }
+
+    /* Otherwise, reuse an old one */
+    else
+        new_seg_id = recycled_ids[--rec_size];
+
+    if (segment_sequence[new_seg_id] == NULL ||
+        size > segment_lengths[new_seg_id])
+    {
+        segment_sequence[new_seg_id] =
+            (uint32_t *)realloc(segment_sequence[new_seg_id],
+                                size * sizeof(uint32_t));
+        segment_lengths[new_seg_id] = size;
+    }
+
+    /* Zero out the segment */
+    memset(segment_sequence[new_seg_id], 0, size * sizeof(uint32_t));
+    return new_seg_id;
+}
+
+void unmap_segment(uint32_t segment)
+{
+    if (rec_size == rec_capacity)
+    {
+        rec_capacity = rec_capacity * 2 + 2;
+        recycled_ids = (uint32_t *)realloc(recycled_ids, (rec_capacity) * sizeof(uint32_t));
+    }
+
+    recycled_ids[rec_size++] = segment;
+}
+
+// Sandmark doesn't work with this method: To be fixed
+void load_segment(uint32_t index, uint32_t *zero)
+{
+    if (index > 0)
+    {
+        uint32_t copied_seq_size = segment_lengths[index];
+        memcpy(zero, segment_sequence[index], copied_seq_size * sizeof(uint32_t));
+    }
+}
+
+// Set up functions
 uint64_t assemble_word(uint64_t word, unsigned width, unsigned lsb,
                        uint64_t value)
 {
@@ -199,4 +296,56 @@ uint64_t assemble_word(uint64_t word, unsigned width, unsigned lsb,
     value = value << lsb;
     uint64_t return_word = (new_word | value);
     return return_word;
+}
+
+uint32_t *initialize_memory(FILE *fp, size_t num_words)
+{
+    seq_capacity = 128;
+    segment_sequence = (uint32_t **)calloc(seq_capacity, sizeof(uint32_t *));
+    segment_lengths = (uint32_t *)calloc(seq_capacity, sizeof(uint32_t));
+
+    rec_capacity = 128;
+    recycled_ids = (uint32_t *)calloc(rec_capacity, sizeof(uint32_t *));
+
+    /* Load initial segment from file */
+    uint32_t *zero = (uint32_t *)calloc(num_words, sizeof(uint32_t));
+    uint32_t word = 0;
+    int c;
+    int i = 0;
+    unsigned char c_char;
+
+    for (c = getc(fp); c != EOF; c = getc(fp))
+    {
+        c_char = (unsigned char)c;
+        if (i % 4 == 0)
+            word = assemble_word(word, 8, 24, c_char);
+        else if (i % 4 == 1)
+            word = assemble_word(word, 8, 16, c_char);
+        else if (i % 4 == 2)
+            word = assemble_word(word, 8, 8, c_char);
+        else if (i % 4 == 3)
+        {
+            word = assemble_word(word, 8, 0, c_char);
+            zero[i / 4] = word;
+            word = 0;
+        }
+        i++;
+    }
+
+    fclose(fp);
+    segment_sequence[0] = zero;
+    segment_lengths[0] = num_words;
+    seq_size++;
+
+    return zero;
+}
+
+// Clean up:
+void handle_stop()
+{
+    for (uint32_t i = 0; i < seq_size; i++)
+        free(segment_sequence[i]);
+    free(segment_sequence);
+    free(segment_lengths);
+    free(recycled_ids);
 }
