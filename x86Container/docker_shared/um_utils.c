@@ -52,16 +52,14 @@ uint32_t map_segment(uint32_t size)
 
             // realloc the array that keeps track of sequence size
             gs.seg_lens = realloc(gs.seg_lens, gs.seq_cap * sizeof(uint32_t));
-
-            // program sequence is now a sequence of void pointers
-            // gs.program_seq = realloc(gs.program_seq, gs.seq_cap * sizeof(void*));
+            assert(gs.seg_lens != NULL);
 
             // also need to init the memory segment
             gs.val_seq = realloc(gs.val_seq, gs.seq_cap * sizeof(uint32_t*));
+            assert(gs.val_seq != NULL);
 
             // Initializing all reallocated memory
             for (uint32_t i = gs.seq_size; i < gs.seq_cap; i++) {
-                // gs.program_seq[i] = NULL;
                 gs.val_seq[i] = NULL;
                 gs.seg_lens[i] = 0;
             }
@@ -77,18 +75,13 @@ uint32_t map_segment(uint32_t size)
 
     /* If the segment didn't previously exist or wasn't large enought for us*/
     if (gs.val_seq[new_seg_id] == NULL || size > gs.seg_lens[new_seg_id]) {
-        
-        // TODO: Ensure this doesn't leak memory
-        // gs.program_seq[new_seg_id] = mmap(gs.program_seq[new_seg_id], size * CHUNK,
-        //                                   PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
         gs.val_seq[new_seg_id] = realloc(gs.val_seq[new_seg_id], size * sizeof(uint32_t*));
-
+        assert(gs.val_seq[new_seg_id] != NULL);
         gs.seg_lens[new_seg_id] = size;
     }
 
     /* zero out the segment */
-    // memset(gs.program_seq[new_seg_id], 0, size * CHUNK);
     memset(gs.val_seq[new_seg_id], 0, size * sizeof(uint32_t));
 
     return new_seg_id;
@@ -106,35 +99,16 @@ void unmap_segment(uint32_t segmentId)
 
 uint32_t segmented_load(uint32_t b_val, uint32_t c_val)
 {
-    /* For a segmented load, we only get the relevant value from the value 
-     * segment, since it makes no sense to put compiled instructions in a 
-     * register. This value can be compiled when it comes time to put it back
-     * into a memory segment */
-
-    /* The return value gets loaded into the correct register by the calling 
-     * assembly */
-    assert(gs.val_seq[b_val]);
-    assert(c_val < gs.seg_lens[b_val]);
-
     uint32_t x = gs.val_seq[b_val][c_val];
-
-    // printf("The seg loaded word is %u\n", x);
     return x;
 }
 
 void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
 {
-
-    // TODO: add a check to see if we're messing with the zero segment
     /* Load the inputted word into value memory */
-
     gs.val_seq[a_val][b_val] = c_val;
 
-    /* Compile the inputted word as if it were an instruction (in case it is)
-     * and put it in executable memory*/
-
     /* NOTE: This only needs to happen if we are storing in the zero segment */
-
     // doing a segmented_store into the zero segment, so we have to compile
     if (a_val == 0) {
         compile_instruction(gs.active, c_val, b_val * CHUNK);
@@ -183,25 +157,7 @@ void *load_program(uint32_t b_val, uint32_t c_val)
 size_t compile_instruction(void *zero, Instruction word, size_t offset)
 {
     uint32_t opcode = (word >> 28) & 0xF;
-    uint32_t a = 0, b = 0, c = 0, val = 0;
-
-    if (opcode == 13)
-    {
-        a = (word >> 25) & 0x7;
-        val = word & 0x1FFFFFF;
-        // printf("Reg a is %d\n", a);
-        // printf("Val to load is %d\n", val);
-    }
-    
-    else
-    {
-        c = word & 0x7;
-        b = (word >> 3) & 0x7;
-        a = (word >> 6) & 0x7;
-        // printf("Reg a is %d\n", a);
-        // printf("Reg b is %d\n", b);
-        // printf("Reg c is %d\n", c);
-    }
+    uint32_t a = 0;
 
     // Now based on the opcode, figure out what to do
 
@@ -210,11 +166,20 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     {
         // printf("Load value a: %u, b: %u, c: %u\n", a, b, c);
         // Load the right register and do the thing
+        a = (word >> 25) & 0x7;
+        uint32_t val = word & 0x1FFFFFF;
         offset += load_reg(zero, offset, a, val);
+        return offset;
     }
 
+    uint32_t b = 0, c = 0;
+
+    c = word & 0x7;
+    b = (word >> 3) & 0x7;
+    a = (word >> 6) & 0x7;
+
     /* Output */
-    else if (opcode == 10)
+    if (opcode == 10)
     {
         // Load the rigther register and do the thing
         // printf("Output a: %u, b: %u, c: %u\n", a, b, c);
@@ -338,49 +303,9 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = (value >> 16) & 0xFF;
     *p++ = (value >> 24) & 0xFF;
 
-    // 32 - 7 = 25 NoOps;
-    // 40 - 7 = 33 No Ops;
-    *p++ = 0x0F; *p++ = 0x1F; *p++ = 0x00;
-
-    *p++ = 0x0F;
+    // Jump forward 31 bytes
+    *p++ = 0xEB;
     *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
     return CHUNK;
 }
@@ -388,11 +313,6 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     unsigned char *p = zero + offset;
-
-    // xor rax, rax
-    *p++ = 0x48;
-    *p++ = 0x31;  
-    *p++ = 0xc0;
 
     // move first source to eax
     *p++ = 0x44;
@@ -409,44 +329,10 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xc0 | a;
 
-    // 40 - 12 = 28 No Ops;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // jump 29 bytes
+    *p++ = 0xEB;
+    *p++ = 0x1D;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x90;
     return CHUNK;
 }
 
@@ -472,11 +358,6 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     unsigned char *p = zero + offset;
 
-    // xor rax,rax
-    *p++ = 0x48;
-    *p++ = 0x31;
-    *p++ = 0xc0;
-
     // mov eax, rBd
     *p++ = 0x44;
     *p++ = 0x89;
@@ -492,72 +373,16 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xC0 | a;
 
-    // 32 - 9 = 23 No Ops
-    // 40 - 9 = 31 No Ops
+    // jump 29 bytes
+    *p++ = 0xEB;
+    *p++ = 0x1D;
 
-    // xor rax,rax
-    *p++ = 0x48;
-    *p++ = 0x31;
-    *p++ = 0xc0;
-
-    // After any arithmetic/logical operation
-    // mov rAd, rAd (zero-extend)
-    *p++ = 0x45;
-    *p++ = 0x89;
-    *p++ = 0xc0 | (a << 3) | a;
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // 40 - 15 = 25 No Ops
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x90;
     return CHUNK;
 }
 
 size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     unsigned char *p = zero + offset;
-
-    // xor rax,rax
-    *p++ = 0x48;
-    *p++ = 0x31;
-    *p++ = 0xc0;
 
     *p++ = 0x48; // REX.W prefix for 64-bit operation
     *p++ = 0x31; // XOR r/m64, r64
@@ -578,57 +403,10 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xC0 | a;
 
-    // xor rax,rax
-    *p++ = 0x48;
-    *p++ = 0x31;
-    *p++ = 0xc0;
+    // jump 26 bytes
+    *p++ = 0xEB;
+    *p++ = 0x1A;
 
-    // 40 - 12 = 28 No Ops
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // 40 - 18 = 22 No Ops
-
-    // After any arithmetic/logical operation
-    // mov rAd, rAd (zero-extend)
-    *p++ = 0x45;
-    *p++ = 0x89;
-    *p++ = 0xc0 | (a << 3) | a;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x90;
     return CHUNK;
 }
 
@@ -648,64 +426,20 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x03;
 
     // Note: I think this comment is wrong
-    // mov rAd, rAd
     *p++ = 0x45;
     *p++ = 0x89;
     *p++ = 0xC0 | (b << 3) | a;
 
-    // 40 - 9 = 31 No Ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // jump 29 bytes
+    *p++ = 0xEB;
+    *p++ = 0x1D;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x90;
     return CHUNK;
 }
 
 size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     unsigned char *p = zero + offset;
-
-    // xor rax, rax
-    *p++ = 0x48;
-    *p++ = 0x31;
-    *p++ = 0xc0;
 
     // move b to rax
     *p++ = 0x44;
@@ -728,41 +462,9 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xc0 | a;
 
-    // // 40 - 15 = 25 No Ops
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x90;
+    // jump 26 bytes
+    *p++ = 0xEB;
+    *p++ = 0x1A;
 
     return CHUNK;
 }
@@ -776,7 +478,8 @@ void print_out(uint32_t x)
 
 size_t print_reg(void *zero, size_t offset, unsigned c)
 {
-    void *putchar_addr = (void *)&print_out;
+    // void *putchar_addr = (void *)&print_out;
+    void *putchar_addr = (void *)&putchar;
 
     unsigned char *p = zero + offset;
 
@@ -786,18 +489,18 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0xc7 | (c << 3); // ModR/M byte: edi(111) with reg number
 
     // push r8 - r11 onto the stack
-    *p++ = 0x41;
-    *p++ = 0x50;
+    // *p++ = 0x41;
+    // *p++ = 0x50;
 
-    *p++ = 0x41;
-    *p++ = 0x51;
-
-    *p++ = 0x41;
-    *p++ = 0x52;
-
-    *p++ = 0x41;
-    *p++ = 0x53;
+    // *p++ = 0x41;
+    // *p++ = 0x51;
     
+    // *p++ = 0x41;
+    // *p++ = 0x52;
+
+    // *p++ = 0x41;
+    // *p++ = 0x53;
+
     /* This calling method has been a nightmare*/
     // int32_t call_offset = (int32_t)((uint64_t)putchar_addr - ((uint64_t)p + 5));
     // *p++ = 0xe8;
@@ -813,32 +516,22 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0xff;
     *p++ = 0xd0; // ModR/M byte for call rax
 
-
     // pop r8 - r11 off the stack
-    *p++ = 0x41;
-    *p++ = 0x5B;
+    // *p++ = 0x41;
+    // *p++ = 0x5B;
+    // *p++ = 0x41;
+    // *p++ = 0x5A;
 
-    *p++ = 0x41;
-    *p++ = 0x5A;
+    // *p++ = 0x41;
+    // *p++ = 0x59;
 
-    *p++ = 0x41;
-    *p++ = 0x59;
+    // *p++ = 0x41;
+    // *p++ = 0x58;
 
-    *p++ = 0x41;
-    *p++ = 0x58;
+    // jump 23 bytes
+    *p++ = 0xEB;
+    *p++ = 0x17;
 
-    // 40 - 31 = 9 No Ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
     return CHUNK;
 }
 
@@ -939,6 +632,7 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x41;
     *p++ = 0x53;
 
+
     // int32_t rel_offset = (int32_t)((uint64_t)map_segment_addr - ((uint64_t)p + 5));
     // // call rel32
     // *p++ = 0xE8; // Direct relative call
@@ -1003,14 +697,12 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0x41;
     *p++ = 0x50;
 
-    *p++ = 0x41;
-    *p++ = 0x51;
-
-    *p++ = 0x41;
-    *p++ = 0x52;
-
-    *p++ = 0x41;
-    *p++ = 0x53;
+    // *p++ = 0x41;
+    // *p++ = 0x51;
+    // *p++ = 0x41;
+    // *p++ = 0x52;
+    // *p++ = 0x41;
+    // *p++ = 0x53;
 
     // int32_t rel_offset = (int32_t)((uint64_t)unmap_segment_addr - ((uint64_t)p + 5));
     // *p++ = 0xe8;
@@ -1027,17 +719,30 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0xd0; // ModR/M byte for call rax
 
     // pop r8 - r11 off the stack
-    *p++ = 0x41;
-    *p++ = 0x5B;
-
-    *p++ = 0x41;
-    *p++ = 0x5A;
-
-    *p++ = 0x41;
-    *p++ = 0x59;
+    // *p++ = 0x41;
+    // *p++ = 0x5B;
+    // *p++ = 0x41;
+    // *p++ = 0x5A;
+    // *p++ = 0x41;
+    // *p++ = 0x59;
 
     *p++ = 0x41;
     *p++ = 0x58;
+
+
+
+    *p++ = 0x90;
+    *p++ = 0x90;
+    *p++ = 0x90;
+    *p++ = 0x90;
+    *p++ = 0x90;
+    *p++ = 0x90;
+    *p++ = 0x90;
+    *p++ = 0x90;
+    *p++ = 0x90;
+    *p++ = 0x90;
+    *p++ = 0x90;
+    *p++ = 0x90;
 
     // 40 - 31 = 9 No Ops
     *p++ = 0x0F;
