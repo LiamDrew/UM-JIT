@@ -214,11 +214,11 @@ static inline bool exec_instr(Instruction word, Instruction **pp, void *active)
         *p++ = 0x41;
         *p++ = 0x51;
 
-        *p++ = 0x41;
-        *p++ = 0x52;
+        // *p++ = 0x41;
+        // *p++ = 0x52;
 
-        *p++ = 0x41;
-        *p++ = 0x53;
+        // *p++ = 0x41;
+        // *p++ = 0x53;
 
         *p++ = 0x48; // REX.W prefix
         *p++ = 0xb8; // mov rax, imm64
@@ -230,11 +230,11 @@ static inline bool exec_instr(Instruction word, Instruction **pp, void *active)
         *p++ = 0xd0; // ModR/M byte for call rax
 
         // pop r8 - r11 off the stack
-        *p++ = 0x41;
-        *p++ = 0x5B;
+        // *p++ = 0x41;
+        // *p++ = 0x5B;
 
-        *p++ = 0x41;
-        *p++ = 0x5A;
+        // *p++ = 0x41;
+        // *p++ = 0x5A;
 
         *p++ = 0x41;
         *p++ = 0x59;
@@ -657,11 +657,11 @@ static inline bool exec_instr(Instruction word, Instruction **pp, void *active)
         *p++ = 0x41;
         *p++ = 0x51;
 
-        *p++ = 0x41;
-        *p++ = 0x52;
+        // *p++ = 0x41;
+        // *p++ = 0x52;
 
-        *p++ = 0x41;
-        *p++ = 0x53;
+        // *p++ = 0x41;
+        // *p++ = 0x53;
 
         // 12 byte function call;
         *p++ = 0x48; // REX.W prefix
@@ -674,11 +674,11 @@ static inline bool exec_instr(Instruction word, Instruction **pp, void *active)
         *p++ = 0xd0; // ModR/M byte for call rax
 
         // pop r8 - r11 off the stack
-        *p++ = 0x41;
-        *p++ = 0x5B;
+        // *p++ = 0x41;
+        // *p++ = 0x5B;
 
-        *p++ = 0x41;
-        *p++ = 0x5A;
+        // *p++ = 0x41;
+        // *p++ = 0x5A;
 
         *p++ = 0x41;
         *p++ = 0x59;
@@ -702,11 +702,11 @@ static inline bool exec_instr(Instruction word, Instruction **pp, void *active)
         *p++ = 0x41;
         *p++ = 0x51;
 
-        *p++ = 0x41;
-        *p++ = 0x52;
+        // *p++ = 0x41;
+        // *p++ = 0x52;
 
-        *p++ = 0x41;
-        *p++ = 0x53;
+        // *p++ = 0x41;
+        // *p++ = 0x53;
 
         // direct function call
         *p++ = 0x48;
@@ -719,11 +719,11 @@ static inline bool exec_instr(Instruction word, Instruction **pp, void *active)
         *p++ = 0xd0;
 
         // pop r8 - r11 off the stack
-        *p++ = 0x41;
-        *p++ = 0x5B;
+        // *p++ = 0x41;
+        // *p++ = 0x5B;
 
-        *p++ = 0x41;
-        *p++ = 0x5A;
+        // *p++ = 0x41;
+        // *p++ = 0x5A;
 
         *p++ = 0x41;
         *p++ = 0x59;
