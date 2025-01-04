@@ -831,6 +831,70 @@ size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsign
     return CHUNK;
 }
 
+// // inject segmented load
+// size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+// {
+//     // void *seg_load_addr = (void *)&segmented_load;
+//     void *val_seq_addr = (void *)&gs.val_seq;
+
+//     unsigned char *p = zero + offset;
+
+//     // load address of val_seq into RAX
+//     *p++ = 0x48;
+//     *p++ = 0xb8;
+//     memcpy(p, &val_seq_addr, sizeof(void*));
+//     p += sizeof(void*);
+
+//     // mov rsi, rBd
+//     *p++ = 0x44;
+//     *p++ = 0x89;
+//     *p++ = 0xc7 | (b << 3);
+
+//     // mov rdi, rCd
+//     *p++ = 0x44;
+//     *p++ = 0x89;
+//     *p++ = 0xc6 | (c << 3);
+
+//     // mov rax, [rax + rsi*8]
+//     *p++ = 0x48;
+//     *p++ = 0x8b;
+//     *p++ = 0x04;
+//     *p++ = 0xf0;
+
+//     // mov eax, [rax + rdi*4]
+//     *p++ = 0x8b;
+//     *p++ = 0x04;
+//     *p++ = 0xb8;
+
+//     // mov to return register
+//     *p++ = 0x41;
+//     *p++ = 0x89;
+//     *p++ = 0xc0 | a;
+
+//     // 14 No Ops
+
+//     *p++ = 0x0F;
+//     *p++ = 0x1F;
+//     *p++ = 0x00;
+
+//     *p++ = 0x0F;
+//     *p++ = 0x1F;
+//     *p++ = 0x00;
+
+//     *p++ = 0x0F;
+//     *p++ = 0x1F;
+//     *p++ = 0x00;
+
+//     *p++ = 0x0F;
+//     *p++ = 0x1F;
+//     *p++ = 0x00;
+
+//     *p++ = 0x90;
+//     *p++ = 0x90;
+
+//     return CHUNK;
+// }
+
 // inject segmented store
 size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {   
