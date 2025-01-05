@@ -29,6 +29,7 @@
 src = $(wildcard *.c)
 obj = $(src:.c=.o)
 
+# O2 Messes things up too much
 CC = gcc
 CFLAGS = -g -Wall -Wextra -Werror -ffixed-r12 -ffixed-r13 -ffixed-r14 -ffixed-r15 -O1
 # CFLAGS = -g -Wall -Wextra -Werror -ffixed-r11 -ffixed-r12 -ffixed-r13 -ffixed-r14 -ffixed-r15 -O2

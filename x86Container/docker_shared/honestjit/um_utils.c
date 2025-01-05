@@ -45,11 +45,9 @@ uint32_t map_segment(uint32_t size)
     uint32_t new_seg_id;
 
     /* If there are no available recycled segment ids, make a new one */
-    if (gs.rec_size == 0)
-    {
+    if (gs.rec_size == 0) {
         /* Expand if necessary */
-        if (gs.seq_size == gs.seq_cap)
-        {
+        if (gs.seq_size == gs.seq_cap) {
             gs.seq_cap *= 2;
 
             // realloc the array that keeps track of sequence size
@@ -57,12 +55,11 @@ uint32_t map_segment(uint32_t size)
             assert(gs.seg_lens != NULL);
 
             // also need to init the memory segment
-            gs.val_seq = realloc(gs.val_seq, gs.seq_cap * sizeof(uint32_t *));
+            gs.val_seq = realloc(gs.val_seq, gs.seq_cap * sizeof(uint32_t*));
             assert(gs.val_seq != NULL);
 
             // Initializing all reallocated memory
-            for (uint32_t i = gs.seq_size; i < gs.seq_cap; i++)
-            {
+            for (uint32_t i = gs.seq_size; i < gs.seq_cap; i++) {
                 gs.val_seq[i] = NULL;
                 gs.seg_lens[i] = 0;
             }
@@ -72,17 +69,15 @@ uint32_t map_segment(uint32_t size)
     }
 
     /* Otherwise, reuse an old one */
-    else
-    {
+    else {
         new_seg_id = gs.rec_ids[--gs.rec_size];
     }
 
     /* If the segment didn't previously exist or wasn't large enought for us*/
-    if (gs.val_seq[new_seg_id] == NULL || size > gs.seg_lens[new_seg_id])
-    {
-        gs.val_seq[new_seg_id] = realloc(gs.val_seq[new_seg_id], size * sizeof(uint32_t));
-        assert(gs.val_seq[new_seg_id] != NULL); // Make sure the realloc didn't fail
+    if (gs.val_seq[new_seg_id] == NULL || size > gs.seg_lens[new_seg_id]) {
 
+        gs.val_seq[new_seg_id] = realloc(gs.val_seq[new_seg_id], size * sizeof(uint32_t*));
+        assert(gs.val_seq[new_seg_id] != NULL);
         gs.seg_lens[new_seg_id] = size;
     }
 
@@ -94,8 +89,7 @@ uint32_t map_segment(uint32_t size)
 
 void unmap_segment(uint32_t segmentId)
 {
-    if (gs.rec_size == gs.rec_cap)
-    {
+    if (gs.rec_size == gs.rec_cap) {
         gs.rec_cap *= 2;
         gs.rec_ids = realloc(gs.rec_ids, gs.rec_cap * sizeof(uint32_t));
     }
@@ -103,25 +97,26 @@ void unmap_segment(uint32_t segmentId)
     gs.rec_ids[gs.rec_size++] = segmentId;
 }
 
-// uint32_t segmented_load(uint32_t b_val, uint32_t c_val)
-// {
-//     uint32_t x = gs.val_seq[b_val][c_val];
-//     return x;
-// }
+uint32_t segmented_load(uint32_t b_val, uint32_t c_val)
+{
+    uint32_t x = gs.val_seq[b_val][c_val];
+    return x;
+}
 
-// void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
-// {
-//     /* Load the inputted word into value memory */
-//     gs.val_seq[a_val][b_val] = c_val;
+void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val)
+{
+    /* Load the inputted word into value memory */
+    gs.val_seq[a_val][b_val] = c_val;
 
-//     /* NOTE: This only needs to happen if we are storing in the zero segment */
-//     // doing a segmented_store into the zero segment, so we have to compile
-//     // if (a_val == 0) {
-//     //     // what if I just don't do this?
-//     //     // NOTE: Some devious stuff is going on here
-//     //     // compile_instruction(gs.active, c_val, b_val * CHUNK);
-//     // }
-// }
+    /* NOTE: This only needs to happen if we are storing in the zero segment */
+    // doing a segmented_store into the zero segment, so we have to compile
+    // if (a_val == 0) {
+    //     // what if I just don't do this?
+    //     // NOTE: Some devious stuff is going on here
+    //     // compile_instruction(gs.active, c_val, b_val * CHUNK);
+    // }
+
+}
 
 void *load_program(uint32_t b_val, uint32_t c_val)
 {
@@ -129,13 +124,23 @@ void *load_program(uint32_t b_val, uint32_t c_val)
     gs.pc = c_val;
 
     /* If segment zero is loaded, just return the active segment */
-    if (b_val == 0)
-    {
+    if (b_val == 0) {
         return gs.active;
     }
 
     /* If a different segment is loaded, put that in */
+    // TODO: Free the existing zero segment
 
+    // if zero segment memory is large enough, reuse it
+
+    // else, free it and realloc
+    if (b_val > gs.seq_size) {
+        printf("B val is %u\n", b_val);
+        printf("Seq size is %u\n", gs.seq_size);
+    }
+
+    assert(b_val < gs.seq_size);
+    
     uint32_t new_seg_size = gs.seg_lens[b_val];
     uint32_t *new_vals = calloc(new_seg_size, sizeof(uint32_t));
     memcpy(new_vals, gs.val_seq[b_val], new_seg_size * sizeof(uint32_t));
@@ -146,12 +151,11 @@ void *load_program(uint32_t b_val, uint32_t c_val)
 
     // this function will have to do the compiling for the new memory segment
     void *new_zero = mmap(NULL, new_seg_size * CHUNK,
-                          PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     memset(new_zero, 0, new_seg_size * CHUNK);
 
     uint32_t offset = 0;
-    for (uint32_t i = 0; i < new_seg_size; i++)
-    {
+    for (uint32_t i = 0; i < new_seg_size; i++) {
         offset = compile_instruction(new_zero, new_vals[i], offset);
     }
 
@@ -299,8 +303,8 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     unsigned char *p = zero + offset;
 
     /* mov rXd, imm32 (where X is reg_num) */
-    *p++ = 0x41;     // Reg prefix for r8-r15
-    *p++ = 0xc7;     // mov immediate value to 32-bit register
+    *p++ = 0x41;           // Reg prefix for r8-r15
+    *p++ = 0xc7;           // mov immediate value to 32-bit register
     *p++ = 0xc0 | a; // ModR/M byte for target register
 
     *p++ = value & 0xFF;
@@ -421,10 +425,10 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
     // if rC != 0, Ra = Rb
     // cmp rC, 0
-    *p++ = 0x41;     // REX.B
-    *p++ = 0x83;     // CMP r/m32, imm8
+    *p++ = 0x41;           // REX.B
+    *p++ = 0x83;           // CMP r/m32, imm8
     *p++ = 0xF8 | c; // ModR/M for CMP
-    *p++ = 0x00;     // immediate 0
+    *p++ = 0x00;           // immediate 0
 
     // jz skip (over 3 bytes)
     *p++ = 0x74;
@@ -474,12 +478,12 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return CHUNK;
 }
 
-// void print_out(uint32_t x)
-// {
-//     /* Registers MUST be saved in the inline assembly */
-//     unsigned char c = (unsigned char)x;
-//     putchar(c);
-// }
+void print_out(uint32_t x)
+{
+    /* Registers MUST be saved in the inline assembly */
+    unsigned char c = (unsigned char)x;
+    putchar(c);
+}
 
 size_t print_reg(void *zero, size_t offset, unsigned c)
 {
@@ -496,15 +500,6 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     // push r8 onto the stack
     *p++ = 0x41;
     *p++ = 0x50;
-
-    *p++ = 0x41;
-    *p++ = 0x51;
-
-    *p++ = 0x41;
-    *p++ = 0x52;
-
-    *p++ = 0x41;
-    *p++ = 0x53;
 
     /* This calling method has been a nightmare*/
     // int32_t call_offset = (int32_t)((uint64_t)putchar_addr - ((uint64_t)p + 5));
@@ -523,20 +518,11 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
 
     // pop r8 off the stack
     *p++ = 0x41;
-    *p++ = 0x5B;
-
-    *p++ = 0x41;
-    *p++ = 0x5A;
-
-    *p++ = 0x41;
-    *p++ = 0x59;
-
-    *p++ = 0x41;
     *p++ = 0x58;
 
     // jump 19 bytes
     *p++ = 0xEB;
-    *p++ = 0x07;
+    *p++ = 0x13;
 
     return CHUNK;
 }
@@ -578,8 +564,8 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 
     // move reg c to be the function call argument
     // mov rC, rdi
-    *p++ = 0x44;            // Reg prefix for r8-r15
-    *p++ = 0x89;            // mov reg to reg
+    *p++ = 0x44; // Reg prefix for r8-r15
+    *p++ = 0x89; // mov reg to reg
     *p++ = 0xc7 | (c << 3); // ModR/M byte
 
     // push r8 - r11 onto the stack
@@ -594,6 +580,7 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 
     *p++ = 0x41;
     *p++ = 0x53;
+
 
     // int32_t rel_offset = (int32_t)((uint64_t)map_segment_addr - ((uint64_t)p + 5));
     // // call rel32
@@ -651,22 +638,13 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
 
     // move reg c to be the function call argument
     // mov rC, rdi
-    *p++ = 0x44;            // Reg prefix for r8-r15
-    *p++ = 0x89;            // mov reg to reg
+    *p++ = 0x44; // Reg prefix for r8-r15
+    *p++ = 0x89; // mov reg to reg
     *p++ = 0xc7 | (c << 3); // ModR/M byte
 
     // push r8 onto the stack
     *p++ = 0x41;
     *p++ = 0x50;
-
-    *p++ = 0x41;
-    *p++ = 0x51;
-
-    *p++ = 0x41;
-    *p++ = 0x52;
-
-    *p++ = 0x41;
-    *p++ = 0x53;
 
     *p++ = 0x48; // REX.W prefix
     *p++ = 0xb8; // mov rax, imm64
@@ -679,6 +657,61 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
 
     // pop r8 off the stack
     *p++ = 0x41;
+    *p++ = 0x58;
+
+    // jump 19 bytes
+    *p++ = 0xEB;
+    *p++ = 0x13;
+
+    return CHUNK;
+}
+
+// inject segmented load
+size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+{
+    void *seg_load_addr = (void *)&segmented_load;
+
+    unsigned char *p = zero + offset;
+
+    // mov rsi, rBd
+    *p++ = 0x44;
+    *p++ = 0x89;
+    *p++ = 0xc7 | (b << 3);
+
+    // mov rdi, rCd
+    *p++ = 0x44;
+    *p++ = 0x89;
+    *p++ = 0xc6 | (c << 3);
+
+    // push r8 - r11 onto the stack
+    *p++ = 0x41;
+    *p++ = 0x50;
+
+    *p++ = 0x41;
+    *p++ = 0x51;
+
+    *p++ = 0x41;
+    *p++ = 0x52;
+
+    *p++ = 0x41;
+    *p++ = 0x53;
+
+    // int32_t rel_offset = (int32_t)((uint64_t)seg_load_addr - ((uint64_t)p + 5));
+    // *p++ = 0xe8;
+    // memcpy(p, &rel_offset, sizeof(rel_offset));
+    // p += sizeof(rel_offset);
+
+    *p++ = 0x48; // REX.W prefix
+    *p++ = 0xb8; // mov rax, imm64
+    memcpy(p, &seg_load_addr, sizeof(void *));
+    p += sizeof(void *);
+
+    // call rax
+    *p++ = 0xff;
+    *p++ = 0xd0; // ModR/M byte for call rax
+
+    // pop r8 - r11 off the stack
+    *p++ = 0x41;
     *p++ = 0x5B;
 
     *p++ = 0x41;
@@ -690,87 +723,79 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0x41;
     *p++ = 0x58;
 
-    // jump 19 bytes
-    *p++ = 0xEB;
-    *p++ = 0x07;
-    // *p++ = 0x13;
-
-    return CHUNK;
-}
-
-// inject segmented load
-size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
-{
-    unsigned char *p = zero + offset;
-
-    // load address of val_seq into RAX
-    *p++ = 0x48;
-    *p++ = 0xb8;
-    uint64_t addr = (uint64_t)&gs.val_seq;
-    memcpy(p, &addr, sizeof(addr));
-    p += 8;
-
-    // mov rax, [rax]            (Dereference to get the value)
-    *p++ = 0x48;
-    *p++ = 0x8b;
-    *p++ = 0x00;
-
-    // mov rdi, rBd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xc7 | (b << 3);
-
-    // mov rsi, rCd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xc6 | (c << 3);
-
-    // mov rax, [rax + rdi*8]  (using rdi now for *8)
-    *p++ = 0x48;
-    *p++ = 0x8b;
-    *p++ = 0x04;
-    *p++ = 0xf8;
-
-    // // mov eax, [rax + rsi*4]  (using rsi now for *4)
-    *p++ = 0x8b;
-    *p++ = 0x04;
-    *p++ = 0xb0;
-
-    // mov to return register
+    // return into correct register
+    // move return value from rax to reg q
+    // mov ra, rax
     *p++ = 0x41;
     *p++ = 0x89;
     *p++ = 0xc0 | a;
 
-    // 12 No Ops
-    *p++ = 0xEB;
-    *p++ = 0x09;
-
+    // 40 - 37 = 3 No Ops
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
     return CHUNK;
 }
 
+// TODO: having a lot of problems here
+// // inject segmented load
+// size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+// {
+//     // void *seg_load_addr = (void *)&segmented_load;
+//     void *val_seq_addr = (void *)&gs.val_seq;
+
+//     unsigned char *p = zero + offset;
+
+//     // load address of val_seq into RAX
+//     *p++ = 0x48;
+//     *p++ = 0xb8;
+//     memcpy(p, &val_seq_addr, sizeof(void*));
+//     p += sizeof(void*);
+
+//     // mov rdi, rBd
+//     *p++ = 0x44;
+//     *p++ = 0x89;
+//     *p++ = 0xc7 | (b << 3);
+
+//     // mov rsi, rCd
+//     *p++ = 0x44;
+//     *p++ = 0x89;
+//     *p++ = 0xc6 | (c << 3);
+
+//     // mov rax, [rax + rdi*8]  (using rdi now for *8)
+//     *p++ = 0x48;
+//     *p++ = 0x8b;
+//     *p++ = 0x04;
+//     *p++ = 0xf8;
+
+//     // mov eax, [rax + rsi*4]  (using rsi now for *4)
+//     *p++ = 0x8b;
+//     *p++ = 0x04;
+//     *p++ = 0xb0;
+
+//     // mov to return register
+//     *p++ = 0x41;
+//     *p++ = 0x89;
+//     *p++ = 0xc0 | a;
+
+//     // 12 No Ops
+//     *p++ = 0xEB;
+//     *p++ = 0x0C;
+
+//     return CHUNK;
+// }
+
 // inject segmented store
-/* I discovered a weakness in the benchmark that allows me to inline this
- * and get a fair bit more performance out of the compiler. If a UM program
- * were to encounter a segmented store that stored an instruction into the zero
- * segment that was going to be executed, this compiler would crash. However,
- * neither the midmark or the sandmark demand this of the JIT. Perhaps advent
- * or codex does, I haven't checked. If that were the case, I could modify this
- * function to make a function call with the 14 remaining bytes I have. */
 size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
-    // void *val_seq_addr = (void *)&gs.val_seq;
+    void *val_seq_addr = (void *)&gs.val_seq;
     unsigned char *p = zero + offset;
 
-    *p++ = 0x48;
-    *p++ = 0xb8;
-    uint64_t addr = (uint64_t)&gs.val_seq;
-    memcpy(p, &addr, sizeof(addr));
-    p += 8;
-
-    // mov rax, [rax]            (Dereference to get the value)
-    *p++ = 0x48;
-    *p++ = 0x8b;
-    *p++ = 0x00;
+    // Load gs.val_seq address into rax
+    *p++ = 0x48; // REX.W
+    *p++ = 0xb8; // mov rax, imm64
+    memcpy(p, &val_seq_addr, sizeof(void *));
+    p += sizeof(void *);
 
     // mov rdi, rad
     *p++ = 0x44;
@@ -800,10 +825,80 @@ size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsig
 
     // 40 - 28 bytes = jump 12 bytes
     *p++ = 0xEB;
-    *p++ = 0x09;
+    *p++ = 0x0C;
 
     return CHUNK;
 }
+
+// // inject segmented store
+// size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+// {   
+//     void *seg_store_addr = (void *)&segmented_store;
+
+//     unsigned char *p = zero + offset;
+
+//     // mov rsi, rad
+//     *p++ = 0x44;
+//     *p++ = 0x89;
+//     *p++ = 0xc7 | (a << 3);
+
+//     // mov rdx, rbd
+//     *p++ = 0x44;
+//     *p++ = 0x89;
+//     *p++ = 0xc6 | (b << 3);
+
+//     // mov rcx, rcd
+//     *p++ = 0x44;
+//     *p++ = 0x89;
+//     *p++ = 0xc2 | (c << 3);
+
+//     // push r8 - r11 onto the stack
+//     *p++ = 0x41;
+//     *p++ = 0x50;
+
+//     *p++ = 0x41;
+//     *p++ = 0x51;
+
+//     *p++ = 0x41;
+//     *p++ = 0x52;
+
+//     *p++ = 0x41;
+//     *p++ = 0x53;
+
+//     // int32_t rel_offset = (int32_t)((uint64_t)seg_store_addr - ((uint64_t)p + 5));
+//     // *p++ = 0xe8;
+//     // memcpy(p, &rel_offset, sizeof(rel_offset));
+//     // p += sizeof(rel_offset);
+
+//     *p++ = 0x48; // REX.W prefix
+//     *p++ = 0xb8; // mov rax, imm64
+//     memcpy(p, &seg_store_addr, sizeof(void*));
+//     p += sizeof(void*);
+
+//     // call rax
+//     *p++ = 0xff;
+//     *p++ = 0xd0; // ModR/M byte for call rax
+
+//     // pop r8 - r11 off the stack
+//     *p++ = 0x41;
+//     *p++ = 0x5B;
+
+//     *p++ = 0x41;
+//     *p++ = 0x5A;
+
+//     *p++ = 0x41;
+//     *p++ = 0x59;
+
+//     *p++ = 0x41;
+//     *p++ = 0x58;
+
+//     // 40 - 37 = 3 no ops
+//     *p++ = 0x0F;
+//     *p++ = 0x1F;
+//     *p++ = 0x00;
+
+//     return CHUNK;
+// }
 
 // inject load program
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
@@ -845,7 +940,7 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     // call rax
     *p++ = 0xff;
     *p++ = 0xd0;
-
+    
     // this function better return rax as the right thing
     // injected function needs to ret (rax should already be the right thing)
 
@@ -875,6 +970,7 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 
     return CHUNK;
 }
+
 
 // NOTEs for readme:
 // have to compile the contents of c_val back into a UM instruction, and store in the right segment

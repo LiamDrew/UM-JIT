@@ -8,7 +8,7 @@
 #include "um_utils.h"
 
 #define ICAP 128
-typedef void *(*Function)(void);
+typedef void* (*Function)(void);
 struct GlobalState gs;
 
 uint64_t assemble_word(uint64_t word, unsigned width, unsigned lsb,
@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
     gs.active = NULL;
 
     /* Sequence of UM words segments (needed for loading and storing) */
-    gs.val_seq = calloc(gs.seq_cap, sizeof(uint32_t *));
+    gs.val_seq = calloc(gs.seq_cap, sizeof(uint32_t*));
 
     /* Array of segment sizes */
     gs.seg_lens = calloc(gs.seq_cap, sizeof(uint32_t));
@@ -62,14 +62,13 @@ int main(int argc, char *argv[])
 
     size_t fsize = 0;
     struct stat file_stat;
-    if (stat(argv[1], &file_stat) == 0)
-    {
+    if (stat(argv[1], &file_stat) == 0) {
         fsize = file_stat.st_size;
         assert((fsize % 4) == 0);
     }
 
     /* Initialize executable and non-executable memory for the zero segment
-     * fsize gives the space for UM words, multiply by 4 for machine
+     * fsize gives the space for UM words, multiply by 4 for machine 
      * instructions */
     void *zero = initialize_zero_segment(fsize * MULT);
     // printf("The address of the zero executable segment is %p\n", zero);
@@ -81,7 +80,7 @@ int main(int argc, char *argv[])
     gs.seg_lens[0] = (fsize / 4);
     gs.seq_size++;
     gs.active = zero;
-
+    
     void *curr_seg = zero;
 
     /* Zero out all registers r8-r15 for JIT use */
@@ -99,15 +98,13 @@ int main(int argc, char *argv[])
         : "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15" // Clobber list
     );
 
-    while (curr_seg != NULL)
-    {
+    while (curr_seg != NULL) {
         Function func = (Function)(curr_seg + (gs.pc * CHUNK));
         curr_seg = func();
     }
 
     /* Free all program segments */
-    for (uint32_t i = 0; i < gs.seq_size; i++)
-    {
+    for (uint32_t i = 0; i < gs.seq_size; i++) {
         free(gs.val_seq[i]);
     }
 
@@ -124,6 +121,7 @@ void *initialize_zero_segment(size_t asmbytes)
     void *zero = mmap(NULL, asmbytes, PROT_READ | PROT_WRITE | PROT_EXEC,
                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     assert(zero != MAP_FAILED);
+
     memset(zero, 0, asmbytes);
     return zero;
 }

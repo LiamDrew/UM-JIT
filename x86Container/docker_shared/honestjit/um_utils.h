@@ -12,6 +12,7 @@
 
 typedef uint32_t Instruction;
 
+
 struct GlobalState
 {
     uint32_t pc;
@@ -21,7 +22,7 @@ struct GlobalState
     uint32_t *seg_lens;
     uint32_t seq_size;
     uint32_t seq_cap;
-
+    
     uint32_t *rec_ids;
     uint32_t rec_size;
     uint32_t rec_cap;
