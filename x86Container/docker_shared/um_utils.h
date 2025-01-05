@@ -7,8 +7,10 @@
 // may experiement with making it 14, but for now keep it a power of 2
 // due to unforseen circumstances, we have to make it a disgusting 32. ugh
 // due to more terrible things, the chunk is now 40 and the MULT is 10
-#define CHUNK 40
-#define MULT 10
+
+// New plan: make this unreasonably large so I have space to unroll a ton of assembly if I want to
+#define CHUNK 64
+#define MULT 16
 
 typedef uint32_t Instruction;
 

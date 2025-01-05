@@ -297,6 +297,7 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
 size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 {
     unsigned char *p = zero + offset;
+    unsigned char *s = p;
 
     /* mov rXd, imm32 (where X is reg_num) */
     *p++ = 0x41;     // Reg prefix for r8-r15
@@ -308,9 +309,13 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = (value >> 16) & 0xFF;
     *p++ = (value >> 24) & 0xFF;
 
-    // Jump forward 31 bytes
+    // Jump forward 31 bytes 
+    // + 24 = 55
+    // This should automatically jump forward the correct number of bytes
     *p++ = 0xEB;
-    *p++ = 0x1F;
+    *p = 0x00 | (CHUNK - (p - s + 1));
+
+    // printf("this chunk is %lu\n", (CHUNK - (p - s + 1)));
 
     return CHUNK;
 }
@@ -318,6 +323,7 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     unsigned char *p = zero + offset;
+    unsigned char *s = p;
 
     // move first source to eax
     *p++ = 0x44;
@@ -335,8 +341,9 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0xc0 | a;
 
     // jump 29 bytes
+    // + 24 = 53
     *p++ = 0xEB;
-    *p++ = 0x1D;
+    *p = 0x00 | (CHUNK - (p - s + 1));
 
     return CHUNK;
 }
@@ -354,14 +361,13 @@ size_t handle_halt(void *zero, size_t offset)
     // ret
     *p++ = 0xc3;
 
-    // 36 No Ops (but we return first so it's no biggie)
-
     return CHUNK;
 }
 
 size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     unsigned char *p = zero + offset;
+    unsigned char *s = p;
 
     // mov eax, rBd
     *p++ = 0x44;
@@ -380,7 +386,8 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
     // jump 29 bytes
     *p++ = 0xEB;
-    *p++ = 0x1D;
+    *p = 0x00 | (CHUNK - (p - s + 1));
+    // *p++ = 0x1D;
 
     return CHUNK;
 }
@@ -388,6 +395,7 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     unsigned char *p = zero + offset;
+    unsigned char *s = p;
 
     *p++ = 0x48; // REX.W prefix for 64-bit operation
     *p++ = 0x31; // XOR r/m64, r64
@@ -410,7 +418,8 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
     // jump 26 bytes
     *p++ = 0xEB;
-    *p++ = 0x1A;
+    *p = 0x00 | (CHUNK - (p - s + 1));
+    // *p++ = 0x1A;
 
     return CHUNK;
 }
@@ -418,6 +427,7 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     unsigned char *p = zero + offset;
+    unsigned char *s = p;
 
     // if rC != 0, Ra = Rb
     // cmp rC, 0
@@ -437,7 +447,8 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
     // jump 29 bytes
     *p++ = 0xEB;
-    *p++ = 0x1D;
+    *p = 0x00 | (CHUNK - (p - s + 1));
+    // *p++ = 0x1D;
 
     return CHUNK;
 }
@@ -445,6 +456,7 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     unsigned char *p = zero + offset;
+    unsigned char *s = p;
 
     // move b to rax
     *p++ = 0x44;
@@ -469,17 +481,11 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
     // jump 26 bytes
     *p++ = 0xEB;
-    *p++ = 0x1A;
+    *p = 0x00 | (CHUNK - (p - s + 1));
+    // *p++ = 0x1A;
 
     return CHUNK;
 }
-
-// void print_out(uint32_t x)
-// {
-//     /* Registers MUST be saved in the inline assembly */
-//     unsigned char c = (unsigned char)x;
-//     putchar(c);
-// }
 
 size_t print_reg(void *zero, size_t offset, unsigned c)
 {
@@ -487,6 +493,7 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     void *putchar_addr = (void *)&putchar;
 
     unsigned char *p = zero + offset;
+    unsigned char *s = p;
 
     // mov edi, rXd (where X is reg_num)
     *p++ = 0x44; // Reg prefix for r8-r15
@@ -536,7 +543,8 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
 
     // jump 19 bytes
     *p++ = 0xEB;
-    *p++ = 0x07;
+    *p = 0x00 | (CHUNK - (p - s + 1));
+    // *p++ = 0x07;
 
     return CHUNK;
 }
@@ -544,6 +552,7 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
 size_t read_into_reg(void *zero, size_t offset, unsigned c)
 {
     unsigned char *p = zero + offset;
+    unsigned char *s = p;
 
     void *read_char_addr = (void *)&read_char;
 
@@ -563,9 +572,10 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0xC0 | c;
 
     *p++ = 0xEB;
+    *p = 0x00 | (CHUNK - (p - s + 1));
 
     // Jump 23 bytes
-    *p++ = 0x17;
+    // *p++ = 0x17;
 
     return CHUNK;
 }
@@ -575,6 +585,7 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     void *map_segment_addr = (void *)&map_segment;
 
     unsigned char *p = zero + offset;
+    unsigned char *s = p;
 
     // move reg c to be the function call argument
     // mov rC, rdi
@@ -630,14 +641,8 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xc0 | b;
 
-    // 40 - 34 = 6 No Ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    *p++ = 0xEB;
+    *p = 0x00 | (CHUNK - (p - s + 1));
 
     return CHUNK;
 }
@@ -648,6 +653,7 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     void *unmap_segment_addr = (void *)&unmap_segment;
 
     unsigned char *p = zero + offset;
+    unsigned char *s = p;
 
     // move reg c to be the function call argument
     // mov rC, rdi
@@ -691,9 +697,10 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0x58;
 
     // jump 19 bytes
+    // jump 19 + 24 = 43 bytes
     *p++ = 0xEB;
-    *p++ = 0x07;
-    // *p++ = 0x13;
+    *p = 0x00 | (CHUNK - (p - s + 1));
+    // *p++ = 0x2B;
 
     return CHUNK;
 }
@@ -702,6 +709,7 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
 size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     unsigned char *p = zero + offset;
+    unsigned char *s = p;
 
     // load address of val_seq into RAX
     *p++ = 0x48;
@@ -741,9 +749,14 @@ size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsign
     *p++ = 0x89;
     *p++ = 0xc0 | a;
 
-    // 12 No Ops
+    // // 12 No Ops
+    // *p++ = 0xEB;
+    // *p++ = 0x09;
+
+    // 36 No Ops
     *p++ = 0xEB;
-    *p++ = 0x09;
+    *p = 0x00 | (CHUNK - (p - s + 1));
+    // *p++ = 0x24;
 
     return CHUNK;
 }
@@ -760,6 +773,7 @@ size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsig
 {
     // void *val_seq_addr = (void *)&gs.val_seq;
     unsigned char *p = zero + offset;
+    unsigned char *s = p;
 
     *p++ = 0x48;
     *p++ = 0xb8;
@@ -799,11 +813,114 @@ size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsig
     *p++ = 0xb0;
 
     // 40 - 28 bytes = jump 12 bytes
+    // *p++ = 0xEB;
+    // *p++ = 0x09;
+    
+    // 64 - 28 = 36
     *p++ = 0xEB;
-    *p++ = 0x09;
+    *p = 0x00 | (CHUNK - (p - s + 1));
+    // *p++ = 0x00 | (CHUNK - (p - s));
+    // *p++ = 0x24;
 
     return CHUNK;
 }
+
+// // TODO: this improved version is in progress
+// // inject load program
+// size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
+// {
+//     void *load_program_addr = (void *)&load_program;
+
+//     unsigned char *p = zero + offset;
+//     // unsigned char *s = p;
+
+//     // stash b in the right register (even if 0, need to update program pointer)
+//     // move b to rdi
+//     *p++ = 0x44;
+//     *p++ = 0x89;
+//     *p++ = 0xc7 | (b << 3);
+
+//     // stash c val in the right register
+//     // move c to rsi
+//     *p++ = 0x44;
+//     *p++ = 0x89;
+//     *p++ = 0xc6 | (c << 3);
+
+//     // load the program pointer into a register
+//     // set the program pointer to the contents of reg c
+//     uint32_t *gs_pc = &gs.pc;
+//     *p++ = 0x89;
+//     *p++ = 0x35;
+//     memcpy(p, &gs_pc, sizeof(gs_pc));
+//     p += sizeof(gs_pc);
+
+//     // test %edi, %edi  (test if b_val is 0)
+//     *p++ = 0x85;
+//     *p++ = 0xff;
+
+//     // jnz slow_path
+//     *p++ = 0x75;
+//     *p++ = 0x0C; // Jump offset to slow path
+
+//     // Load gs.active into rax if b_val is 0
+//     // mov (gs_active), %rax
+//     void **gs_active = &gs.active;
+//     *p++ = 0x48;
+//     *p++ = 0x8b;
+//     *p++ = 0x05;
+//     memcpy(p, &gs_active, sizeof(gs_active));
+//     p += sizeof(gs_active);
+
+//     // Fast path (b_val == 0): gs.active is already in rax
+//     // ret
+//     *p++ = 0xc3;
+
+//     // slow path below
+
+//     // push r8 - r11 onto the stack
+//     *p++ = 0x41;
+//     *p++ = 0x50;
+
+//     *p++ = 0x41;
+//     *p++ = 0x51;
+
+//     *p++ = 0x41;
+//     *p++ = 0x52;
+
+//     *p++ = 0x41;
+//     *p++ = 0x53;
+
+//     *p++ = 0x48;
+//     *p++ = 0xb8;
+//     memcpy(p, &load_program_addr, sizeof(load_program_addr));
+//     p += sizeof(load_program_addr);
+
+//     // call rax
+//     *p++ = 0xff;
+//     *p++ = 0xd0;
+
+//     // this function better return rax as the right thing
+//     // injected function needs to ret (rax should already be the right thing)
+
+//     // pop r8 - r11 off the stack
+//     *p++ = 0x41;
+//     *p++ = 0x5B;
+
+//     *p++ = 0x41;
+//     *p++ = 0x5A;
+
+//     *p++ = 0x41;
+//     *p++ = 0x59;
+
+//     *p++ = 0x41;
+//     *p++ = 0x58;
+
+//     // ret
+//     *p++ = 0xc3;
+
+//     // 64 - 61 = 3 bytes of No ops
+//     return CHUNK;
+// }
 
 // inject load program
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
@@ -811,6 +928,7 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     void *load_program_addr = (void *)&load_program;
 
     unsigned char *p = zero + offset;
+    // unsigned char *s = p;
 
     // stash b in the right register (even if 0, need to update program pointer)
     // move b to rdi
@@ -861,14 +979,6 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 
     *p++ = 0x41;
     *p++ = 0x58;
-
-    // 40 - 35 = 5 No ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x90;
-    *p++ = 0x90;
 
     // ret
     *p++ = 0xc3;
