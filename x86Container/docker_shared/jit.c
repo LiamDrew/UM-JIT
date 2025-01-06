@@ -68,8 +68,6 @@ int main(int argc, char *argv[])
         assert((fsize % 4) == 0);
     }
 
-    // printf("REcycle address is %p\n", gs.rec_ids);
-
     /* Initialize executable and non-executable memory for the zero segment
      * fsize gives the space for UM words, multiply by 4 for machine
      * instructions */
@@ -123,9 +121,11 @@ int main(int argc, char *argv[])
 
 void *initialize_zero_segment(size_t asmbytes)
 {
-    void *zero = mmap(NULL, asmbytes, PROT_READ | PROT_WRITE | PROT_EXEC,
-                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    void *hint_addr = (void *)((uintptr_t)&gs & ~0xFFF); // Round down to page boundary
+    void *zero = mmap(hint_addr, asmbytes, PROT_READ | PROT_WRITE | PROT_EXEC,
+                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     assert(zero != MAP_FAILED);
+
     memset(zero, 0, asmbytes);
     return zero;
 }
