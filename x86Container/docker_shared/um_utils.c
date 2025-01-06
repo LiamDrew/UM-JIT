@@ -41,6 +41,7 @@ uint32_t map_segment(uint32_t size)
     uint32_t new_seg_id;
 
     /* If there are no available recycled segment ids, make a new one */
+    // if (gs.rec_size <= 0)
     if (gs.rec_size == 0)
     {
         /* Expand if necessary */
@@ -586,12 +587,17 @@ void handle_realloc()
     gs.rec_cap *= 2;
     gs.rec_ids = realloc(gs.rec_ids, gs.rec_cap * sizeof(uint32_t));
     assert(gs.rec_ids != NULL);
+
+    // gs.rec_size++;
 }
 
 size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
 {
     // void *realloc_addr = (void *)&realloc;
     void *handle_realloc_addr = (void *)&handle_realloc;
+    (void)handle_realloc_addr;
+
+    // printf("In function: Pointer is %p\n", handle_realloc_addr);
 
     unsigned char *p = zero + offset;
     unsigned char *s = p;
@@ -643,6 +649,15 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0xff;
     *p++ = 0xd0; // call rax
 
+    // // Load and call realloc from gs.handle_realloc_ptr ([rbx + 8])
+    // *p++ = 0x48; // REX.W
+    // *p++ = 0x8b; // mov
+    // *p++ = 0x43; // ModR/M: [rbx + disp8] to rax
+    // *p++ = 0x0c; // displacement of 8
+
+    // *p++ = 0xff;
+    // *p++ = 0xd0; // call rax
+
     // Restore registers
     *p++ = 0x41;
     *p++ = 0x5b; // pop r11
@@ -658,29 +673,12 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     // JUMP LANDING POINT HERE
     // Store segmentId in rec_ids[rec_size]
 
-    // still need to use reg c
-    // rec_size in rdx
-
     // rdi is a pointer
     // First load rec_ids pointer from [rbx - 8] into rdi
     *p++ = 0x48; // REX.W prefix
     *p++ = 0x8b; // mov
     *p++ = 0x7b; // ModRM: 01 111 011 (changed from 0x43 to 0x7b)
     *p++ = 0xf8; // -8 displacement
-
-    // // rsi is for register c
-    // // rC is the segment id getting recycled
-    // // mov rsi, rC
-    // *p++ = 0x44;            // Reg prefix for r8-r15
-    // *p++ = 0x89;            // mov reg to reg
-    // *p++ = 0xc6 | (c << 3); // ModR/M byte - changed from 0xc7 to 0xc6
-
-    // // rdx already contains the size
-
-    // // mov    %esi,(%rdi,%rdx,4)
-    // *p++ = 0x89;
-    // *p++ = 0x34;
-    // *p++ = 0x97;
 
     // mov [rdi + rdx*4], rC  (directly from rC to memory)
     *p++ = 0x44;              // REX.R prefix for r8-r15
@@ -857,22 +855,8 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     // ret
     *p++ = 0xc3;
 
-    // slow path below
 
     // NOTE: super sus that the registers don't need to be on the stack.. double check this
-    // push r8 - r11 onto the stack
-    // *p++ = 0x41;
-    // *p++ = 0x50;
-
-    // *p++ = 0x41;
-    // *p++ = 0x51;
-
-    // *p++ = 0x41;
-    // *p++ = 0x52;
-
-    // *p++ = 0x41;
-    // *p++ = 0x53;
-
     // 12 byte function call
     *p++ = 0x48;
     *p++ = 0xb8;
@@ -883,20 +867,6 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 
     // this function better return rax as the right thing
     // injected function needs to ret (rax should already be the right thing)
-
-    // pop r8 - r11 off the stack
-    // *p++ = 0x41;
-    // *p++ = 0x5B;
-
-    // *p++ = 0x41;
-    // *p++ = 0x5A;
-
-    // *p++ = 0x41;
-    // *p++ = 0x59;
-
-    // *p++ = 0x41;
-    // *p++ = 0x58;
-
     // ret
     *p++ = 0xc3;
 

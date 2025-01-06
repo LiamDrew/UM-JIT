@@ -36,6 +36,10 @@ int main(int argc, char *argv[])
 
     /* Initializing the global state variables */
 
+    gs.handle_realloc_ptr = (void *)&handle_realloc;
+
+    // printf("Pointer is %p\n", gs.handle_realloc_ptr);
+
     // Setting the program counter to 0
     gs.pc = 0;
 

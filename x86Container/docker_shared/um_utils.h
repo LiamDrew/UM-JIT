@@ -7,7 +7,7 @@
 // may experiement with making it 14, but for now keep it a power of 2
 // due to unforseen circumstances, we have to make it a disgusting 32. ugh
 // due to more terrible things, the chunk is now 40 and the MULT is 10
-#define CHUNK 72
+#define CHUNK 64
 #define MULT (CHUNK / 4)
 
 typedef uint32_t Instruction;
@@ -24,6 +24,11 @@ struct GlobalState
     uint32_t *rec_ids;
     uint32_t rec_size;
     uint32_t rec_cap;
+
+    uint32_t padding;
+    void *handle_realloc_ptr; // for unmap segment
+    // void *map_segment_ptr; // for map segment
+    // void *load_program_ptr; // for load program
 } __attribute__((packed));
 
 extern struct GlobalState gs;
@@ -52,7 +57,10 @@ size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsig
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c);
 
 uint32_t map_segment(uint32_t size);
+
+void handle_realloc();
 void unmap_segment(uint32_t segmentID);
+
 uint32_t segmented_load(uint32_t b_val, uint32_t c_val);
 void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val);
 void *load_program(uint32_t b_val, uint32_t c_val);
