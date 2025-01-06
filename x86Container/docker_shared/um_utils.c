@@ -560,12 +560,6 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x41;
     *p++ = 0x53;
 
-    /* This calling method has been a nightmare*/
-    // int32_t call_offset = (int32_t)((uint64_t)putchar_addr - ((uint64_t)p + 5));
-    // *p++ = 0xe8;
-    // memcpy(p, &call_offset, sizeof(call_offset));
-    // p += sizeof(call_offset);
-
     *p++ = 0x48; // REX.W prefix
     *p++ = 0xb8; // mov rax, imm64
     memcpy(p, &putchar_addr, sizeof(putchar_addr));
@@ -588,10 +582,8 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x41;
     *p++ = 0x58;
 
-    // jump 19 bytes
     *p++ = 0xEB;
     *p = 0x00 | (CHUNK - (p - s + 1));
-    // *p++ = 0x07;
 
     return CHUNK;
 }
@@ -652,12 +644,6 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 
     *p++ = 0x41;
     *p++ = 0x53;
-
-    // int32_t rel_offset = (int32_t)((uint64_t)map_segment_addr - ((uint64_t)p + 5));
-    // // call rel32
-    // *p++ = 0xE8; // Direct relative call
-    // memcpy(p, &rel_offset, sizeof(rel_offset));
-    // p += sizeof(rel_offset);
 
     *p++ = 0x48; // REX.W prefix
     *p++ = 0xb8; // mov rax, imm64
@@ -1183,14 +1169,9 @@ size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsign
     *p++ = 0x89;
     *p++ = 0xc0 | a;
 
-    // // 12 No Ops
-    // *p++ = 0xEB;
-    // *p++ = 0x09;
-
     // 36 No Ops
     *p++ = 0xEB;
     *p = 0x00 | (CHUNK - (p - s + 1));
-    // *p++ = 0x24;
 
     return CHUNK;
 }

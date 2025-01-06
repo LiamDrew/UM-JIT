@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 // New plan: make this unreasonably large so I have space to unroll a ton of assembly if I want to
-#define CHUNK 140
+#define CHUNK 120
 #define MULT (CHUNK / 4)
 
 typedef uint32_t Instruction;
