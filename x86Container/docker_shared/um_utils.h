@@ -4,20 +4,15 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-// may experiement with making it 14, but for now keep it a power of 2
-// due to unforseen circumstances, we have to make it a disgusting 32. ugh
-// due to more terrible things, the chunk is now 40 and the MULT is 10
-
 // New plan: make this unreasonably large so I have space to unroll a ton of assembly if I want to
-#define CHUNK 64
-#define MULT 16
+#define CHUNK 140
+#define MULT (CHUNK / 4)
 
 typedef uint32_t Instruction;
 
 struct GlobalState
 {
     uint32_t pc;
-    // void **program_seq;
     void *active;
     uint32_t **val_seq;
     uint32_t *seg_lens;
@@ -27,7 +22,7 @@ struct GlobalState
     uint32_t *rec_ids;
     uint32_t rec_size;
     uint32_t rec_cap;
-};
+} __attribute__((packed));
 
 extern struct GlobalState gs;
 
@@ -56,6 +51,10 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c);
 
 uint32_t map_segment(uint32_t size);
 void unmap_segment(uint32_t segmentID);
+
+void checkpoint(uint32_t *in, uint32_t rec_id, uint32_t size);
+uint32_t *help_unmap(uint32_t *rids, uint32_t bytes);
+
 uint32_t segmented_load(uint32_t b_val, uint32_t c_val);
 void segmented_store(uint32_t a_val, uint32_t b_val, uint32_t c_val);
 void *load_program(uint32_t b_val, uint32_t c_val);

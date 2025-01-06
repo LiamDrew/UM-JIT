@@ -68,6 +68,8 @@ int main(int argc, char *argv[])
         assert((fsize % 4) == 0);
     }
 
+    // printf("REcycle address is %p\n", gs.rec_ids);
+
     /* Initialize executable and non-executable memory for the zero segment
      * fsize gives the space for UM words, multiply by 4 for machine
      * instructions */
