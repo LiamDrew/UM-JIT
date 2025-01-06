@@ -7,7 +7,7 @@
 // may experiement with making it 14, but for now keep it a power of 2
 // due to unforseen circumstances, we have to make it a disgusting 32. ugh
 // due to more terrible things, the chunk is now 40 and the MULT is 10
-#define CHUNK 88
+#define CHUNK 72
 #define MULT (CHUNK / 4)
 
 typedef uint32_t Instruction;
