@@ -9,6 +9,7 @@
 // due to more terrible things, the chunk is now 40 and the MULT is 10
 #define CHUNK 64
 #define MULT (CHUNK / 4)
+#define OPS 15
 
 typedef uint32_t Instruction;
 

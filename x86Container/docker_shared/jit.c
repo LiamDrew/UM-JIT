@@ -17,8 +17,9 @@ void *initialize_zero_segment(size_t fsize);
 size_t zero_all_registers(void *zero, size_t offset);
 void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t fsize);
 void *init_registers();
+void *initialize_instruction_bank();
 
-int main(int argc, char *argv[])
+    int main(int argc, char *argv[])
 {
     if (argc != 2)
     {
@@ -80,6 +81,9 @@ int main(int argc, char *argv[])
     uint32_t *zero_vals = calloc(fsize, sizeof(uint32_t));
     load_zero_segment(zero, zero_vals, fp, fsize);
 
+    void *temp = initialize_instruction_bank(); 
+    (void)temp;
+
     // gs.program_seq[0] = zero;
     gs.val_seq[0] = zero_vals;
     gs.seg_lens[0] = (fsize / 4);
@@ -132,6 +136,67 @@ void *initialize_zero_segment(size_t asmbytes)
 
     memset(zero, 0, asmbytes);
     return zero;
+}
+
+void *initialize_instruction_bank()
+{
+    void *bank = mmap(NULL, CHUNK * OPS, PROT_READ | PROT_WRITE | PROT_EXEC,
+                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    assert(bank != MAP_FAILED);
+    memset(bank, 0, CHUNK * OPS);
+
+    uint32_t offset = 0;
+
+    // Need to make an array of a indexes, b indexes, and c indexes
+    // at each index, an instruction needs to be modified
+
+    // Conditional Move
+    offset += cond_move(bank, offset, 0, 0, 0);
+    
+    // Segmented Load
+    offset += inject_seg_load(bank, offset, 0, 0, 0);
+
+    // Segmented Store
+    offset += inject_seg_store(bank, offset, 0, 0, 0);
+
+    // Addition
+    offset += add_regs(bank, offset, 0, 0, 0);
+
+    // Multiplication
+    offset += mult_regs(bank, offset, 0, 0, 0);
+
+    // Division
+    offset += div_regs(bank, offset, 0, 0, 0);
+
+    // Bitwise NAND
+    offset += nand_regs(bank, offset, 0, 0, 0);
+
+    // Halt
+    offset += handle_halt(bank, offset);
+
+    // Map Segment
+    offset += inject_map_segment(bank, offset, 0, 0);
+
+    // Unmap Segment
+    offset += inject_unmap_segment(bank, offset, 0);
+
+    // Output
+    offset += print_reg(bank, offset, 0);
+
+    // Input
+    offset += read_into_reg(bank, offset, 0);
+
+    // Load Program
+    offset += inject_load_program(bank, offset, 0, 0);
+
+    // TODO: it may just be simpler to handle this case as it appears
+    // Load Value
+    offset += load_reg(bank, offset, 0, 0);
+
+    // Invalid op (just return blank space)
+    offset += CHUNK;
+
+    return bank;
 }
 
 void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t fsize)
