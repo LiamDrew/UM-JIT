@@ -4,23 +4,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-// may experiement with making it 14, but for now keep it a power of 2
-// due to unforseen circumstances, we have to make it a disgusting 32. ugh
-// due to more terrible things, the chunk is now 40 and the MULT is 10
 #define CHUNK 40
 #define MULT 10
 // #define MULT (CHUNK / 4)
 #define OPS 15
-
-// #define AS 1
-// #define A 6
-
-// #define BS 8
-// #define B 1
-
-// #define CS 8
-// #define C 4
-
 #define ICAP 32500
 
 typedef uint32_t Instruction;

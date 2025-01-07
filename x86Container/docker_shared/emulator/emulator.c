@@ -59,20 +59,16 @@ uint32_t map_segment(uint32_t size);
 void unmap_segment(uint32_t segment);
 void load_segment(uint32_t index, uint32_t *zero);
 
-void print_registers(uint32_t *regs);
-
 int main(int argc, char *argv[])
 {
-    if (argc != 2)
-    {
+    if (argc != 2) {
         fprintf(stderr, "Usage: ./um [executable.um]\n");
         return EXIT_FAILURE;
     }
 
     FILE *fp = fopen(argv[1], "r");
 
-    if (fp == NULL)
-    {
+    if (fp == NULL) {
         fprintf(stderr, "File %s could not be opened.\n", argv[1]);
         return EXIT_FAILURE;
     }
@@ -103,8 +99,7 @@ uint32_t *initialize_memory(FILE *fp, size_t fsize)
     int i = 0;
     unsigned char c_char;
 
-    for (c = getc(fp); c != EOF; c = getc(fp))
-    {
+    for (c = getc(fp); c != EOF; c = getc(fp)) {
         c_char = (unsigned char)c;
         if (i % 4 == 0)
             word = assemble_word(word, 8, 24, c_char);
@@ -112,8 +107,7 @@ uint32_t *initialize_memory(FILE *fp, size_t fsize)
             word = assemble_word(word, 8, 16, c_char);
         else if (i % 4 == 2)
             word = assemble_word(word, 8, 8, c_char);
-        else if (i % 4 == 3)
-        {
+        else if (i % 4 == 3) {
             word = assemble_word(word, 8, 0, c_char);
             zero[i / 4] = word;
             word = 0;
@@ -127,6 +121,21 @@ uint32_t *initialize_memory(FILE *fp, size_t fsize)
     seq_size++;
 
     return zero;
+}
+
+uint64_t assemble_word(uint64_t word, unsigned width, unsigned lsb,
+                       uint64_t value)
+{
+    uint64_t mask = (uint64_t)1 << (width - 1);
+    mask = mask << 1;
+    mask -= 1;
+    mask = mask << lsb;
+    mask = ~mask;
+
+    uint64_t new_word = (word & mask);
+    value = value << lsb;
+    uint64_t return_word = (new_word | value);
+    return return_word;
 }
 
 void handle_instructions(uint32_t *zero)
@@ -143,6 +152,8 @@ void handle_instructions(uint32_t *zero)
         pp++;
         exit = exec_instr(word, &pp, regs, zero);
     }
+
+    handle_stop();
 }
 
 static inline bool exec_instr(Instruction word, Instruction **pp, 
@@ -230,7 +241,6 @@ static inline bool exec_instr(Instruction word, Instruction **pp,
 
     /* Stop or Invalid Instruction */
     else {
-        handle_stop();
         return true;
     }
 
@@ -244,7 +254,6 @@ void handle_stop()
     free(segment_sequence);
     free(segment_lengths);
     free(recycled_ids);
-    exit(EXIT_SUCCESS);
 }
 
 uint32_t map_segment(uint32_t size)
@@ -314,19 +323,4 @@ void load_segment(uint32_t index, uint32_t *zero)
                copied_seq_size * sizeof(uint32_t));
         segment_sequence[0] = new_zero;
     }
-}
-
-uint64_t assemble_word(uint64_t word, unsigned width, unsigned lsb,
-                       uint64_t value)
-{
-    uint64_t mask = (uint64_t)1 << (width - 1);
-    mask = mask << 1;
-    mask -= 1;
-    mask = mask << lsb;
-    mask = ~mask;
-
-    uint64_t new_word = (word & mask);
-    value = value << lsb;
-    uint64_t return_word = (new_word | value);
-    return return_word;
 }
