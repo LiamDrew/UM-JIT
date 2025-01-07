@@ -151,7 +151,8 @@ void update_bank(uint32_t a, uint32_t b, uint32_t c, uint32_t opcode)
     {
         bank[ou.asi] &= ~(0x7 << 3);
         bank[ou.asi] |= (a << 3);
-    } else if (ou.ai != 0)
+    }
+    else if (ou.ai != 0)
     {
         bank[ou.ai] &= ~(0x7);
         bank[ou.ai] |= a;
@@ -161,7 +162,8 @@ void update_bank(uint32_t a, uint32_t b, uint32_t c, uint32_t opcode)
     {
         bank[ou.bsi] &= ~(0x7 << 3);
         bank[ou.bsi] |= (b << 3);
-    } else if (ou.bi != 0)
+    }
+    else if (ou.bi != 0)
     {
         bank[ou.bi] &= ~(0x7);
         bank[ou.bi] |= b;
@@ -171,7 +173,8 @@ void update_bank(uint32_t a, uint32_t b, uint32_t c, uint32_t opcode)
     {
         bank[ou.csi] &= ~(0x7 << 3);
         bank[ou.csi] |= (c << 3);
-    } else if (ou.ci != 0)
+    }
+    else if (ou.ci != 0)
     {
         bank[ou.ci] &= ~(0x7);
         bank[ou.ci] |= c;
@@ -202,7 +205,9 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
 
     // update a, b, and c values within the appropriate ranges
     update_bank(a, b, c, opcode);
-    memcpy(zero + offset, mc.bank + lower, CHUNK);
+
+    uint32_t copy_size = mc.seg_bytes[opcode];
+    memcpy(zero + offset, mc.bank + lower, copy_size);
 
     offset += CHUNK;
     return offset;
@@ -224,6 +229,133 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = (value >> 24) & 0xFF;
 
     // This should automatically jump forward the correct number of bytes
+    *p++ = 0xEB;
+    *p = 0x00 | (CHUNK - (p - s + 1));
+
+    return CHUNK;
+}
+
+size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+{
+    unsigned char *p = zero + offset;
+    unsigned char *s = p;
+
+    // if rC != 0, Ra = Rb
+    // cmp rC, 0
+    *p++ = 0x41;     // REX.B
+    *p++ = 0x83;     // CMP r/m32, imm8
+    *p++ = 0xF8 | c; // ModR/M for CMP
+    *p++ = 0x00;     // immediate 0
+
+    // jz skip (over 3 bytes)
+    *p++ = 0x74;
+    *p++ = 0x03;
+
+    *p++ = 0x45;
+    *p++ = 0x89;
+    *p++ = 0xC0 | (b << 3) | a;
+
+    // jump 29 bytes
+    *p++ = 0xEB;
+    *p = 0x00 | (CHUNK - (p - s + 1));
+
+    return CHUNK;
+}
+
+// inject segmented load
+size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+{
+    unsigned char *p = zero + offset;
+    unsigned char *s = p;
+
+    // load address of val_seq into RAX
+    *p++ = 0x48;
+    *p++ = 0xb8;
+    uint64_t addr = (uint64_t)&gs.val_seq;
+    memcpy(p, &addr, sizeof(addr));
+    p += 8;
+
+    // mov rax, [rax]            (Dereference to get the value)
+    *p++ = 0x48;
+    *p++ = 0x8b;
+    *p++ = 0x00;
+
+    // mov rdi, rBd
+    *p++ = 0x44;
+    *p++ = 0x89;
+    *p++ = 0xc7 | (b << 3);
+
+    // mov rsi, rCd
+    *p++ = 0x44;
+    *p++ = 0x89;
+    *p++ = 0xc6 | (c << 3);
+
+    // mov rax, [rax + rdi*8]  (using rdi now for *8)
+    *p++ = 0x48;
+    *p++ = 0x8b;
+    *p++ = 0x04;
+    *p++ = 0xf8;
+
+    // // mov eax, [rax + rsi*4]  (using rsi now for *4)
+    *p++ = 0x8b;
+    *p++ = 0x04;
+    *p++ = 0xb0;
+
+    // mov to return register
+    *p++ = 0x41;
+    *p++ = 0x89;
+    *p++ = 0xc0 | a;
+
+    // 36 No Ops
+    *p++ = 0xEB;
+    *p = 0x00 | (CHUNK - (p - s + 1));
+
+    return CHUNK;
+}
+
+size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+{
+    // void *val_seq_addr = (void *)&gs.val_seq;
+    unsigned char *p = zero + offset;
+    unsigned char *s = p;
+
+    *p++ = 0x48;
+    *p++ = 0xb8;
+    uint64_t addr = (uint64_t)&gs.val_seq;
+    memcpy(p, &addr, sizeof(addr));
+    p += sizeof(addr);
+
+    // mov rax, [rax]            (Dereference to get the value)
+    *p++ = 0x48;
+    *p++ = 0x8b;
+    *p++ = 0x00;
+
+    // mov rdi, rad
+    *p++ = 0x44;
+    *p++ = 0x89;
+    *p++ = 0xc7 | (a << 3);
+
+    // mov rsi, rbd
+    *p++ = 0x44;
+    *p++ = 0x89;
+    *p++ = 0xc6 | (b << 3);
+
+    // mov rcx, rcd
+    *p++ = 0x44;
+    *p++ = 0x89;
+    *p++ = 0xc2 | (c << 3);
+
+    // mov rax, [rax + rdi*8]
+    *p++ = 0x48;
+    *p++ = 0x8b;
+    *p++ = 0x04;
+    *p++ = 0xf8;
+
+    // mov [rax + rsi*4], edx
+    *p++ = 0x89;
+    *p++ = 0x14;
+    *p++ = 0xb0;
+
     *p++ = 0xEB;
     *p = 0x00 | (CHUNK - (p - s + 1));
 
@@ -253,22 +385,6 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     // Jump
     *p++ = 0xEB;
     *p = 0x00 | (CHUNK - (p - s + 1));
-
-    return CHUNK;
-}
-
-size_t handle_halt(void *zero, size_t offset)
-{
-    unsigned char *p = zero + offset;
-
-    // set RAX to 0 (NULL);
-    // xor rax,rax
-    *p++ = 0x48;
-    *p++ = 0x31;
-    *p++ = 0xc0;
-
-    // ret
-    *p++ = 0xc3;
 
     return CHUNK;
 }
@@ -331,33 +447,6 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return CHUNK;
 }
 
-size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
-{
-    unsigned char *p = zero + offset;
-    unsigned char *s = p;
-
-    // if rC != 0, Ra = Rb
-    // cmp rC, 0
-    *p++ = 0x41;     // REX.B
-    *p++ = 0x83;     // CMP r/m32, imm8
-    *p++ = 0xF8 | c; // ModR/M for CMP
-    *p++ = 0x00;     // immediate 0
-
-    // jz skip (over 3 bytes)
-    *p++ = 0x74;
-    *p++ = 0x03;
-
-    *p++ = 0x45;
-    *p++ = 0x89;
-    *p++ = 0xC0 | (b << 3) | a;
-
-    // jump 29 bytes
-    *p++ = 0xEB;
-    *p = 0x00 | (CHUNK - (p - s + 1));
-
-    return CHUNK;
-}
-
 size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     unsigned char *p = zero + offset;
@@ -391,90 +480,18 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return CHUNK;
 }
 
-size_t print_reg(void *zero, size_t offset, unsigned c)
-{
-    void *putchar_addr = (void *)&putchar;
-
-    unsigned char *p = zero + offset;
-    unsigned char *s = p;
-
-    // mov edi, rXd (where X is reg_num)
-    *p++ = 0x44; // Reg prefix for r8-r15
-    *p++ = 0x89;
-    *p++ = 0xc7 | (c << 3); // ModR/M byte: edi(111) with reg number
-
-    // push r8 onto the stack
-    *p++ = 0x41;
-    *p++ = 0x50;
-
-    *p++ = 0x41;
-    *p++ = 0x51;
-
-    *p++ = 0x41;
-    *p++ = 0x52;
-
-    *p++ = 0x41;
-    *p++ = 0x53;
-
-    *p++ = 0x48; // REX.W prefix
-    *p++ = 0xb8; // mov rax, imm64
-    memcpy(p, &putchar_addr, sizeof(putchar_addr));
-    p += sizeof(putchar_addr);
-
-    // call rax
-    *p++ = 0xff;
-    *p++ = 0xd0; // ModR/M byte for call rax
-
-    // pop r8 off the stack
-    *p++ = 0x41;
-    *p++ = 0x5B;
-
-    *p++ = 0x41;
-    *p++ = 0x5A;
-
-    *p++ = 0x41;
-    *p++ = 0x59;
-
-    *p++ = 0x41;
-    *p++ = 0x58;
-
-    *p++ = 0xEB;
-    *p = 0x00 | (CHUNK - (p - s + 1));
-
-    return CHUNK;
-}
-
-unsigned char read_char(void)
-{
-    int x = getc(stdin);
-    unsigned char c = (unsigned char)x;
-    return c;
-}
-
-size_t read_into_reg(void *zero, size_t offset, unsigned c)
+size_t handle_halt(void *zero, size_t offset)
 {
     unsigned char *p = zero + offset;
-    unsigned char *s = p;
 
-    void *read_char_addr = (void *)&read_char;
-
-    // direct function call
+    // set RAX to 0 (NULL);
+    // xor rax,rax
     *p++ = 0x48;
-    *p++ = 0xb8;
+    *p++ = 0x31;
+    *p++ = 0xc0;
 
-    memcpy(p, &read_char_addr, sizeof(read_char_addr));
-    p += sizeof(read_char_addr);
-
-    *p++ = 0xff;
-    *p++ = 0xd0;
-
-    // mov rCd, eax
-    *p++ = 0x41;
-    *p++ = 0x89;
-    *p++ = 0xC0 | c;
-
-    *p++ = 0xEB;
-    *p = 0x00 | (CHUNK - (p - s + 1));
+    // ret
+    *p++ = 0xc3;
 
     return CHUNK;
 }
@@ -558,12 +575,11 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x41;
     *p++ = 0x53;
 
+    // 12 byte function call
     *p++ = 0x48; // REX.W prefix
     *p++ = 0xb8; // mov rax, imm64
     memcpy(p, &map_segment_addr, sizeof(void *));
     p += sizeof(void *);
-
-    // call rax
     *p++ = 0xff;
     *p++ = 0xd0; // ModR/M byte for call rax
 
@@ -593,7 +609,6 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     return CHUNK;
 }
 
-/*
 void unmap_segment(uint32_t segmentId)
 {
     if (gs.rec_size == gs.rec_cap)
@@ -631,12 +646,11 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0x41;
     *p++ = 0x53;
 
+    // 12 byte function call
     *p++ = 0x48; // REX.W prefix
     *p++ = 0xb8; // mov rax, imm64
     memcpy(p, &unmap_segment_addr, sizeof(void *));
     p += sizeof(void *);
-
-    // call rax
     *p++ = 0xff;
     *p++ = 0xd0; // ModR/M byte for call rax
 
@@ -662,8 +676,7 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     return CHUNK;
 }
 
-*/
-
+/*
 // Below is the unrolled version of Map segment. The rolled version might be interesting
 void handle_realloc()
 {
@@ -774,99 +787,85 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     return CHUNK;
 }
 
-// inject segmented load
-size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+*/
+
+size_t print_reg(void *zero, size_t offset, unsigned c)
 {
+    void *putchar_addr = (void *)&putchar;
+
     unsigned char *p = zero + offset;
     unsigned char *s = p;
 
-    // load address of val_seq into RAX
-    *p++ = 0x48;
-    *p++ = 0xb8;
-    uint64_t addr = (uint64_t)&gs.val_seq;
-    memcpy(p, &addr, sizeof(addr));
-    p += 8;
-
-    // mov rax, [rax]            (Dereference to get the value)
-    *p++ = 0x48;
-    *p++ = 0x8b;
-    *p++ = 0x00;
-
-    // mov rdi, rBd
-    *p++ = 0x44;
+    // mov edi, rXd (where X is reg_num)
+    *p++ = 0x44; // Reg prefix for r8-r15
     *p++ = 0x89;
-    *p++ = 0xc7 | (b << 3);
+    *p++ = 0xc7 | (c << 3); // ModR/M byte: edi(111) with reg number
 
-    // mov rsi, rCd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xc6 | (c << 3);
-
-    // mov rax, [rax + rdi*8]  (using rdi now for *8)
-    *p++ = 0x48;
-    *p++ = 0x8b;
-    *p++ = 0x04;
-    *p++ = 0xf8;
-
-    // // mov eax, [rax + rsi*4]  (using rsi now for *4)
-    *p++ = 0x8b;
-    *p++ = 0x04;
-    *p++ = 0xb0;
-
-    // mov to return register
+    // push r8 onto the stack
     *p++ = 0x41;
-    *p++ = 0x89;
-    *p++ = 0xc0 | a;
+    *p++ = 0x50;
 
-    // 36 No Ops
+    *p++ = 0x41;
+    *p++ = 0x51;
+
+    *p++ = 0x41;
+    *p++ = 0x52;
+
+    *p++ = 0x41;
+    *p++ = 0x53;
+
+    *p++ = 0x48; // REX.W prefix
+    *p++ = 0xb8; // mov rax, imm64
+    memcpy(p, &putchar_addr, sizeof(putchar_addr));
+    p += sizeof(putchar_addr);
+    *p++ = 0xff;
+    *p++ = 0xd0; // ModR/M byte for call rax
+
+    // pop r8 off the stack
+    *p++ = 0x41;
+    *p++ = 0x5B;
+
+    *p++ = 0x41;
+    *p++ = 0x5A;
+
+    *p++ = 0x41;
+    *p++ = 0x59;
+
+    *p++ = 0x41;
+    *p++ = 0x58;
+
     *p++ = 0xEB;
     *p = 0x00 | (CHUNK - (p - s + 1));
 
     return CHUNK;
 }
 
-size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+unsigned char read_char(void)
 {
-    // void *val_seq_addr = (void *)&gs.val_seq;
+    int x = getc(stdin);
+    unsigned char c = (unsigned char)x;
+    return c;
+}
+
+size_t read_into_reg(void *zero, size_t offset, unsigned c)
+{
     unsigned char *p = zero + offset;
     unsigned char *s = p;
 
+    void *read_char_addr = (void *)&read_char;
+
+    // direct function call
     *p++ = 0x48;
     *p++ = 0xb8;
-    uint64_t addr = (uint64_t)&gs.val_seq;
-    memcpy(p, &addr, sizeof(addr));
-    p += sizeof(addr);
+    memcpy(p, &read_char_addr, sizeof(read_char_addr));
+    p += sizeof(read_char_addr);
+    *p++ = 0xff;
+    *p++ = 0xd0;
 
-    // mov rax, [rax]            (Dereference to get the value)
-    *p++ = 0x48;
-    *p++ = 0x8b;
-    *p++ = 0x00;
-
-    // mov rdi, rad
-    *p++ = 0x44;
+    // mov rCd, eax
+    *p++ = 0x41;
     *p++ = 0x89;
-    *p++ = 0xc7 | (a << 3);
-
-    // mov rsi, rbd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xc6 | (b << 3);
-
-    // mov rcx, rcd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xc2 | (c << 3);
-
-    // mov rax, [rax + rdi*8]
-    *p++ = 0x48;
-    *p++ = 0x8b;
-    *p++ = 0x04;
-    *p++ = 0xf8;
-
-    // mov [rax + rsi*4], edx
-    *p++ = 0x89;
-    *p++ = 0x14;
-    *p++ = 0xb0;
+    *p++ = 0xC0 | c;
 
     *p++ = 0xEB;
     *p = 0x00 | (CHUNK - (p - s + 1));

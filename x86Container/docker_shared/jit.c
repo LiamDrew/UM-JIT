@@ -20,7 +20,7 @@ void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t fsize);
 void *init_registers();
 void initialize_instruction_bank();
 
-    int main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
     if (argc != 2)
     {
@@ -37,7 +37,10 @@ void initialize_instruction_bank();
     }
 
     /* Initializing the global state variables */
+    // mc.seg_bytes = {11, 31, 31, 11, 11, 14, 14, 4, 36, 33, 33, 17, 40, 0, 0};
 
+    uint32_t init_values[] = {11, 31, 31, 11, 11, 14, 14, 4, 36, 33, 33, 17, 40, 0, 0};
+    memcpy(mc.seg_bytes, init_values, sizeof(init_values));
     // Setting the program counter to 0
     gs.pc = 0;
 
@@ -70,7 +73,7 @@ void initialize_instruction_bank();
         assert((fsize % 4) == 0);
     }
 
-    /* This function hardcodes the addresses of a, b, and c that need to get 
+    /* This function hardcodes the addresses of a, b, and c that need to get
      * injected. They are stored in the MachineCode struct */
     initialize_instruction_bank();
     // mc.bank = initialize_instruction_bank();
@@ -79,7 +82,6 @@ void initialize_instruction_bank();
     void *zero = initialize_zero_segment(fsize * MULT);
     uint32_t *zero_vals = calloc(fsize, sizeof(uint32_t));
     assert(zero_vals != NULL);
-
 
     load_zero_segment(zero, zero_vals, fp, fsize);
 
@@ -156,7 +158,6 @@ void initialize_instruction_bank()
     i++;
 
     offset += cond_move(bank, offset, 0, 0, 0);
-    
 
     // Segmented Load
     mc.ou[i].asi = 0;
@@ -171,7 +172,6 @@ void initialize_instruction_bank()
 
     offset += inject_seg_load(bank, offset, 0, 0, 0);
 
-
     // Segmented Store
     mc.ou[i].asi = offset + 15;
     mc.ou[i].ai = 0;
@@ -184,7 +184,6 @@ void initialize_instruction_bank()
     i++;
 
     offset += inject_seg_store(bank, offset, 0, 0, 0);
-
 
     // Addition
     mc.ou[i].asi = 0;
@@ -199,7 +198,6 @@ void initialize_instruction_bank()
 
     offset += add_regs(bank, offset, 0, 0, 0);
 
-
     // Multiplication
     mc.ou[i].asi = 0;
     mc.ou[i].ai = offset + 8;
@@ -212,7 +210,6 @@ void initialize_instruction_bank()
     i++;
 
     offset += mult_regs(bank, offset, 0, 0, 0);
-
 
     // Division
     mc.ou[i].asi = 0;
@@ -227,7 +224,6 @@ void initialize_instruction_bank()
 
     offset += div_regs(bank, offset, 0, 0, 0);
 
-
     // Bitwise NAND
     mc.ou[i].asi = 0;
     mc.ou[i].ai = offset + 11;
@@ -240,7 +236,6 @@ void initialize_instruction_bank()
     i++;
 
     offset += nand_regs(bank, offset, 0, 0, 0);
-
 
     // Halt
     mc.ou[i].asi = 0;
@@ -255,7 +250,6 @@ void initialize_instruction_bank()
 
     offset += handle_halt(bank, offset);
 
-
     // Map Segment
     mc.ou[i].asi = 0;
     mc.ou[i].ai = 0;
@@ -269,7 +263,6 @@ void initialize_instruction_bank()
 
     offset += inject_map_segment(bank, offset, 0, 0);
 
-
     // Unmap Segment
     mc.ou[i].asi = 0;
     mc.ou[i].ai = 0;
@@ -277,13 +270,12 @@ void initialize_instruction_bank()
     mc.ou[i].bsi = 0;
     mc.ou[i].bi = 0;
 
-    mc.ou[i].csi = offset + 56; // Unrolled
-    // mc.ou[i].csi = offset + 2;  // Rolled
+    // mc.ou[i].csi = offset + 56; // Unrolled
+    mc.ou[i].csi = offset + 2; // Rolled
     mc.ou[i].ci = 0;
     i++;
 
     offset += inject_unmap_segment(bank, offset, 0);
-
 
     // Output
     mc.ou[i].asi = 0;
@@ -298,7 +290,6 @@ void initialize_instruction_bank()
 
     offset += print_reg(bank, offset, 0);
 
-
     // Input
     mc.ou[i].asi = 0;
     mc.ou[i].ai = 0;
@@ -312,7 +303,6 @@ void initialize_instruction_bank()
 
     offset += read_into_reg(bank, offset, 0);
 
-
     // Load Program
     mc.ou[i].asi = 0;
     mc.ou[i].ai = 0;
@@ -325,7 +315,6 @@ void initialize_instruction_bank()
     i++;
 
     offset += inject_load_program(bank, offset, 0, 0);
-    
 
     // Load Value
     mc.ou[i].asi = 0;
@@ -340,7 +329,6 @@ void initialize_instruction_bank()
 
     offset += CHUNK;
 
-
     // Opcode 14
     mc.ou[i].asi = 0;
     mc.ou[i].ai = 0;
@@ -353,7 +341,6 @@ void initialize_instruction_bank()
     i++;
     offset += CHUNK;
 
-
     // Opcode 15
     mc.ou[i].asi = 0;
     mc.ou[i].ai = 0;
@@ -364,7 +351,7 @@ void initialize_instruction_bank()
     mc.ou[i].csi = 0;
     mc.ou[i].ci = 0;
     i++;
-    
+
     offset += CHUNK;
 }
 

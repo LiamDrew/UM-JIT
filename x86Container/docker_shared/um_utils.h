@@ -7,7 +7,7 @@
 // may experiement with making it 14, but for now keep it a power of 2
 // due to unforseen circumstances, we have to make it a disgusting 32. ugh
 // due to more terrible things, the chunk is now 40 and the MULT is 10
-#define CHUNK 64
+#define CHUNK 40
 #define MULT (CHUNK / 4)
 #define OPS 15
 
@@ -38,7 +38,8 @@ struct GlobalState
     uint32_t rec_cap;
 } __attribute__((packed));
 
-typedef struct {
+typedef struct
+{
     uint32_t asi;
     uint32_t ai;
     uint32_t bsi;
@@ -47,14 +48,12 @@ typedef struct {
     uint32_t ci;
 } OpcodeUpdate;
 
-
-
 struct MachineCode
 {
     unsigned char bank[CHUNK * OPS];
     OpcodeUpdate ou[OPS + 1];
+    uint32_t seg_bytes[OPS];
 };
-
 
 extern struct GlobalState gs;
 
