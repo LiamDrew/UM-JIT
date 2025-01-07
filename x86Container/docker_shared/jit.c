@@ -8,6 +8,9 @@
 #include <stdbool.h>
 #include <sys/mman.h>
 
+// TODO: for the invalid instructions, put inline assembly to kill the program
+// to prove that the legal case I'm talking about is possible
+
 #define CHUNK 40
 #define MULT (CHUNK / 4)
 #define OPS 15
@@ -52,7 +55,7 @@ struct MachineCode mc;
 
 void initialize_instruction_bank();
 void *initialize_zero_segment(size_t fsize);
-void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t fsize);
+void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t size);
 uint64_t make_word(uint64_t word, unsigned width, unsigned lsb, uint64_t value);
 
 size_t compile_instruction(void *zero, uint32_t word, size_t offset);
@@ -103,6 +106,7 @@ int main(int argc, char *argv[])
     memcpy(mc.seg_bytes, in_v, sizeof(in_v));
     
     // Setting the program counter to 0
+    // Careful, cuz the executable memory is still zero indexed
     gs.pc = 0;
 
     /* Initializing the size and capacity of the memory segment array */
@@ -116,7 +120,7 @@ int main(int argc, char *argv[])
     gs.val_seq = calloc(gs.seq_cap, sizeof(uint32_t *));
 
     /* Array of segment sizes */
-    gs.seg_lens = calloc(gs.seq_cap, sizeof(uint32_t));
+    // gs.seg_lens = calloc(gs.seq_cap, sizeof(uint32_t));
 
     /* Initializing the size and capacity of the recycled segments array */
     gs.rec_size = 0;
@@ -138,14 +142,22 @@ int main(int argc, char *argv[])
     initialize_instruction_bank();
 
     /* Initialize executable and non-executable memory for the zero segment */
-    void *zero = initialize_zero_segment(fsize * MULT);
-    uint32_t *zero_vals = calloc(fsize, sizeof(uint32_t));
+    void *zero = initialize_zero_segment(fsize * (CHUNK / sizeof(uint32_t)));
+
+    // NOTE: adding one here to store the segment size inline with the words
+    // this is basically a 1 indexed array.
+
+    // uint32_t zero_seg_size = (fsize / sizeof(uint32_t)) + 1;
+    uint32_t zero_seg_size = (fsize / sizeof(uint32_t));
+    uint32_t *zero_vals = calloc(zero_seg_size, sizeof(uint32_t));
     assert(zero_vals != NULL);
 
-    load_zero_segment(zero, zero_vals, fp, fsize);
+    //this needs to be 1 indexed now
+    load_zero_segment(zero, zero_vals, fp, zero_seg_size);
 
     gs.val_seq[0] = zero_vals;
-    gs.seg_lens[0] = (fsize / 4);
+    gs.seg_lens[0] = zero_seg_size;
+
     gs.seq_size++;
     gs.active = zero;
 
@@ -412,14 +424,17 @@ void *initialize_zero_segment(size_t asmbytes)
     return zero;
 }
 
-void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t fsize)
+void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t size)
 {
-    (void)fsize;
-    uint32_t word = 0;
     int c;
     int i = 0;
     unsigned char c_char;
     size_t offset = 0;
+    Instruction word = 0;
+
+    // switching to storing the segment size in the segment array
+    (void)size;
+    // zero_vals[0] = size;
 
     for (c = getc(fp); c != EOF; c = getc(fp))
     {
@@ -433,7 +448,10 @@ void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t fsize)
         else if (i % 4 == 3)
         {
             word = make_word(word, 8, 0, c_char);
-            zero_vals[i / 4] = word;
+
+            // offset each by 1
+            zero_vals[(i / 4)] = word;
+            // zero_vals[(i / 4) + 1] = word;
 
             /* At this point, the word is assembled and ready to be compiled
              * into assembly */
@@ -459,8 +477,82 @@ uint64_t make_word(uint64_t word, unsigned width, unsigned lsb,
     return return_word;
 }
 
-// An alternate (less optimized) implementation of compile instruction
+void update_bank(uint32_t a, uint32_t b, uint32_t c, uint32_t opcode)
+{
+    uint8_t *bank = (uint8_t *)mc.bank;
+
+    OpcodeUpdate ou = mc.ou[opcode];
+
+    if (ou.asi != 0)
+    {
+        bank[ou.asi] &= ~(0x7 << 3);
+        bank[ou.asi] |= (a << 3);
+    }
+    else if (ou.ai != 0)
+    {
+        bank[ou.ai] &= ~(0x7);
+        bank[ou.ai] |= a;
+    }
+
+    if (ou.bsi != 0)
+    {
+        bank[ou.bsi] &= ~(0x7 << 3);
+        bank[ou.bsi] |= (b << 3);
+    }
+    else if (ou.bi != 0)
+    {
+        bank[ou.bi] &= ~(0x7);
+        bank[ou.bi] |= b;
+    }
+
+    if (ou.csi != 0)
+    {
+        bank[ou.csi] &= ~(0x7 << 3);
+        bank[ou.csi] |= (c << 3);
+    }
+    else if (ou.ci != 0)
+    {
+        bank[ou.ci] &= ~(0x7);
+        bank[ou.ci] |= c;
+    }
+}
+
+size_t compile_instruction(void *zero, Instruction word, size_t offset)
+{
+    uint32_t opcode = (word >> 28) & 0xF;
+    uint32_t a = 0;
+
+    // Load Value
+    if (opcode == 13)
+    {
+        a = (word >> 25) & 0x7;
+        uint32_t val = word & 0x1FFFFFF;
+        offset += load_reg(zero, offset, a, val);
+        return offset;
+    }
+
+    uint32_t b = 0, c = 0;
+
+    c = word & 0x7;
+    b = (word >> 3) & 0x7;
+    a = (word >> 6) & 0x7;
+
+    uint32_t lower = opcode * CHUNK;
+
+    // update a, b, and c values within the appropriate ranges
+    update_bank(a, b, c, opcode);
+
+    uint32_t copy_size = mc.seg_bytes[opcode];
+    memcpy(zero + offset, mc.bank + lower, copy_size);
+
+    offset += CHUNK;
+    return offset;
+}
+
+
 /*
+//An alternate (less optimized) implementation of compile instruction
+// This version will not be broken by feeble offset issues
 size_t compile_instruction(void *zero, Instruction word, size_t offset)
 {
     uint32_t opcode = (word >> 28) & 0xF;
@@ -554,14 +646,14 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     else if (opcode == 1)
     {
         // printf("Segmented load a: %u, b: %u, c: %u\n", a, b, c);
-        offset += inject_seg_load(zero, offset, a, b, c);
+        offset += seg_load(zero, offset, a, b, c);
     }
 
     // Segmented Store
     else if (opcode == 2)
     {
         // printf("Segmented store a: %u, b: %u, c: %u\n", a, b, c);
-        offset += inject_seg_store(zero, offset, a, b, c);
+        offset += seg_store(zero, offset, a, b, c);
     }
 
     // Load Program
@@ -595,80 +687,8 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
 
     return offset;
 }
+
 */
-
-void update_bank(uint32_t a, uint32_t b, uint32_t c, uint32_t opcode)
-{
-    uint8_t *bank = (uint8_t *)mc.bank;
-
-    OpcodeUpdate ou = mc.ou[opcode];
-
-    if (ou.asi != 0)
-    {
-        bank[ou.asi] &= ~(0x7 << 3);
-        bank[ou.asi] |= (a << 3);
-    }
-    else if (ou.ai != 0)
-    {
-        bank[ou.ai] &= ~(0x7);
-        bank[ou.ai] |= a;
-    }
-
-    if (ou.bsi != 0)
-    {
-        bank[ou.bsi] &= ~(0x7 << 3);
-        bank[ou.bsi] |= (b << 3);
-    }
-    else if (ou.bi != 0)
-    {
-        bank[ou.bi] &= ~(0x7);
-        bank[ou.bi] |= b;
-    }
-
-    if (ou.csi != 0)
-    {
-        bank[ou.csi] &= ~(0x7 << 3);
-        bank[ou.csi] |= (c << 3);
-    }
-    else if (ou.ci != 0)
-    {
-        bank[ou.ci] &= ~(0x7);
-        bank[ou.ci] |= c;
-    }
-}
-
-size_t compile_instruction(void *zero, Instruction word, size_t offset)
-{
-    uint32_t opcode = (word >> 28) & 0xF;
-    uint32_t a = 0;
-
-    /* Load Value */
-    if (opcode == 13)
-    {
-        a = (word >> 25) & 0x7;
-        uint32_t val = word & 0x1FFFFFF;
-        offset += load_reg(zero, offset, a, val);
-        return offset;
-    }
-
-    uint32_t b = 0, c = 0;
-
-    c = word & 0x7;
-    b = (word >> 3) & 0x7;
-    a = (word >> 6) & 0x7;
-
-    uint32_t lower = opcode * CHUNK;
-
-    // update a, b, and c values within the appropriate ranges
-    update_bank(a, b, c, opcode);
-
-    uint32_t copy_size = mc.seg_bytes[opcode];
-    memcpy(zero + offset, mc.bank + lower, copy_size);
-
-    offset += CHUNK;
-    return offset;
-}
-
 size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 {
     unsigned char *p = zero + offset;
@@ -750,6 +770,8 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xc6 | (c << 3);
 
+    // TODO: increment rsi by 1 (it's the index we're loading from)
+
     // mov rax, [rax + rdi*8]  (using rdi now for *8)
     *p++ = 0x48;
     *p++ = 0x8b;
@@ -800,6 +822,8 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x44;
     *p++ = 0x89;
     *p++ = 0xc6 | (b << 3);
+
+    // TODO: increment rsi by 1 (it's the index we're loading from)
 
     // mov rcx, rcd
     *p++ = 0x44;
@@ -965,6 +989,36 @@ size_t handle_halt(void *zero, size_t offset)
     return CHUNK;
 }
 
+/* I'm considering making a major change to the program. Instead of manually handing
+all this mallocing and freeing, and keeping track of memory segments and whatnot, I could
+just malloc to map a segment, free to unmap a segment, and access pointers directly for
+seg load, seg store, and load program. For each function, I plan to write out the
+psuedocode of what this could look like. I expect it will be much simpler and faster*/
+
+// uint32_t *help_map_seg(uint32_t size)
+// {
+//     // store size at some sensible memory address (ugh but this sucks)
+// }
+
+// uint32_t map_segment_inline(void *zero, size_t offset, unsigned b, unsigned c)
+// {
+//     // mov rc into rdi
+//     // shift rdi by 2 (multiply rdi by 4)
+
+//     // save approriate registers
+
+//     // call malloc or help_map_seg (depending on my memory options)
+
+//     // unpop appropriate registers
+
+//     // store resulting pointer (remember it's 64 bits) into register c
+
+//     // NOTE: do we need to store the size of the allocated segment?
+//     // it would be necessary when loading a program, unless there was a way to
+//     // copy memory by a pointer without knowing the size.
+//     // even if we did need to know the size, this would be a big speed up.
+// }
+
 uint32_t map_segment(uint32_t size)
 {
     uint32_t new_seg_id;
@@ -1001,6 +1055,8 @@ uint32_t map_segment(uint32_t size)
     {
         new_seg_id = gs.rec_ids[--gs.rec_size];
     }
+
+    // TODO: need some surgery here to make things work with the new 1 index approach
 
     /* If the segment didn't previously exist or wasn't large enought for us*/
     if (gs.val_seq[new_seg_id] == NULL || size > gs.seg_lens[new_seg_id])
@@ -1078,6 +1134,14 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 
     return CHUNK;
 }
+
+
+// size_t unmap_segment_inline(void *zero, size_t offset, unsigned c)
+// {
+//     // move rC into rdi
+
+//     // call free
+// }
 
 void unmap_segment(uint32_t segmentId)
 {
@@ -1354,9 +1418,10 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
 
 void *load_program(uint32_t b_val, uint32_t c_val)
 {
-    // assert(false);
-    // printf("Actually getting called\n");
     (void)c_val;
+
+    // TODO: surgery needs to be done here to work with the 1 index array
+
     // The following two steps get handled in inline assembly
     /* Set the program counter to be the contents of register c */
     /* If segment zero is loaded, just return the active segment */
@@ -1380,8 +1445,6 @@ void *load_program(uint32_t b_val, uint32_t c_val)
     {
         offset = compile_instruction(new_zero, new_vals[i], offset);
     }
-
-    // printf("Over loading a program\n");
 
     gs.active = new_zero;
     return new_zero;
@@ -1433,7 +1496,7 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     // ret
     *p++ = 0xc3;
 
-    // NOTE: super sus that the registers don't need to be on the stack.. double check this
+    // NOTE: super sus that the registers don't need to be on the stack..
     // 12 byte function call
     *p++ = 0x48;
     *p++ = 0xb8;
@@ -1442,14 +1505,8 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0xff;
     *p++ = 0xd0;
 
-    // this function better return rax as the right thing
-    // injected function needs to ret (rax should already be the right thing)
-    // ret
+    // return (rax already contains the new zero segment address)
     *p++ = 0xc3;
 
     return CHUNK;
 }
-
-// NOTE: The inline calculation of the jump size costs us some performance. When the assembly
-// has been locked in, hardcode the jump size for some extra performance
-

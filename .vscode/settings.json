@@ -6,6 +6,8 @@
         "string.h": "c",
         "stdbool.h": "c",
         "stdlib.h": "c",
-        "inet.h": "c"
+        "inet.h": "c",
+        "alloca.h": "c",
+        "_malloc.h": "c"
     }
 }
