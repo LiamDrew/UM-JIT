@@ -56,6 +56,8 @@ Based on these initial tests, I concluded 3 things:
 2. The emulated x86_64 architecture running on the Apple hardware, is about 20% slower than the native ARM architecture
 3. Amazingly, Docker runs Aarch linux on Apple hardware faster than MacOS runs on Apple hardware
 
+Here is the perfomance comparisons between the emulator and the JIT.
+
 In my x86 container:
 ### Emulator
 Midmark: 0.13 seconds
@@ -73,15 +75,31 @@ JIT Compiler:
 TODO
 
 ## Running the Program
+1. Download the source code
+2. Build or download my docker image:
+Unless your computer runs x86_64 linux (and maybe even if it does!), you will likely want to run the program with docker.
+You can download my docker image from docker hub (HERE), or you can build it yourself using my docker file.
+```docker build -t dev-tools-x86 .```
+The container has the bare minimum utilities you need to run the program. It also accesses the `docker_shared` directory, which
+is shared between the container and your local machine
+
+```docker run something something shared directory```
+
+TODO: can you load a docker container with files already inside of it?
+
+3. Navigate to the x86container/docker_shared directory
+4. Compile with `make`
+5. Run with `./jit umasm/sandmark.umz`
+The umasm directory contains many UM programs.
 
 ## Challenges
 This program is of course not portable, as it executes x86 machine code that will not run on another system.
 
 ## Potential Improvements
-The benchmark assembly language programs used to test emulators have a couple weaknesses that I exploited to make my JIT faster
+The benchmark assembly language programs used to test emulators have a couple weaknesses that I exploited to make my JIT faster.
 
 ## Acknowledgements
-A huge thank you to my professor Mark Sheldon for giving me the idea for this project.
+Mark Sheldon for giving me the idea to make a compiler for the UM.
 Peter Wolfe, my project partner for the UM assignment.
 Norman Ramsey, the author of the UM assignment.
 
