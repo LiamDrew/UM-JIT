@@ -20,6 +20,8 @@
 #define CS 8
 #define C 4
 
+#define ICAP 128
+
 typedef uint32_t Instruction;
 
 struct GlobalState
@@ -34,27 +36,25 @@ struct GlobalState
     uint32_t *rec_ids;
     uint32_t rec_size;
     uint32_t rec_cap;
-
-    // uint32_t padding;
-    // void *handle_realloc_ptr; // for unmap segment
-    // void *map_segment_ptr; // for map segment
-    // void *load_program_ptr; // for load program
 } __attribute__((packed));
+
+typedef struct {
+    uint32_t asi;
+    uint32_t ai;
+    uint32_t bsi;
+    uint32_t bi;
+    uint32_t csi;
+    uint32_t ci;
+} OpcodeUpdate;
+
+
 
 struct MachineCode
 {
-    // void *bank;
     unsigned char bank[CHUNK * OPS];
-    unsigned char preserve[CHUNK * OPS];
-    uint32_t a_shift[AS];
-    uint32_t a[A];
-
-    uint32_t b_shift[BS];
-    uint32_t b[B];
-
-    uint32_t c_shift[CS];
-    uint32_t c[C];
+    OpcodeUpdate ou[OPS + 1];
 };
+
 
 extern struct GlobalState gs;
 

@@ -16,6 +16,11 @@ RUN apt-get update && apt-get install -y \
     graphviz \
     cmake \
     git \
+    linux-tools-generic \
+    linux-tools-common \
+    linux-cloud-tools-generic \
+    strace \
+    ltrace \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up X11 forwarding for GUI applications
@@ -47,6 +52,11 @@ RUN useradd -u 501 -m -s /bin/bash developer && \
     chown -R developer:developer /home/developer && \
     chmod -R 755 /home/developer
 
+# # Configure perf permissions
+# RUN echo 'developer ALL=(ALL:ALL) NOPASSWD: /usr/bin/perf' >> /etc/sudoers && \
+#     echo 'kernel.perf_event_paranoid = -1' >> /etc/sysctl.conf && \
+#     echo 'kernel.kptr_restrict = 0' >> /etc/sysctl.conf
+
 USER developer
 WORKDIR /home/developer
 
@@ -63,3 +73,5 @@ CMD ["/bin/bash"]
 #     -v /tmp/.X11-unix:/tmp/.X11-unix \
 #     -v "$PWD/docker_shared:/home/developer/shared" \
 #     dev-tools-x86
+
+docker run -it -v "$PWD/docker_shared:/home/developer/shared" dev-tools-x86

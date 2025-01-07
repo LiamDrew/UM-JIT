@@ -141,88 +141,41 @@
 //     return offset;
 // }
 
-void update_bank(uint32_t a, uint32_t b, uint32_t c, uint32_t lower, uint32_t upper)
+void update_bank(uint32_t a, uint32_t b, uint32_t c, uint32_t opcode)
 {
     uint8_t *bank = (uint8_t *)mc.bank;
-    uint32_t temp = 0;
 
-    // all these loops, all these comparisons. I think it might be faster to just update everything at every
-    // target index
+    OpcodeUpdate ou = mc.ou[opcode];
 
-    for (unsigned i = 0; i < AS; i++)
+    if (ou.asi != 0)
     {
-        temp = mc.a_shift[i];
-        if (lower <= temp)
-        {
-            if (temp >= upper)
-                break;
-
-            bank[temp] &= ~(0x7 << 3);
-            bank[temp] |= (a << 3);
-        }
-    }
-
-    for (unsigned i = 0; i < A; i++)
+        bank[ou.asi] &= ~(0x7 << 3);
+        bank[ou.asi] |= (a << 3);
+    } else if (ou.ai != 0)
     {
-        temp = mc.a[i];
-        if (lower <= temp)
-        {
-            if (temp >= upper)
-                break;
-            bank[temp] &= ~(0x7);
-            bank[temp] |= a;
-        }
+        bank[ou.ai] &= ~(0x7);
+        bank[ou.ai] |= a;
     }
 
-    for (unsigned i = 0; i < BS; i++) {
-        temp = mc.b_shift[i];
-        if (lower <= temp)
-        {
-            if (temp >= upper)
-                break;
-            
-            bank[temp] &= ~(0x7 << 3);
-            bank[temp] |= (b << 3);
-        }
+    if (ou.bsi != 0)
+    {
+        bank[ou.bsi] &= ~(0x7 << 3);
+        bank[ou.bsi] |= (b << 3);
+    } else if (ou.bi != 0)
+    {
+        bank[ou.bi] &= ~(0x7);
+        bank[ou.bi] |= b;
     }
 
-    for (unsigned i = 0; i < B; i++) {
-        temp = mc.b[i];
-        if (lower <= temp)
-        {
-            if (temp >= upper)
-                break;
-            
-            bank[temp] &= ~(0x7);
-            bank[temp] |= b;
-        }
+    if (ou.csi != 0)
+    {
+        bank[ou.csi] &= ~(0x7 << 3);
+        bank[ou.csi] |= (c << 3);
+    } else if (ou.ci != 0)
+    {
+        bank[ou.ci] &= ~(0x7);
+        bank[ou.ci] |= c;
     }
-
-    for (unsigned i = 0; i < CS; i++) {
-        temp = mc.c_shift[i];
-        if (lower <= temp)
-        {
-            if (temp >= upper)
-                break;
-
-            bank[temp] &= ~(0x7 << 3);
-            bank[temp] |= (c << 3);
-        }
-    }
-
-    for (unsigned i = 0; i < C; i++) {
-        temp = mc.c[i];
-
-        if (lower <= temp)
-        {
-            if (temp >= upper)
-                break;
-            
-            bank[temp] &= ~(0x7);
-            bank[temp] |= c;
-        }
-    }
-    return;
 }
 
 size_t compile_instruction(void *zero, Instruction word, size_t offset)
@@ -246,10 +199,9 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     a = (word >> 6) & 0x7;
 
     uint32_t lower = opcode * CHUNK;
-    uint32_t upper = (opcode + 1) * CHUNK;
 
     // update a, b, and c values within the appropriate ranges
-    update_bank(a, b, c, lower, upper);
+    update_bank(a, b, c, opcode);
     memcpy(zero + offset, mc.bank + lower, CHUNK);
 
     offset += CHUNK;
@@ -278,20 +230,6 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     return CHUNK;
 }
 
-void print_memory(const void *memory, size_t size)
-{
-    const unsigned char *ptr = memory;
-    for (size_t i = 0; i < size; i++)
-    {
-        printf("%02x ", ptr[i]);
-        if ((i + 1) % 16 == 0)
-        { // Line break every 16 bytes
-            printf("\n");
-        }
-    }
-    printf("\n");
-}
-
 size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     unsigned char *p = zero + offset;
@@ -315,8 +253,6 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     // Jump
     *p++ = 0xEB;
     *p = 0x00 | (CHUNK - (p - s + 1));
-
-    // print_memory(s, CHUNK);
 
     return CHUNK;
 }
@@ -657,6 +593,76 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     return CHUNK;
 }
 
+/*
+void unmap_segment(uint32_t segmentId)
+{
+    if (gs.rec_size == gs.rec_cap)
+    {
+        gs.rec_cap *= 2;
+        gs.rec_ids = realloc(gs.rec_ids, gs.rec_cap * sizeof(uint32_t));
+    }
+
+    gs.rec_ids[gs.rec_size++] = segmentId;
+}
+
+size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
+{
+    void *unmap_segment_addr = (void *)&unmap_segment;
+
+    unsigned char *p = zero + offset;
+    unsigned char *s = p;
+
+    // move reg c to be the function call argument
+    // mov rC, rdi
+    *p++ = 0x44;            // Reg prefix for r8-r15
+    *p++ = 0x89;            // mov reg to reg
+    *p++ = 0xc7 | (c << 3); // ModR/M byte
+
+    // push r8 onto the stack
+    *p++ = 0x41;
+    *p++ = 0x50;
+
+    *p++ = 0x41;
+    *p++ = 0x51;
+
+    *p++ = 0x41;
+    *p++ = 0x52;
+
+    *p++ = 0x41;
+    *p++ = 0x53;
+
+    *p++ = 0x48; // REX.W prefix
+    *p++ = 0xb8; // mov rax, imm64
+    memcpy(p, &unmap_segment_addr, sizeof(void *));
+    p += sizeof(void *);
+
+    // call rax
+    *p++ = 0xff;
+    *p++ = 0xd0; // ModR/M byte for call rax
+
+    // pop r8 off the stack
+    *p++ = 0x41;
+    *p++ = 0x5B;
+
+    *p++ = 0x41;
+    *p++ = 0x5A;
+
+    *p++ = 0x41;
+    *p++ = 0x59;
+
+    *p++ = 0x41;
+    *p++ = 0x58;
+
+    // jump 19 bytes
+    // jump 19 + 24 = 43 bytes
+    *p++ = 0xEB;
+    *p = 0x00 | (CHUNK - (p - s + 1));
+    // *p++ = 0x2B;
+
+    return CHUNK;
+}
+
+*/
 
 // Below is the unrolled version of Map segment. The rolled version might be interesting
 void handle_realloc()
@@ -767,7 +773,6 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
 
     return CHUNK;
 }
-
 
 // inject segmented load
 size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
@@ -950,7 +955,6 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     // ret
     *p++ = 0xc3;
 
-
     // NOTE: super sus that the registers don't need to be on the stack.. double check this
     // 12 byte function call
     *p++ = 0x48;
@@ -979,26 +983,3 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
  * neither the midmark or the sandmark demand this of the JIT. Perhaps advent
  * or codex does, I haven't checked. If that were the case, I could modify this
  * function to make a function call with the 14 remaining bytes I have. */
-
-void print_registers()
-{
-    uint64_t r8, r9, r10, r11, r12, r13, r14, r15;
-
-    asm volatile(
-        "movq %%r8, %0\n\t"
-        "movq %%r9, %1\n\t"
-        "movq %%r10, %2\n\t"
-        "movq %%r11, %3\n\t"
-        "movq %%r12, %4\n\t"
-        "movq %%r13, %5\n\t"
-        "movq %%r14, %6\n\t"
-        "movq %%r15, %7\n\t"
-        : "=m"(r8), "=m"(r9), "=m"(r10), "=m"(r11),
-          "=m"(r12), "=m"(r13), "=m"(r14), "=m"(r15)
-        :
-        :);
-
-    printf("R8: %lu\nR9: %lu\nR10: %lu\nR11: %lu\n"
-           "R12: %lu\nR13: %lu\nR14: %lu\nR15: %lu\n",
-           r8, r9, r10, r11, r12, r13, r14, r15);
-}
