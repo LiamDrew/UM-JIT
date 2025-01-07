@@ -74,4 +74,4 @@ CMD ["/bin/bash"]
 #     -v "$PWD/docker_shared:/home/developer/shared" \
 #     dev-tools-x86
 
-docker run -it -v "$PWD/docker_shared:/home/developer/shared" dev-tools-x86
+# docker run -it -v "$PWD/docker_shared:/home/developer/shared" dev-tools-x86

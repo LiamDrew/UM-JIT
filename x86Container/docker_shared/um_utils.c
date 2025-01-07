@@ -230,7 +230,10 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 
     // This should automatically jump forward the correct number of bytes
     *p++ = 0xEB;
-    *p = 0x00 | (CHUNK - (p - s + 1));
+    *p = 0x1F;
+    // *p = 0x00 | (CHUNK - (p - s + 1));
+    (void)s;
+
 
     return CHUNK;
 }
@@ -257,7 +260,9 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
     // jump 29 bytes
     *p++ = 0xEB;
-    *p = 0x00 | (CHUNK - (p - s + 1));
+    *p = 0x1D;
+    // *p = 0x00 | (CHUNK - (p - s + 1));
+    (void)s;
 
     return CHUNK;
 }
@@ -308,7 +313,9 @@ size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsign
 
     // 36 No Ops
     *p++ = 0xEB;
-    *p = 0x00 | (CHUNK - (p - s + 1));
+    *p = 0x09;
+    // *p = 0x00 | (CHUNK - (p - s + 1));
+    (void)s;
 
     return CHUNK;
 }
@@ -357,7 +364,9 @@ size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsig
     *p++ = 0xb0;
 
     *p++ = 0xEB;
-    *p = 0x00 | (CHUNK - (p - s + 1));
+    *p = 0x09;
+    // *p = 0x00 | (CHUNK - (p - s + 1));
+    (void)s;
 
     return CHUNK;
 }
@@ -411,7 +420,9 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
     // jump
     *p++ = 0xEB;
-    *p = 0x00 | (CHUNK - (p - s + 1));
+    *p = 0x1D;
+    // *p = 0x00 | (CHUNK - (p - s + 1));
+    (void)s;
 
     return CHUNK;
 }
@@ -442,7 +453,9 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
     // jump 26 bytes
     *p++ = 0xEB;
-    *p = 0x00 | (CHUNK - (p - s + 1));
+    *p = 0x1A;
+    // *p = 0x00 | (CHUNK - (p - s + 1));
+    (void)s;
 
     return CHUNK;
 }
@@ -475,7 +488,9 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
     // jump
     *p++ = 0xEB;
-    *p = 0x00 | (CHUNK - (p - s + 1));
+    *p = 0x1A;
+    // *p = 0x00 | (CHUNK - (p - s + 1));
+    (void)s;
 
     return CHUNK;
 }
@@ -604,7 +619,9 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0xc0 | b;
 
     *p++ = 0xEB;
-    *p = 0x00 | (CHUNK - (p - s + 1));
+    *p = 0x04;
+    // *p = 0x00 | (CHUNK - (p - s + 1));
+    (void)s;
 
     return CHUNK;
 }
@@ -667,11 +684,10 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0x41;
     *p++ = 0x58;
 
-    // jump 19 bytes
-    // jump 19 + 24 = 43 bytes
     *p++ = 0xEB;
-    *p = 0x00 | (CHUNK - (p - s + 1));
-    // *p++ = 0x2B;
+    *p = 0x07;
+    // *p = 0x00 | (CHUNK - (p - s + 1));
+    (void)s;
 
     return CHUNK;
 }
@@ -835,7 +851,15 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x58;
 
     *p++ = 0xEB;
-    *p = 0x00 | (CHUNK - (p - s + 1));
+    *p = 0x07;
+    // *p = 0x00 | (CHUNK - (p - s + 1));
+    (void)s;
+    (void)p;
+    (void)putchar_addr;
+    (void)c;
+
+    // *p++ = 0xEB;
+    // *p = 0x26;
 
     return CHUNK;
 }
@@ -868,7 +892,9 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0xC0 | c;
 
     *p++ = 0xEB;
-    *p = 0x00 | (CHUNK - (p - s + 1));
+    *p = 0x17;
+    // *p = 0x00 | (CHUNK - (p - s + 1));
+    (void)s;
 
     return CHUNK;
 }
