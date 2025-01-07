@@ -103,6 +103,15 @@ Mark Sheldon for giving me the idea to make a compiler for the UM.
 Peter Wolfe, my project partner for the UM assignment.
 Norman Ramsey, the author of the UM assignment.
 
+## Notes
+// inject segmented store
+/* I discovered a weakness in the benchmark that allows me to inline this
+ * and get a fair bit more performance out of the compiler. If a UM program
+ * were to encounter a segmented store that stored an instruction into the zero
+ * segment that was going to be executed, this compiler would crash. However,
+ * neither the midmark or the sandmark demand this of the JIT. Perhaps advent
+ * or codex does, I haven't checked. If that were the case, I could modify this
+ * function to make a function call with the 14 remaining bytes I have. */
 
 
  
