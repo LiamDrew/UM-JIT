@@ -143,50 +143,23 @@
 
 void update_bank(uint32_t a, uint32_t b, uint32_t c, uint32_t lower, uint32_t upper)
 {
-    // printf("Bank being updated\n");
     uint8_t *bank = (uint8_t *)mc.bank;
     uint32_t temp = 0;
 
-    (void)a;
-    (void)b;
-    (void)c;
-    (void)lower;
-    (void)upper;
-    (void)bank;
-    (void)temp;
+    // all these loops, all these comparisons. I think it might be faster to just update everything at every
+    // target index
 
-    // printf("copying values between %u, and %u\n", lower, upper);
-
-    // NEW
-    // for (unsigned i = 0; i < AS; i++)
-    // {
-    //     temp = mc.a_shift[i];
-    //     if (lower <= temp)
-    //     {
-    //         if (temp >= upper)
-    //             break;
-            
-    //         bank[temp] |= (a << 3);
-    //     }
-    // }
-
-    if (lower == 192) {
-        // printf("handle add\n");
-        bank[lower + 2] |= (b << 3);
-        bank[lower + 5] |= (c << 3);
-        bank[lower + 8] |= a;
-        return;
-    }
-
-    if (lower == 384)
+    for (unsigned i = 0; i < AS; i++)
     {
-        // printf("Trying to nand regs\n");
-        // do a NAND
-        bank[lower + 2] |= (b << 3);
-        bank[lower + 5] |= (c << 3);
+        temp = mc.a_shift[i];
+        if (lower <= temp)
+        {
+            if (temp >= upper)
+                break;
 
-        bank[lower + 11] |= a;
-        return;
+            bank[temp] &= ~(0x7 << 3);
+            bank[temp] |= (a << 3);
+        }
     }
 
     for (unsigned i = 0; i < A; i++)
@@ -196,7 +169,7 @@ void update_bank(uint32_t a, uint32_t b, uint32_t c, uint32_t lower, uint32_t up
         {
             if (temp >= upper)
                 break;
-
+            bank[temp] &= ~(0x7);
             bank[temp] |= a;
         }
     }
@@ -208,21 +181,22 @@ void update_bank(uint32_t a, uint32_t b, uint32_t c, uint32_t lower, uint32_t up
             if (temp >= upper)
                 break;
             
+            bank[temp] &= ~(0x7 << 3);
             bank[temp] |= (b << 3);
         }
     }
 
-    // NEW
-    // for (unsigned i = 0; i < B; i++) {
-    //     temp = mc.b[i];
-    //     if (lower <= temp)
-    //     {
-    //         if (temp >= upper)
-    //             break;
+    for (unsigned i = 0; i < B; i++) {
+        temp = mc.b[i];
+        if (lower <= temp)
+        {
+            if (temp >= upper)
+                break;
             
-    //         bank[temp] |= b;
-    //     }
-    // }
+            bank[temp] &= ~(0x7);
+            bank[temp] |= b;
+        }
+    }
 
     for (unsigned i = 0; i < CS; i++) {
         temp = mc.c_shift[i];
@@ -231,25 +205,23 @@ void update_bank(uint32_t a, uint32_t b, uint32_t c, uint32_t lower, uint32_t up
             if (temp >= upper)
                 break;
 
+            bank[temp] &= ~(0x7 << 3);
             bank[temp] |= (c << 3);
         }
     }
 
-    // // NEW
-    // for (unsigned i = 0; i < C; i++) {
-    //     temp = mc.c[i];
+    for (unsigned i = 0; i < C; i++) {
+        temp = mc.c[i];
 
-    //     if (lower <= temp)
-    //     {
-    //         if (temp >= upper)
-    //             break;
+        if (lower <= temp)
+        {
+            if (temp >= upper)
+                break;
             
-    //         bank[temp] | c;
-    //     }
-    // }
-
-
-
+            bank[temp] &= ~(0x7);
+            bank[temp] |= c;
+        }
+    }
     return;
 }
 
@@ -258,19 +230,12 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     uint32_t opcode = (word >> 28) & 0xF;
     uint32_t a = 0;
 
-    // Now based on the opcode, figure out what to do
-    // printf("Opcode is %u\n", opcode);
-
-
     /* Load Value */
     if (opcode == 13)
     {
-        // printf("Load value a: %u, b: %u, c: %u\n", a, b, c);
-        // Load the right register and do the thing
         a = (word >> 25) & 0x7;
         uint32_t val = word & 0x1FFFFFF;
         offset += load_reg(zero, offset, a, val);
-        // printf("opcode is 13, returning\n");
         return offset;
     }
 
@@ -280,121 +245,15 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     b = (word >> 3) & 0x7;
     a = (word >> 6) & 0x7;
 
-    // if (opcode == 12)
-    // {
-    //     printf("Load program a: %u, b: %u, c: %u\n", a, b, c);
-    // }
-
-    // /* Output */
-    if (opcode == 10) {
-        offset += print_reg(zero, offset, c);
-        return offset;
-    }
-
-    /* Addition */
-    else if (opcode == 3) {
-        offset += add_regs(zero, offset, a, b, c);
-        return offset;
-    }
-
-    // /* Halt */
-    // else if (opcode == 7) {
-    //     offset += handle_halt(zero, offset);
-    //     return offset;
-    // }
-
-    /* Bitwise NAND */
-    else if (opcode == 6) {
-        offset += nand_regs(zero, offset, a, b, c);
-        return offset;
-    }
-
-
-    /* Multiplication */
-    else if (opcode == 4)
-    {
-        // printf("Multiplication a: %u, b: %u, c: %u\n", a, b, c);
-        offset += mult_regs(zero, offset, a, b, c);
-        return offset;
-    }
-
-    /* Division */
-    else if (opcode == 5)
-    {
-        // printf("Division a: %u, b: %u, c: %u\n", a, b, c);
-        offset += div_regs(zero, offset, a, b, c);
-        return offset;
-    }
-
-    /* Conditional Move */
-    else if (opcode == 0)
-    {
-        // printf("Conditional move a: %u, b: %u, c: %u\n", a, b, c);
-        offset += cond_move(zero, offset, a, b, c);
-        return offset;
-    }
-
-    /* Input */
-    else if (opcode == 11)
-    {
-        // printf("Input a: %u, b: %u, c: %u\n", a, b, c);
-        offset += read_into_reg(zero, offset, c);
-        return offset;
-    }
-
-    /* Segmented Load */
-    else if (opcode == 1)
-    {
-        // printf("Segmented load a: %u, b: %u, c: %u\n", a, b, c);
-        offset += inject_seg_load(zero, offset, a, b, c);
-        return offset;
-    }
-
-    /* Segmented Store */
-    else if (opcode == 2)
-    {
-        // printf("Segmented store a: %u, b: %u, c: %u\n", a, b, c);
-        offset += inject_seg_store(zero, offset, a, b, c);
-        return offset;
-    }
-
-    /* Load Program */
-    else if (opcode == 12)
-    {
-        // printf("Load progam a: %u, b: %u, c: %u\n", a, b, c);
-        offset += inject_load_program(zero, offset, b, c);
-        return offset;
-    }
-
-    /* Map Segment */
-    else if (opcode == 8)
-    {
-        // printf("Map segment a: %u, b: %u, c: %u\n", a, b, c);
-        offset += inject_map_segment(zero, offset, b, c);
-        return offset;
-    }
-
-    /* Unmap Segment */
-    else if (opcode == 9)
-    {
-        // printf("Unmap segment a: %u, b: %u, c: %u\n", a, b, c);
-        offset += inject_unmap_segment(zero, offset, c);
-        return offset;
-    }
-
     uint32_t lower = opcode * CHUNK;
     uint32_t upper = (opcode + 1) * CHUNK;
 
     // update a, b, and c values within the appropriate ranges
     update_bank(a, b, c, lower, upper);
-
-    // // call memcpy from the word bank;
-    // memcpy(zero + offset, mc.bank + lower, CHUNK);
-    memcpy((unsigned char *)zero + offset, (unsigned char *)mc.bank + lower, CHUNK);
+    memcpy(zero + offset, mc.bank + lower, CHUNK);
 
     offset += CHUNK;
     return offset;
-
 }
 
 size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
@@ -417,6 +276,20 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p = 0x00 | (CHUNK - (p - s + 1));
 
     return CHUNK;
+}
+
+void print_memory(const void *memory, size_t size)
+{
+    const unsigned char *ptr = memory;
+    for (size_t i = 0; i < size; i++)
+    {
+        printf("%02x ", ptr[i]);
+        if ((i + 1) % 16 == 0)
+        { // Line break every 16 bytes
+            printf("\n");
+        }
+    }
+    printf("\n");
 }
 
 size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
@@ -442,6 +315,8 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     // Jump
     *p++ = 0xEB;
     *p = 0x00 | (CHUNK - (p - s + 1));
+
+    // print_memory(s, CHUNK);
 
     return CHUNK;
 }
@@ -782,6 +657,8 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     return CHUNK;
 }
 
+
+// Below is the unrolled version of Map segment. The rolled version might be interesting
 void handle_realloc()
 {
     // double the capacity
@@ -891,6 +768,7 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     return CHUNK;
 }
 
+
 // inject segmented load
 size_t inject_seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
@@ -952,7 +830,7 @@ size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsig
     *p++ = 0xb8;
     uint64_t addr = (uint64_t)&gs.val_seq;
     memcpy(p, &addr, sizeof(addr));
-    p += 8;
+    p += sizeof(addr);
 
     // mov rax, [rax]            (Dereference to get the value)
     *p++ = 0x48;
@@ -993,7 +871,8 @@ size_t inject_seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsig
 
 void *load_program(uint32_t b_val, uint32_t c_val)
 {
-    printf("Actually getting called\n");
+    // assert(false);
+    // printf("Actually getting called\n");
     (void)c_val;
     // The following two steps get handled in inline assembly
     /* Set the program counter to be the contents of register c */
@@ -1018,6 +897,8 @@ void *load_program(uint32_t b_val, uint32_t c_val)
     {
         offset = compile_instruction(new_zero, new_vals[i], offset);
     }
+
+    // printf("Over loading a program\n");
 
     gs.active = new_zero;
     return new_zero;

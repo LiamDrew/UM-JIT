@@ -12,9 +12,9 @@
 #define OPS 15
 
 #define AS 1
-#define A 5
+#define A 6
 
-#define BS 7
+#define BS 8
 #define B 1
 
 #define CS 8
@@ -43,7 +43,9 @@ struct GlobalState
 
 struct MachineCode
 {
-    void *bank;
+    // void *bank;
+    unsigned char bank[CHUNK * OPS];
+    unsigned char preserve[CHUNK * OPS];
     uint32_t a_shift[AS];
     uint32_t a[A];
 
@@ -57,6 +59,8 @@ struct MachineCode
 extern struct GlobalState gs;
 
 extern struct MachineCode mc;
+
+void print_memory(const void *memory, size_t size);
 
 void print_out(uint32_t x);
 unsigned char read_char(void);

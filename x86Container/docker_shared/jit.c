@@ -75,7 +75,9 @@ void *initialize_instruction_bank();
 
     /* This function hardcodes the addresses of a, b, and c that need to get 
      * injected. They are stored in the MachineCode struct */
-    mc.bank = initialize_instruction_bank();
+    initialize_instruction_bank();
+    memcpy(mc.preserve, mc.bank, CHUNK * OPS);
+    // mc.bank = initialize_instruction_bank();
 
     /* Initialize executable and non-executable memory for the zero segment */
     void *zero = initialize_zero_segment(fsize * MULT);
@@ -142,11 +144,13 @@ void *initialize_zero_segment(size_t asmbytes)
 
 void *initialize_instruction_bank()
 {
-    // printf("instruction bank being initialized\n");
-    void *bank = mmap(NULL, CHUNK * OPS, PROT_READ | PROT_WRITE | PROT_EXEC,
-                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    assert(bank != MAP_FAILED);
-    memset(bank, 0, CHUNK * OPS);
+    // // printf("instruction bank being initialized\n");
+    // void *bank = mmap(NULL, CHUNK * OPS, PROT_READ | PROT_WRITE | PROT_EXEC,
+    //                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    // assert(bank != MAP_FAILED);
+    // memset(bank, 0, CHUNK * OPS);
+
+    unsigned char *bank = mc.bank;
 
     uint32_t offset = 0;
 
@@ -166,6 +170,8 @@ void *initialize_instruction_bank()
 
     // Conditional Move
     mc.c[ci++] = offset + 2; // c at index 2 (no shift)
+    mc.b_shift[bsi++] = offset + 8;
+    mc.a[ai++] = offset + 8;
     offset += cond_move(bank, offset, 0, 0, 0);
     
     // Segmented Load
@@ -252,7 +258,8 @@ void *initialize_instruction_bank()
     assert(csi == CS);
     assert(ci == C);
 
-    return bank;
+    // return bank;
+    return NULL;
 }
 
 void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t fsize)
