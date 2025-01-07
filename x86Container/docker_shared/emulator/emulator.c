@@ -31,7 +31,8 @@
 #include <string.h>
 
 #define NUM_REGISTERS 8
-#define POWER ((uint64_t)1 << 32)
+#define POWER ((uint64_t)1 << 32)   // for preventing overflow with add and div
+#define ICAP 32500                  // determined experimentally for sandmark
 
 typedef uint32_t Instruction;
 
@@ -86,28 +87,13 @@ int main(int argc, char *argv[])
     return EXIT_SUCCESS;
 }
 
-uint64_t assemble_word(uint64_t word, unsigned width, unsigned lsb,
-                           uint64_t value)
-{
-    uint64_t mask = (uint64_t)1 << (width - 1);
-    mask = mask << 1;
-    mask -= 1;
-    mask = mask << lsb;
-    mask = ~mask;
-
-    uint64_t new_word = (word & mask);
-    value = value << lsb;
-    uint64_t return_word = (new_word | value);
-    return return_word;
-}
-
 uint32_t *initialize_memory(FILE *fp, size_t fsize)
 {
-    seq_capacity = 128;
+    seq_capacity = ICAP;
     segment_sequence = (uint32_t **)calloc(seq_capacity, sizeof(uint32_t *));
     segment_lengths = (uint32_t *)calloc(seq_capacity, sizeof(uint32_t));
 
-    rec_capacity = 128;
+    rec_capacity = ICAP;
     recycled_ids = (uint32_t *)calloc(rec_capacity, sizeof(uint32_t *));
 
     /* Load initial segment from file */
@@ -143,6 +129,114 @@ uint32_t *initialize_memory(FILE *fp, size_t fsize)
     return zero;
 }
 
+void handle_instructions(uint32_t *zero)
+{
+    uint32_t regs[NUM_REGISTERS] = {0};
+    Instruction *pp = zero;
+    Instruction word;
+
+    bool exit = false;
+
+    while (!exit)
+    {
+        word = *pp;
+        pp++;
+        exit = exec_instr(word, &pp, regs, zero);
+    }
+}
+
+static inline bool exec_instr(Instruction word, Instruction **pp, 
+                               uint32_t *regs, uint32_t *zero)
+{
+    (void)zero;
+    uint32_t a = 0, b = 0, c = 0, val = 0;
+    uint32_t opcode = word >> 28;
+
+    /* Load Value */
+    if (__builtin_expect(opcode == 13, 1)) {
+        a = (word >> 25) & 0x7;
+        val = word & 0x1FFFFFF;
+        regs[a] = val;
+        return false;
+    }
+
+    c = word & 0x7;
+    b = (word >> 3) & 0x7;
+    a = (word >> 6) & 0x7;
+
+    /* Segmented Load */
+    if (__builtin_expect(opcode == 1, 1)) {
+        regs[a] = segment_sequence[regs[b]][regs[c]];
+    }
+
+    /* Segmented Store */
+    else if (__builtin_expect(opcode == 2, 1)) {
+        segment_sequence[regs[a]][regs[b]] = regs[c];
+    }
+
+    /* Bitwise NAND */
+    else if (__builtin_expect(opcode == 6, 1)) {
+        regs[a] = ~(regs[b] & regs[c]);
+    }
+
+    /* Load Segment */
+    else if (__builtin_expect(opcode == 12, 0))
+    {
+        load_segment(regs[b], zero);
+        *pp = segment_sequence[0] + regs[c];
+    }
+
+    /* Addition */
+    else if (__builtin_expect(opcode == 3, 0)) {
+        regs[a] = (regs[b] + regs[c]) % POWER;
+    }
+
+    /* Conditional Move */
+    else if (__builtin_expect(opcode == 0, 0))
+    {
+        if (regs[c] != 0)
+            regs[a] = regs[b];
+    }
+
+    /* Map Segment */
+    else if (__builtin_expect(opcode == 8, 0)) {
+        regs[b] = map_segment(regs[c]);
+    }
+
+    /* Unmap Segment */
+    else if (__builtin_expect(opcode == 9, 0)) {
+        unmap_segment(regs[c]);
+    }
+
+    /* Division */
+    else if (__builtin_expect(opcode == 5, 0)) {
+        regs[a] = regs[b] / regs[c];
+    }
+
+    /* Multiplication */
+    else if (__builtin_expect(opcode == 4, 0)) {
+        regs[a] = (regs[b] * regs[c]) % POWER;
+    }
+
+    /* Output */
+    else if (__builtin_expect(opcode == 10, 0)) {
+        putchar((unsigned char)regs[c]);
+    }
+
+    /* Input */
+    else if (__builtin_expect(opcode == 11, 0)) {
+        regs[c] = getc(stdin);
+    }
+
+    /* Stop or Invalid Instruction */
+    else {
+        handle_stop();
+        return true;
+    }
+
+    return false;
+}
+
 void handle_stop()
 {
     for (uint32_t i = 0; i < seq_size; i++)
@@ -164,10 +258,10 @@ uint32_t map_segment(uint32_t size)
         {
             /* Expand the sequence if necessary */
             seq_capacity = seq_capacity * 2 + 2;
-            segment_lengths = (uint32_t *)realloc(segment_lengths, 
-                (seq_capacity) * sizeof(uint32_t));
-            segment_sequence = (uint32_t **)realloc(segment_sequence, 
-                (seq_capacity) * sizeof(uint32_t *));
+            segment_lengths = (uint32_t *)realloc(segment_lengths,
+                                                  (seq_capacity) * sizeof(uint32_t));
+            segment_sequence = (uint32_t **)realloc(segment_sequence,
+                                                    (seq_capacity) * sizeof(uint32_t *));
 
             for (uint32_t i = seq_size; i < seq_capacity; i++)
             {
@@ -183,11 +277,11 @@ uint32_t map_segment(uint32_t size)
     else
         new_seg_id = recycled_ids[--rec_size];
 
-    if (segment_sequence[new_seg_id] == NULL || 
+    if (segment_sequence[new_seg_id] == NULL ||
         size > segment_lengths[new_seg_id])
     {
-        segment_sequence[new_seg_id] = 
-            (uint32_t *)realloc(segment_sequence[new_seg_id], 
+        segment_sequence[new_seg_id] =
+            (uint32_t *)realloc(segment_sequence[new_seg_id],
                                 size * sizeof(uint32_t));
         segment_lengths[new_seg_id] = size;
     }
@@ -199,7 +293,8 @@ uint32_t map_segment(uint32_t size)
 
 void unmap_segment(uint32_t segment)
 {
-    if (rec_size == rec_capacity) {
+    if (rec_size == rec_capacity)
+    {
         rec_capacity = rec_capacity * 2 + 2;
         recycled_ids = (uint32_t *)realloc(recycled_ids, (rec_capacity) * sizeof(uint32_t));
     }
@@ -209,147 +304,29 @@ void unmap_segment(uint32_t segment)
 
 void load_segment(uint32_t index, uint32_t *zero)
 {
-    if (index > 0) {
+    (void)zero;
+    if (index > 0)
+    {
         uint32_t copied_seq_size = segment_lengths[index];
-        memcpy(zero, segment_sequence[index], copied_seq_size * sizeof(uint32_t));
-    }
 
-    
-}
-
-void print_regs(uint32_t *regs)
-{
-    for (unsigned i = 0; i < 8; i++) {
-        printf("R%u: %u\n", i + 8, regs[i]);
+        uint32_t *new_zero = malloc(copied_seq_size * sizeof(uint32_t));
+        memcpy(new_zero, segment_sequence[index], 
+               copied_seq_size * sizeof(uint32_t));
+        segment_sequence[0] = new_zero;
     }
 }
 
-static inline bool exec_instr(Instruction word, Instruction **pp, 
-                               uint32_t *regs, uint32_t *zero)
+uint64_t assemble_word(uint64_t word, unsigned width, unsigned lsb,
+                       uint64_t value)
 {
-    uint32_t a = 0, b = 0, c = 0, val = 0;
-    uint32_t opcode = word >> 28;
+    uint64_t mask = (uint64_t)1 << (width - 1);
+    mask = mask << 1;
+    mask -= 1;
+    mask = mask << lsb;
+    mask = ~mask;
 
-    /* Load Value */
-    if (__builtin_expect(opcode == 13, 1)) {
-        a = (word >> 25) & 0x7;
-        val = word & 0x1FFFFFF;
-        // printf("Load value %u into reg %u\n", val, a);
-        regs[a] = val;
-        return false;
-    }
-
-    c = word & 0x7;
-    b = (word >> 3) & 0x7;
-    a = (word >> 6) & 0x7;
-
-    /* Segmented Load */
-    if (__builtin_expect(opcode == 1, 1)) {
-        // printf("Segmented load a: %u, b: %u, c: %u\n", a, b, c);
-        regs[a] = segment_sequence[regs[b]][regs[c]];
-    }
-
-    /* Segmented Store */
-    else if (__builtin_expect(opcode == 2, 1)) {
-        // printf("Segmented store a: %u, b: %u, c: %u\n", a, b, c);
-        segment_sequence[regs[a]][regs[b]] = regs[c];
-    }
-
-    /* Bitwise NAND */
-    else if (__builtin_expect(opcode == 6, 1)) {
-        // printf("Bitwise NAND a: %u, b: %u, c: %u\n", a, b, c);
-        regs[a] = ~(regs[b] & regs[c]);
-
-    }
-
-    /* Load Segment */
-    else if (__builtin_expect(opcode == 12, 0))
-    {
-        // printf("Load progam a: %u, b: %u, c: %u\n", a, b, c);
-
-        // printf("Program %u getting loaded at counter %u\n", regs[b], regs[c]);
-        // print_regs(regs);
-        load_segment(regs[b], zero);
-        *pp = zero + regs[c];
-    }
-
-    /* Addition */
-    else if (__builtin_expect(opcode == 3, 0)) {
-        // printf("Addition a: %u, b: %u, c: %u\n", a, b, c);
-        regs[a] = (regs[b] + regs[c]) % POWER;
-    }
-
-    /* Conditional Move */
-    else if (__builtin_expect(opcode == 0, 0))
-    {
-        // printf("Conditional move a: %u, b: %u, c: %u\n", a, b, c);
-
-        if (regs[c] != 0)
-            regs[a] = regs[b];
-        
-        // printf("Cond move: regs a is now: %u\n", regs[a]);
-
-    }
-
-    /* Map Segment */
-    else if (__builtin_expect(opcode == 8, 0)) {
-        // printf("Map segment a: %u, b: %u, c: %u\n", a, b, c);
-        regs[b] = map_segment(regs[c]);
-    }
-
-    /* Unmap Segment */
-    else if (__builtin_expect(opcode == 9, 0)) {
-        // printf("Unmap segment a: %u, b: %u, c: %u\n", a, b, c);
-        unmap_segment(regs[c]);
-    }
-
-    /* Division */
-    else if (__builtin_expect(opcode == 5, 0)) {
-        // printf("Division a: %u, b: %u, c: %u\n", a, b, c);
-        regs[a] = regs[b] / regs[c];
-    }
-
-    /* Multiplication */
-    else if (__builtin_expect(opcode == 4, 0)) {
-        // printf("Multiplication a: %u, b: %u, c: %u\n", a, b, c);
-        regs[a] = (regs[b] * regs[c]) % POWER;
-    }
-
-    /* Output */
-    else if (__builtin_expect(opcode == 10, 0)) {
-        // printf("Output a: %u, b: %u, c: %u\n", a, b, c);
-        putchar((unsigned char)regs[c]);
-    }
-
-    /* Input */
-    else if (__builtin_expect(opcode == 11, 0)) {
-        // printf("Input a: %u, b: %u, c: %u\n", a, b, c);
-        regs[c] = getc(stdin);
-    }
-
-    /* Stop or Invalid Instruction */
-    else
-    {
-        // printf("Halt or other a: %u, b: %u, c: %u\n", a, b, c);
-        handle_stop();
-        return true;
-    }
-
-    return false;
-}
-
-void handle_instructions(uint32_t *zero)
-{
-    uint32_t regs[NUM_REGISTERS] = {0};
-    Instruction *pp = zero;
-    Instruction word;
-
-    bool exit = false;
-
-    while (!exit)
-    {
-        word = *pp;
-        pp ++;
-        exit = exec_instr(word, &pp, regs, zero);
-    }
+    uint64_t new_word = (word & mask);
+    value = value << lsb;
+    uint64_t return_word = (new_word | value);
+    return return_word;
 }

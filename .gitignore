@@ -1,5 +1,0 @@
-
-x86Container/docker_shared/umasm/map-excessive.um
-x86Container/docker_shared/umasm/multiplemap.um
-x86Container/docker_shared/umasm/seg-load-store.um
-x86Container/docker_shared/umasm/segments.um

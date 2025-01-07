@@ -37,10 +37,9 @@ int main(int argc, char *argv[])
     }
 
     /* Initializing the global state variables */
-    // mc.seg_bytes = {11, 31, 31, 11, 11, 14, 14, 4, 36, 33, 33, 17, 40, 0, 0};
-
     uint32_t init_values[] = {11, 31, 31, 11, 11, 14, 14, 4, 36, 33, 33, 17, 40, 0, 0};
     memcpy(mc.seg_bytes, init_values, sizeof(init_values));
+    
     // Setting the program counter to 0
     gs.pc = 0;
 
