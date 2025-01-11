@@ -115,9 +115,6 @@ int main(int argc, char *argv[])
     /* Sequence of UM words segments (needed for loading and storing) */
     gs.val_seq = calloc(gs.seq_cap, sizeof(uint32_t *));
 
-    /* Array of segment sizes */
-    gs.seg_lens = calloc(gs.seq_cap, sizeof(uint32_t));
-
     /* Initializing the size and capacity of the recycled segments array */
     gs.rec_size = 0;
     gs.rec_cap = ICAP;
@@ -140,14 +137,11 @@ int main(int argc, char *argv[])
     /* Initialize executable and non-executable memory for the zero segment */
     void *zero = initialize_zero_segment((fsize / 4) * CHUNK);
 
-    // TODO: update this block to change the way size is stored
     uint32_t zero_seg_size = (fsize / 4) + 1;
     uint32_t *zero_vals = calloc(zero_seg_size, sizeof(uint32_t));
     load_zero_segment(zero, zero_vals, fp, zero_seg_size);
     gs.val_seq[0] = zero_vals;
 
-    (void)gs.seg_lens;
-    // gs.seg_lens[0] = zero_seg_size;
     gs.seq_size++;
     gs.active = zero;
 
@@ -181,7 +175,6 @@ int main(int argc, char *argv[])
     }
 
     free(gs.val_seq);
-    free(gs.seg_lens);
     free(gs.rec_ids);
 
     fclose(fp);
@@ -437,8 +430,6 @@ void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t zero_se
         else if (i % 4 == 3)
         {
             word = make_word(word, 8, 0, c_char);
-
-            // TODO: change the location the word gets inserted into the val array
             // zero_vals[i / 4] = word;
             zero_vals[(i / 4) + 1] = word;
 
@@ -735,6 +726,10 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     unsigned char *p = zero + offset;
     unsigned char *s = p;
 
+    // TODO: update the way memory is accessed
+    // the memory address will be stored directly in rB, instead of being
+    // indexed from an global array.
+    // rC will still be the index
 
     // load address of val_seq into RAX
     *p++ = 0x48;
@@ -757,9 +752,6 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x44;
     *p++ = 0x89;
     *p++ = 0xc6 | (c << 3);
-
-    // TODO: increment correct register by one when loading
-    // TODO: need to increment rsi by 1
 
     // increment rsi (rC is preserved)
     *p++ = 0xff; // inc
@@ -797,6 +789,8 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     unsigned char *p = zero + offset;
     unsigned char *s = p;
 
+    // TODO: update the way memory is accessed in exactly the same way here
+
     *p++ = 0x48;
     *p++ = 0xb8;
     uint64_t addr = (uint64_t)&gs.val_seq;
@@ -818,8 +812,6 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xc6 | (b << 3);
 
-    // TODO: increment correct register when storing
-    // TODO: increment rsi by 1
     // increment rsi (rC is preserved)
     *p++ = 0xff; // inc
     *p++ = 0xc6; // inc rsi
@@ -994,7 +986,8 @@ uint32_t map_segment(uint32_t seg_size)
     uint32_t eff_size = seg_size + 1;
     (void)eff_size;
 
-    // TODO: make the map segment 1 element larger (to store size)
+    // TODO: complete change the way this function works.
+    // plan: let the operating system handle everything
 
     /* If there are no available recycled segment ids, make a new one */
     if (gs.rec_size == 0)
@@ -1004,10 +997,6 @@ uint32_t map_segment(uint32_t seg_size)
         {
             gs.seq_cap *= 2;
 
-            // realloc the array that keeps track of sequence size
-            gs.seg_lens = realloc(gs.seg_lens, gs.seq_cap * sizeof(uint32_t));
-            assert(gs.seg_lens != NULL);
-
             // also need to init the memory segment
             gs.val_seq = realloc(gs.val_seq, gs.seq_cap * sizeof(uint32_t *));
             assert(gs.val_seq != NULL);
@@ -1016,7 +1005,6 @@ uint32_t map_segment(uint32_t seg_size)
             for (uint32_t i = gs.seq_size; i < gs.seq_cap; i++)
             {
                 gs.val_seq[i] = NULL;
-                gs.seg_lens[i] = 0;
             }
         }
 
@@ -1029,17 +1017,13 @@ uint32_t map_segment(uint32_t seg_size)
         new_seg_id = gs.rec_ids[--gs.rec_size];
     }
 
-    // TODO: should simplify to just free and malloc every time, especially
     // considering the changes that are coming
 
     /* If the segment didn't previously exist or wasn't large enought for us*/
-    // if (gs.val_seq[new_seg_id] == NULL || seg_size > gs.seg_lens[new_seg_id])
     if (gs.val_seq[new_seg_id] == NULL || seg_size > gs.val_seq[new_seg_id][0])
     {
         gs.val_seq[new_seg_id] = realloc(gs.val_seq[new_seg_id], eff_size * sizeof(uint32_t));
         assert(gs.val_seq[new_seg_id] != NULL); // Make sure the realloc didn't fail
-
-        gs.seg_lens[new_seg_id] = eff_size;
     }
 
     /* zero out the segment */
@@ -1113,6 +1097,7 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 
 void unmap_segment(uint32_t segmentId)
 {
+    // TODO: all this function does now is free memory
     if (gs.rec_size == gs.rec_cap)
     {
         gs.rec_cap *= 2;
@@ -1397,6 +1382,7 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
 
 void *load_program(uint32_t b_val, uint32_t c_val)
 {
+    // TODO: this function now duplicates a memory segment and returns it
     (void)c_val;
     // The following two steps get handled in inline assembly
     /* Set the program counter to be the contents of register c */
@@ -1410,7 +1396,6 @@ void *load_program(uint32_t b_val, uint32_t c_val)
 
     /* Update the existing memory segment */
     gs.val_seq[0] = new_vals;
-    // gs.seg_lens[0] = new_seg_size;
 
     // this function will have to do the compiling for the new memory segment
     void *new_zero = mmap(NULL, new_seg_size * CHUNK,
