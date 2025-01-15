@@ -53,8 +53,8 @@ struct MachineCode mc;
 
 uint32_t *og_vals;
 uint32_t *curr_vals;
+uint64_t upper_bits;
 
-void initialize_instruction_bank();
 void *initialize_zero_segment(size_t fsize);
 void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t fsize);
 uint64_t make_word(uint64_t word, unsigned width, unsigned lsb, uint64_t value);
@@ -91,7 +91,6 @@ unsigned char read_char(void);
 size_t read_into_reg(void *zero, size_t offset, unsigned c);
 
 void *load_program(uint32_t segId, uint32_t c_val);
-// void *load_program(uint32_t *segment, uint32_t c_val);
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c);
 
 void print_registers();
@@ -132,6 +131,13 @@ int main(int argc, char *argv[])
 
     uint32_t zero_seg_size = (fsize / 4) + 1;
     uint32_t *zero_vals = calloc(zero_seg_size, sizeof(uint32_t));
+
+    upper_bits = (uintptr_t)zero_vals & 0xFFFFFFFF00000000;
+
+    // printf("Upper bits are %lx\n", upper_bits);
+    // printf("Zero val addr is %p\n", zero_vals);
+    // assert(false);
+
     og_vals = zero_vals;
     curr_vals = zero_vals;
 
@@ -170,9 +176,10 @@ int main(int argc, char *argv[])
             "pushq %%r14\n\t"
             "pushq %%r15\n\t" ::: "memory");
 
-        // if (gs.val_seq[0] != og_vals) {
-        //     // print_registers();
-        // }
+        if (curr_vals != og_vals) {
+            // print_registers();
+            // assert(false);
+        }
 
         asm volatile(
             "popq %%r15\n\t"
@@ -196,224 +203,6 @@ int main(int argc, char *argv[])
 
     fclose(fp);
     return 0;
-}
-
-void initialize_instruction_bank()
-{
-    unsigned char *bank = mc.bank;
-    uint32_t offset = 0;
-
-    unsigned i = 0;
-
-    // Conditional Move
-    mc.ou[i].asi = 0;
-    mc.ou[i].ai = offset + 8;
-
-    mc.ou[i].bsi = offset + 8;
-    mc.ou[i].bi = 0;
-
-    mc.ou[i].csi = 0;
-    mc.ou[i].ci = offset + 2;
-    i++;
-
-    offset += cond_move(bank, offset, 0, 0, 0);
-
-    // Segmented Load
-    mc.ou[i].asi = 0;
-    mc.ou[i].ai = offset + 28;
-
-    mc.ou[i].bsi = offset + 15;
-    mc.ou[i].bi = 0;
-
-    mc.ou[i].csi = offset + 18;
-    mc.ou[i].ci = 0;
-    i++;
-
-    assert(false);
-    offset += seg_load(bank, offset, 0, 0, 0, NULL);
-
-    // Segmented Store
-    mc.ou[i].asi = offset + 15;
-    mc.ou[i].ai = 0;
-
-    mc.ou[i].bsi = offset + 18;
-    mc.ou[i].bi = 0;
-
-    mc.ou[i].csi = offset + 21;
-    mc.ou[i].ci = 0;
-    i++;
-
-    assert(false);
-    offset += seg_store(bank, offset, 0, 0, 0, NULL);
-
-    // Addition
-    mc.ou[i].asi = 0;
-    mc.ou[i].ai = offset + 8;
-
-    mc.ou[i].bsi = offset + 2;
-    mc.ou[i].bi = 0;
-
-    mc.ou[i].csi = offset + 5;
-    mc.ou[i].ci = 0;
-    i++;
-
-    offset += add_regs(bank, offset, 0, 0, 0);
-
-    // Multiplication
-    mc.ou[i].asi = 0;
-    mc.ou[i].ai = offset + 8;
-
-    mc.ou[i].bsi = offset + 2;
-    mc.ou[i].bi = 0;
-
-    mc.ou[i].csi = 0;
-    mc.ou[i].ci = offset + 5;
-    i++;
-
-    offset += mult_regs(bank, offset, 0, 0, 0);
-
-    // Division
-    mc.ou[i].asi = 0;
-    mc.ou[i].ai = offset + 11;
-
-    mc.ou[i].bsi = offset + 5;
-    mc.ou[i].bi = 0;
-
-    mc.ou[i].csi = 0;
-    mc.ou[i].ci = offset + 8;
-    i++;
-
-    offset += div_regs(bank, offset, 0, 0, 0);
-
-    // Bitwise NAND
-    mc.ou[i].asi = 0;
-    mc.ou[i].ai = offset + 11;
-
-    mc.ou[i].bsi = offset + 2;
-    mc.ou[i].bi = 0;
-
-    mc.ou[i].csi = offset + 5;
-    mc.ou[i].ci = 0;
-    i++;
-
-    offset += nand_regs(bank, offset, 0, 0, 0);
-
-    // Halt
-    mc.ou[i].asi = 0;
-    mc.ou[i].ai = 0;
-
-    mc.ou[i].bsi = 0;
-    mc.ou[i].bi = 0;
-
-    mc.ou[i].csi = 0;
-    mc.ou[i].ci = 0;
-    i++;
-
-    offset += handle_halt(bank, offset);
-
-    // Map Segment
-    mc.ou[i].asi = 0;
-    mc.ou[i].ai = 0;
-
-    mc.ou[i].bsi = 0;
-    mc.ou[i].bi = offset + 33;
-
-    mc.ou[i].csi = offset + 2;
-    mc.ou[i].ci = 0;
-    i++;
-
-    offset += inject_map_segment(bank, offset, 0, 0);
-
-    // Unmap Segment
-    mc.ou[i].asi = 0;
-    mc.ou[i].ai = 0;
-
-    mc.ou[i].bsi = 0;
-    mc.ou[i].bi = 0;
-
-    // mc.ou[i].csi = offset + 56; // Unrolled
-    mc.ou[i].csi = offset + 2; // Rolled
-    mc.ou[i].ci = 0;
-    i++;
-
-    offset += inject_unmap_segment(bank, offset, 0);
-
-    // Output
-    mc.ou[i].asi = 0;
-    mc.ou[i].ai = 0;
-
-    mc.ou[i].bsi = 0;
-    mc.ou[i].bi = 0;
-
-    mc.ou[i].csi = offset + 2;
-    mc.ou[i].ci = 0;
-    i++;
-
-    offset += print_reg(bank, offset, 0);
-
-    // Input
-    mc.ou[i].asi = 0;
-    mc.ou[i].ai = 0;
-
-    mc.ou[i].bsi = 0;
-    mc.ou[i].bi = 0;
-
-    mc.ou[i].csi = 0;
-    mc.ou[i].ci = offset + 14;
-    i++;
-
-    offset += read_into_reg(bank, offset, 0);
-
-    // Load Program
-    mc.ou[i].asi = 0;
-    mc.ou[i].ai = 0;
-
-    mc.ou[i].bsi = offset + 2;
-    mc.ou[i].bi = 0;
-
-    mc.ou[i].csi = offset + 5;
-    mc.ou[i].ci = 0;
-    i++;
-
-    offset += inject_load_program(bank, offset, 0, 0);
-
-    // Load Value
-    mc.ou[i].asi = 0;
-    mc.ou[i].ai = 0;
-
-    mc.ou[i].bsi = 0;
-    mc.ou[i].bi = 0;
-
-    mc.ou[i].csi = 0;
-    mc.ou[i].ci = 0;
-    i++;
-
-    offset += CHUNK;
-
-    // Opcode 14
-    mc.ou[i].asi = 0;
-    mc.ou[i].ai = 0;
-
-    mc.ou[i].bsi = 0;
-    mc.ou[i].bi = 0;
-
-    mc.ou[i].csi = 0;
-    mc.ou[i].ci = 0;
-    i++;
-    offset += CHUNK;
-
-    // Opcode 15
-    mc.ou[i].asi = 0;
-    mc.ou[i].ai = 0;
-
-    mc.ou[i].bsi = 0;
-    mc.ou[i].bi = 0;
-
-    mc.ou[i].csi = 0;
-    mc.ou[i].ci = 0;
-    i++;
-
-    offset += CHUNK;
 }
 
 void *initialize_zero_segment(size_t asmbytes)
@@ -613,79 +402,6 @@ size_t compile_instruction(void *zero, uint32_t *zero_vals, Instruction word, si
     return offset;
 }
 
-void update_bank(uint32_t a, uint32_t b, uint32_t c, uint32_t opcode)
-{
-    uint8_t *bank = (uint8_t *)mc.bank;
-
-    OpcodeUpdate ou = mc.ou[opcode];
-
-    if (ou.asi != 0)
-    {
-        bank[ou.asi] &= ~(0x7 << 3);
-        bank[ou.asi] |= (a << 3);
-    }
-    else if (ou.ai != 0)
-    {
-        bank[ou.ai] &= ~(0x7);
-        bank[ou.ai] |= a;
-    }
-
-    if (ou.bsi != 0)
-    {
-        bank[ou.bsi] &= ~(0x7 << 3);
-        bank[ou.bsi] |= (b << 3);
-    }
-    else if (ou.bi != 0)
-    {
-        bank[ou.bi] &= ~(0x7);
-        bank[ou.bi] |= b;
-    }
-
-    if (ou.csi != 0)
-    {
-        bank[ou.csi] &= ~(0x7 << 3);
-        bank[ou.csi] |= (c << 3);
-    }
-    else if (ou.ci != 0)
-    {
-        bank[ou.ci] &= ~(0x7);
-        bank[ou.ci] |= c;
-    }
-}
-/*
-size_t compile_instruction(void *zero, Instruction word, size_t offset)
-{
-    uint32_t opcode = (word >> 28) & 0xF;
-    uint32_t a = 0;
-
-    // Load Value
-    if (opcode == 13)
-    {
-        a = (word >> 25) & 0x7;
-        uint32_t val = word & 0x1FFFFFF;
-        offset += load_reg(zero, offset, a, val);
-        return offset;
-    }
-
-    uint32_t b = 0, c = 0;
-
-    c = word & 0x7;
-    b = (word >> 3) & 0x7;
-    a = (word >> 6) & 0x7;
-
-    uint32_t lower = opcode * CHUNK;
-
-    // update a, b, and c values within the appropriate ranges
-    update_bank(a, b, c, opcode);
-
-    uint32_t copy_size = mc.seg_bytes[opcode];
-    memcpy(zero + offset, mc.bank + lower, copy_size);
-
-    offset += CHUNK;
-    return offset;
-}
-*/
-
 size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 {
     unsigned char *p = zero + offset;
@@ -804,8 +520,7 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, u
 
     *p++ = 0x48;
     *p++ = 0xb8;
-    uint64_t upper = ((uint64_t)0x5555 << 32);
-    memcpy(p, &upper, sizeof(uint64_t));
+    memcpy(p, &upper_bits, sizeof(uint64_t));
     p += sizeof(uint64_t);
 
     // add rax, rB
@@ -876,8 +591,7 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, 
     // if a is not zero, calculate correct memory address
     *p++ = 0x48;
     *p++ = 0xb8;
-    uint64_t upper = ((uint64_t)0x5555 << 32);
-    memcpy(p, &upper, sizeof(uint64_t));
+    memcpy(p, &upper_bits, sizeof(uint64_t));
     p += sizeof(uint64_t);
 
     // add rax, rA
@@ -893,6 +607,7 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, 
     // increment rsi (rB is preserved)
     *p++ = 0xff; // inc
     *p++ = 0xc6; // inc rsi
+
 
     // mov [rax + rsi * 4], rC
     *p++ = 0x44;
@@ -1051,14 +766,31 @@ size_t handle_halt(void *zero, size_t offset)
 uint32_t map_segment(uint32_t seg_size)
 {
     // og_vals is the memory address of the first zero segment
+
     uint32_t eff_size = seg_size + 1;
     uint32_t *new_seg = calloc(eff_size, sizeof(uint32_t));
     new_seg[0] = seg_size;
 
+    // printf("mapping segment with size %u\n", seg_size);
+    // printf("mapping new segment with address %p\n", new_seg);
+
+
+    uintptr_t differential = (uintptr_t)new_seg - upper_bits;
+
+    // Add debugging before the assert fails
+    if ((uint64_t)differential >= UINT32_MAX)
+    {
+        fprintf(stderr, "Segment allocation failed:\n");
+        fprintf(stderr, "Initial upper_bits: 0x%lx\n", upper_bits);
+        fprintf(stderr, "New segment addr: %p\n", (void *)new_seg);
+        fprintf(stderr, "Differential: 0x%lx\n", differential);
+        fprintf(stderr, "Segment size: %u\n", seg_size);
+    }
+    assert((uint64_t)differential < UINT32_MAX);
+
     uint32_t lower = (uint32_t)((uintptr_t)new_seg & 0xFFFFFFFF);
-    // uint64_t upper = ((uint64_t)0x5555) << 32;
-    // uintptr_t rec = (upper) | lower;
-    // uint32_t *p = (uint32_t *)rec;
+    uint32_t test = (uint32_t)differential;
+    assert(test == lower);
 
     return lower;
 }
@@ -1126,8 +858,7 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 
 void unmap_segment(uint32_t seg_addr)
 {
-    uint64_t upper = ((uint64_t)0x5555 << 32);
-    uintptr_t rec = (upper) | seg_addr;
+    uintptr_t rec = upper_bits | seg_addr;
     uint32_t *p = (uint32_t *)rec;
 
     uint32_t *to_free = p;
@@ -1294,8 +1025,7 @@ void *load_program(uint32_t segId, uint32_t c_val)
 
     // Need to convert the segID into a real memory address
 
-    uint64_t upper = ((uint64_t)0x5555 << 32);
-    uintptr_t rec = (upper) | segId;
+    uintptr_t rec = upper_bits | segId;
     uint32_t *p = (uint32_t *)rec;
 
     uint32_t *segment = p;
@@ -1306,6 +1036,9 @@ void *load_program(uint32_t segId, uint32_t c_val)
     uint32_t *new_vals = calloc(eff_size, sizeof(uint32_t));
     memcpy(new_vals, segment, eff_size);
 
+    // assert(false);
+
+    free(curr_vals);
     curr_vals = new_vals;
 
     // Recompile the new zero segment into machine code
@@ -1376,12 +1109,39 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 
     // NOTE: super sus that the registers don't need to be on the stack.. double check this
     // 12 byte function call
+
+    // push r8 onto the stack
+    *p++ = 0x41;
+    *p++ = 0x50;
+
+    *p++ = 0x41;
+    *p++ = 0x51;
+
+    *p++ = 0x41;
+    *p++ = 0x52;
+
+    *p++ = 0x41;
+    *p++ = 0x53;
+
     *p++ = 0x48;
     *p++ = 0xb8;
     memcpy(p, &load_program_addr, sizeof(load_program_addr));
     p += sizeof(load_program_addr);
     *p++ = 0xff;
     *p++ = 0xd0;
+
+    // pop r8 off the stack
+    *p++ = 0x41;
+    *p++ = 0x5B;
+
+    *p++ = 0x41;
+    *p++ = 0x5A;
+
+    *p++ = 0x41;
+    *p++ = 0x59;
+
+    *p++ = 0x41;
+    *p++ = 0x58;
 
     // this function better return rax as the right thing
     // injected function needs to ret (rax should already be the right thing)

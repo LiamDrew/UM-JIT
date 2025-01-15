@@ -195,6 +195,14 @@ static inline bool exec_instr(Instruction word, Instruction **pp,
     {
         load_segment(regs[b], zero);
         *pp = segment_sequence[0] + regs[c];
+        if (regs[b] != 0) {
+
+            printf("B is %u\n", b);
+            printf("C is %u\n", c);
+            for (int i = 0; i < 8; i++) {
+                printf("R%d: %u\n", i + 8, regs[i]);
+            }
+        }
     }
 
     /* Addition */
