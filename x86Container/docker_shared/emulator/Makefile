@@ -10,3 +10,4 @@ um: $(obj)
 
 clean:
 	rm -f *.o um
+	

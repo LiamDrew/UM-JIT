@@ -20,6 +20,8 @@
  * I intend for this VM to be used as a starting benchmark for the
  * VM assembly to x86 assembly just-in-time compiler I'm building.
  * 
+ * Adding to gitignore
+ * 
  */
 
 #include <stdio.h>
