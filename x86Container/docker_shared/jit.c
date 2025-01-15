@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <sys/mman.h>
 
-#define CHUNK 48
+#define CHUNK 64
 #define MULT (CHUNK / 4)
 #define OPS 15
 #define ICAP 100
@@ -93,6 +93,8 @@ void *load_program(uint32_t segId, uint32_t c_val);
 // void *load_program(uint32_t *segment, uint32_t c_val);
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c);
 
+void print_registers();
+
 
 int main(int argc, char *argv[])
 {
@@ -111,21 +113,14 @@ int main(int argc, char *argv[])
     }
 
     /* Initializing the global state variables */
-    uint32_t in_v[] = {11, 31, 31, 11, 11, 14, 14, 4, 36, 33, 33, 17, 40, 0, 0};
-    memcpy(mc.seg_bytes, in_v, sizeof(in_v));
+    // uint32_t in_v[] = {11, 31, 31, 11, 11, 14, 14, 4, 36, 33, 33, 17, 40, 0, 0};
+    // memcpy(mc.seg_bytes, in_v, sizeof(in_v));
     
     // Setting the program counter to 0
     gs.pc = 0;
 
-    /* Initializing the size and capacity of the memory segment array */
-    gs.seq_size = 0;
-    gs.seq_cap = ICAP;
-
     /* Sequence of executable memory segments */
     gs.active = NULL;
-
-    /* Sequence of UM words segments (needed for loading and storing) */
-    gs.val_seq = calloc(gs.seq_cap, sizeof(uint32_t *));
 
     /* Initializing the size and capacity of the recycled segments array */
     gs.rec_size = 0;
@@ -149,18 +144,16 @@ int main(int argc, char *argv[])
     /* Initialize executable and non-executable memory for the zero segment */
     void *zero = initialize_zero_segment((fsize / 4) * CHUNK);
 
-
     // NOTE: this must be the last memory allocation in main (for pointer offset reasons)
+    // uint32_t zero_seg_size = fsize + 4;
     uint32_t zero_seg_size = (fsize / 4) + 1;
     uint32_t *zero_vals = calloc(zero_seg_size, sizeof(uint32_t));
     og_vals = zero_vals;
+    // gs.val_seq[0] = zero_vals;
 
     load_zero_segment(zero, zero_vals, fp, zero_seg_size);
 
-    // IMPORTANT: still updated gs.val_seq[0] here
-    gs.val_seq[0] = zero_vals;
-
-    gs.seq_size++;
+    // gs.seq_size++;
     gs.active = zero;
 
     // assert(false);
@@ -185,6 +178,32 @@ int main(int argc, char *argv[])
     {
         Function func = (Function)(curr_seg + (gs.pc * CHUNK));
         curr_seg = func();
+
+        asm volatile(
+            "pushq %%r8\n\t"
+            "pushq %%r9\n\t"
+            "pushq %%r10\n\t"
+            "pushq %%r11\n\t"
+            "pushq %%r12\n\t"
+            "pushq %%r13\n\t"
+            "pushq %%r14\n\t"
+            "pushq %%r15\n\t" ::: "memory");
+
+        // if (gs.val_seq[0] != og_vals) {
+        //     // print_registers();
+        // }
+
+
+        asm volatile(
+            "popq %%r15\n\t"
+            "popq %%r14\n\t"
+            "popq %%r13\n\t"
+            "popq %%r12\n\t"
+            "popq %%r11\n\t"
+            "popq %%r10\n\t"
+            "popq %%r9\n\t"
+            "popq %%r8\n\t" ::: "memory");
+        // assert(false);
     }
 
     /* Free all program segments */
@@ -741,28 +760,28 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return CHUNK;
 }
 
-// void print_registers()
-// {
-//     uint64_t r8, r9, r10, r11, r12, r13, r14, r15;
+void print_registers()
+{
+    uint64_t r8, r9, r10, r11, r12, r13, r14, r15;
 
-//     asm volatile(
-//         "movq %%r8, %0\n\t"
-//         "movq %%r9, %1\n\t"
-//         "movq %%r10, %2\n\t"
-//         "movq %%r11, %3\n\t"
-//         "movq %%r12, %4\n\t"
-//         "movq %%r13, %5\n\t"
-//         "movq %%r14, %6\n\t"
-//         "movq %%r15, %7\n\t"
-//         : "=m"(r8), "=m"(r9), "=m"(r10), "=m"(r11),
-//           "=m"(r12), "=m"(r13), "=m"(r14), "=m"(r15)
-//         :
-//         :);
+    asm volatile(
+        "movq %%r8, %0\n\t"
+        "movq %%r9, %1\n\t"
+        "movq %%r10, %2\n\t"
+        "movq %%r11, %3\n\t"
+        "movq %%r12, %4\n\t"
+        "movq %%r13, %5\n\t"
+        "movq %%r14, %6\n\t"
+        "movq %%r15, %7\n\t"
+        : "=m"(r8), "=m"(r9), "=m"(r10), "=m"(r11),
+          "=m"(r12), "=m"(r13), "=m"(r14), "=m"(r15)
+        :
+        :);
 
-//     printf("R8: %lu\nR9: %lu\nR10: %lu\nR11: %lu\n"
-//            "R12: %lu\nR13: %lu\nR14: %lu\nR15: %lu\n",
-//            r8, r9, r10, r11, r12, r13, r14, r15);
-// }
+    printf("R8: %lu\nR9: %lu\nR10: %lu\nR11: %lu\n"
+           "R12: %lu\nR13: %lu\nR14: %lu\nR15: %lu\n",
+           r8, r9, r10, r11, r12, r13, r14, r15);
+}
 
 // void print_registers(uint32_t *ptr, uint32_t idx)
 // {
@@ -775,7 +794,6 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, u
 {
     unsigned char *p = zero + offset;
     unsigned char *s = p;
-    (void)zero_vals;
     // rA = m[rB][rC]
 
     // cmp r{B}d, 0   (compare 32-bit register with 0)
@@ -784,9 +802,14 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, u
     *p++ = 0xf8 | b; // ModRM byte for register
     *p++ = 0x00;     // Compare with 0
 
+    // *p++ = 0x48;
+    // *p++ = 0x31;
+    // *p++ = 0xc0;
+    // *p++ = 0xc3;
+
     // if b == 0
     *p++ = 0x74;
-    *p++ = 0x0f;
+    *p++ = 0x0f; // jump 15 bytes
 
     // PATH if b != 0
     *p++ = 0x48;
@@ -804,7 +827,7 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, u
     *p++ = 0x0a;
 
     // PATH if b == 0
-    // if b is zero, load the address of the current zero segment
+    // if b is zero, load the address of the current zero segment into rax
     *p++ = 0x48;
     *p++ = 0xb8;
     memcpy(p, &zero_vals, sizeof(uint32_t*));
@@ -844,8 +867,6 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, 
     unsigned char *p = zero + offset;
     unsigned char *s = p;
 
-    (void)zero_vals;
-
     // m[rA][rB] = rC
 
     // cmp r{A}d, 0   (compare 32-bit register with 0)
@@ -872,7 +893,13 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c, 
 
     // jump to common path
     *p++ = 0xEB;
+    // *p++ = 0x0e;
     *p++ = 0x0a;
+
+    // *p++ = 0x48;
+    // *p++ = 0x31;
+    // *p++ = 0xc0;
+    // *p++ = 0xc3;
 
     // PATH if b == 0
     // if a is zero, load the address of the current zero segment
@@ -1041,39 +1068,34 @@ size_t handle_halt(void *zero, size_t offset)
     // ret
     *p++ = 0xc3;
 
+    // *p++ = 0x48;
+    // *p++ = 0x31;
+    // *p++ = 0xc0;
+    // *p++ = 0xc3;
+
     return CHUNK;
 }
 
-// uint32_t *map_segment(uint32_t seg_size, uint32_t *zero_vals)
 uint32_t map_segment(uint32_t seg_size)
 {
-    // TODO: This will require properly maintaining the address of the zero segment
-    // uint32_t *zero_vals = gs.val_seq[0];
+    // og_vals is the memory address of the first zero segment
     uint32_t *zero_vals = og_vals;
-
-    // assert(zero_vals == og_vals);
 
     uint32_t eff_size = seg_size + 1;
     uint32_t *new_seg = calloc(eff_size, sizeof(uint32_t));
     new_seg[0] = seg_size;
 
-    // printf("Zero vals address is %p\n", zero_vals);
-    // printf("Mem segment addr is %p\n", new_seg);
+    // intptr_t offset = (uintptr_t)new_seg - (uintptr_t)zero_vals;
+    uintptr_t offset = (uintptr_t)new_seg - (uintptr_t)zero_vals;
 
-    intptr_t offset = (uintptr_t)new_seg - (uintptr_t)zero_vals;
-    intptr_t rev_offset = (uintptr_t)zero_vals - (uintptr_t)new_seg;
+    // if (offset <= INT32_MAX) {
+    //     printf("offset is %ld\n", offset);
+    //     assert(false);
+    // }
+    // assert(offset <= INT32_MAX && offset >= INT32_MIN);
 
-    // printf("The offset is %ld\n", offset);
-    // printf("The reverse offset is %ld\n", rev_offset);
-    (void)rev_offset;
-
-    // assert that new seg is going to fit in 32 bits
-    uintptr_t addr = (uintptr_t)new_seg;
-    uint32_t upper_bits = (uint32_t)(addr >> 32);
-    assert(upper_bits == 0x5555);
-
-    // NOTE: the new plan is to return the offset from the zero memory segment
-    // Adding the offset to the zero segment will get us to the address we need
+    // printf("New segment with offset %u\n", (uint32_t)offset);
+    // printf("The segment pointer is %p\n", new_seg);
 
     return (uint32_t)offset;
 }
@@ -1126,8 +1148,6 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x58;
 
     // store the result in register b
-    // move return value from rax to reg b
-    // NOTE: this now becomes a 64 bit move
     // mov rB, rax
     *p++ = 0x41;
     *p++ = 0x89;
@@ -1143,10 +1163,7 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 
 void unmap_segment(uint32_t seg_addr)
 {
-    // uint32_t *zero_vals = gs.val_seq[0];
-    // assert(zero_vals == og_vals);
     uint32_t *zero_vals = og_vals;
-
     uint32_t *to_free = zero_vals + (seg_addr / sizeof(uint32_t));
     free(to_free);
 }
@@ -1305,41 +1322,33 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
 
 void *load_program(uint32_t segId, uint32_t c_val)
 {
-    (void)c_val;
-
     // This function now duplicates a memory segment and returns it
-    printf("Making it into load program\n\n");
-
+    (void)c_val;
     assert(segId != 0);
 
-    // TODO: convert the segId back into a real memory address
-
-    // the seg ID is offset in terms of the original zero segment
-    // all memory addresses are offset in terms of the original zero segment.
-    // is that a terrible idea?
-    // uint32_t *zero_vals = gs.val_seq[0];
-    
+    // Need to convert the segID into a real memory address
     uint32_t *zero_vals = og_vals;
-    uint32_t *segment = zero_vals + (intptr_t)(segId / sizeof(uint32_t));
+    uint32_t *segment = zero_vals + (segId / sizeof(uint32_t));
+    printf("\n\nThe segment ID we recieved is: %lu\n", segId / sizeof(uint32_t));
 
-    printf("Base addr: %p\n", zero_vals);
-    printf("Source segment addr: %p\n", segment);
+    // printf("Base addr: %p\n", zero_vals);
+    printf("Segment address to be loaded: %p\n", segment);
 
     uint32_t new_seg_size = segment[0];
-    printf("New segment size is %u\n", new_seg_size);
+    uint32_t zero_seg_size = zero_vals[0];
+
+    (void)zero_seg_size;
+
+    // assert(zero_seg_size > new_seg_size);
+    // printf("Zero segment size is %u\n", zero_seg_size);
+    // printf("New segment size is %u\n", new_seg_size);
+
+
     uint32_t eff_size = new_seg_size + 1;
     uint32_t *new_vals = calloc(eff_size, sizeof(uint32_t));
-
-    printf("New vals addr %p\n", new_vals);
     memcpy(new_vals, segment, eff_size);
 
-    printf("made it this far\n");
-
-    // IMPORTANT: updating val seq here
-    // New plan: don't ever update val
-    gs.val_seq[0] = new_vals;
-
-    // this function will have to do the compiling for the new memory segment
+    // Recompile the new zero segment into machine code
     void *new_zero = mmap(NULL, new_seg_size * CHUNK,
                           PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     memset(new_zero, 0, new_seg_size * CHUNK);
@@ -1349,12 +1358,13 @@ void *load_program(uint32_t segId, uint32_t c_val)
     for (uint32_t i = 1; i < eff_size; i++)
     {
         // NOTE: Need to be careful here with the new_vals situation
-        offset = compile_instruction(new_zero, new_vals, new_vals[i], offset);
-        // offset = compile_instruction(new_zero, og_vals, new_vals[i], offset);
+
+        // These should not both work on tuffer. Something is amiss
+        // offset = compile_instruction(new_zero, new_vals, new_vals[i], offset);
+        offset = compile_instruction(new_zero, NULL, new_vals[i], offset);
     }
 
     gs.active = new_zero;
-    // printf("Finished with load program");
     return new_zero;
 }
 
@@ -1424,7 +1434,3 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 
     return CHUNK;
 }
-
-// NOTE: The inline calculation of the jump size costs us some performance. When the assembly
-// has been locked in, hardcode the jump size for some extra performance
-
