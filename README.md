@@ -1,7 +1,7 @@
 # UMJIT
 
 A Just-In-Time compiler from Universal Machine assembly language to x86 machine code.
-Compiles and executes a UM program 2.8 times faster than an optimized UM emulator. TODO: Video demo (HERE).
+Compiles and executes a UM program 2.8 times faster than an optimized UM emulator. Video demo [(HERE)](https://www.youtube.com/watch?v=aWdoqx7MhJY&ab_channel=LiamDrew).
 
 ## Overview
 
