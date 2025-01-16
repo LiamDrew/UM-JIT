@@ -6,6 +6,7 @@
 // #include <string.h>
 // #include <sys/mman.h>
 
+
 // // size_t compile_instruction(void *zero, Instruction word, size_t offset)
 // // {
 // //     uint32_t opcode = (word >> 28) & 0xF;
