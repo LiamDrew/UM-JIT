@@ -106,5 +106,5 @@ This program is (of course) not portable, as it executes x86 machine code that w
 The benchmark assembly language programs used to test emulators have a couple weaknesses that I exploited to make my JIT faster. If a UM program were to encounter a segmented store that stored an instruction into the zero segment that was going to be executed, this compiler would crash. However, neither the midmark or the sandmark demand this of the JIT. To handle this case, any instruction stored in the zero segment would have to be compiled into machine code, even if it never ends up being executed. This slows the program down, so I removed it from my compiler and am noting the choice here.
 
 ## Acknowledgements
-Professor Mark Sheldon, for giving me the idea to make a compiler for the UM.
+Professor Mark Sheldon, for giving me the idea to make a compiler for the UM.  
 Peter Wolfe, my project partner for the UM assignment.

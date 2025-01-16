@@ -147,7 +147,6 @@ int main(int argc, char *argv[])
 
     while (curr_seg != NULL)
     {
-        // Function func = (Function)(curr_seg);
         Function func = (Function)(curr_seg + (gs.pc * CHUNK));
         curr_seg = func();
     }
