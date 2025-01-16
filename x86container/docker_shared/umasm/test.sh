@@ -1,6 +1,6 @@
 
 echo "Testing print six"
-output=$(./jit umasm/print-six.um)
+output=$(../jit print-six.um)
 if [ "$output" = "6" ]; then
   echo "Test passed"
 else
@@ -8,7 +8,7 @@ else
 fi
 
 echo "Testing simple mult"
-output=$(./jit umasm/simple_mult.um)
+output=$(../jit simple_mult.um)
 if [ "$output" = "6" ]; then
   echo "Test passed"
 else
@@ -16,7 +16,7 @@ else
 fi
 
 echo "Testing Hello World"
-output=$(./jit umasm/hello.um)
+output=$(../jit hello.um)
 expected=$(printf "Hello, world.\n")
 if [ "$output" = "$expected" ]; then
   echo "Test passed"
@@ -25,7 +25,7 @@ else
 fi
 
 echo "Testing Conditional Move Yes"
-output=$(./jit umasm/condmove_yes.um)
+output=$(../jit condmove_yes.um)
 if [ "$output" = "7" ]; then
   echo "Test passed"
 else
@@ -33,7 +33,7 @@ else
 fi
 
 echo "Testing Conditional Move No"
-output=$(./jit umasm/condmove_no.um)
+output=$(../jit condmove_no.um)
 if [ "$output" = "6" ]; then
   echo "Test passed"
 else
@@ -42,7 +42,7 @@ fi
 
 
 echo "Testing Echo"
-output=$(./jit umasm/echo.um <<< 8)
+output=$(../jit echo.um <<< 8)
 if [ "$output" = "8" ]; then
   echo "Test passed"
 else
@@ -50,7 +50,7 @@ else
 fi
 
 echo "Testing Nand"
-output=$(./jit umasm/nand.um)
+output=$(../jit nand.um)
 if [ "$output" = "7" ]; then
   echo "Test passed"
 else

@@ -1,27 +1,18 @@
 /**
  * @file main.c
  * @author Liam Drew
- * @date 2024-12-27
+ * @date January 2025
  * @brief
- * 
- * This program implements a virtual machine. The VM recognizes 14 instructions
- * and only has 8 registers, but has boundless 4 byte oriented memory
- * that is only limited by the memory of the host machine.
+ * This program implements a Universal Machine (UM) emulator. The UM is an
+ * extremely simple virtual machine. For more information about the UM
+ * specification, please see the project README.
  *
- * This VM has been profiled for an x86 linux system hosted in a Docker
- * container on an Apple silicon machine. It runs the benchmark assembly
- * language program in 2.8 seconds
+ * This UM emulator has been profiled for an x86 linux system hosted in a Docker
+ * container on an Apple Silicon Mac. It runs the sandmark, a benchmark 
+ * UM assembly language program, in 2.80 seconds
  *
- * Other minor variations of this program have been profiled on ARM
- * systems. Natively on MacOS, the benchmark runs in 2.5 seconds. Remarkably,
- * on an Aarch64 linux system hosted on the same Apple silicon machine, the
- * benchmark runs in 2.3 seconds.
- *
- * I intend for this VM to be used as a starting benchmark for the
- * VM assembly to x86 assembly just-in-time compiler I'm building.
- * 
- * Adding to gitignore
- * 
+ * This already fast UM emulator is the starting benchmark for my UM assembly 
+ * to x86 assembly just-in-time compiler.
  */
 
 #include <stdio.h>

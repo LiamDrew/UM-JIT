@@ -1,10 +1,14 @@
 /** 
  * @file jit.c
  * @author Liam Drew
- * @date 1/15/2025
+ * @date January 2025
  * @brief 
  * A Just-In-Time compiler from Universal Machine assembly language to
  * x86 assembly language.
+ * 
+ * This JIT completes the sandmark in 1.02 seconds in an x86 docker container
+ * running on an Apple Silicon Mac. It is nearly 3 times faster than the
+ * benchmark emulator.
 */
 
 #include <stdio.h>
