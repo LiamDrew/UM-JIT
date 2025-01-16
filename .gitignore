@@ -1,4 +1,8 @@
 
-x86Container/docker_shared/emulator/emulator.c
-x86Container/docker_shared/emulator/Makefile
+# Ignore DS_Store
+.DS_Store
+
+# Ignore .vscode directory
+.vscode/
+
 /x86container/docker_shared/temp
