@@ -66,22 +66,21 @@ Here is the perfomance comparisons between the emulator and the JIT in these env
 
 ### x86 Container:
 #### Emulator:
-Midmark: 0.13 seconds
-Sandmark: 2.8 seconds
+Midmark: 0.13 seconds  
+Sandmark: 2.8 seconds  
 
 #### JIT Compiler:
-In my x86 container
-Midmark: 0.09 seconds
-Sandmark: 1.01 seconds
+Midmark: 0.09 seconds  
+Sandmark: 1.01 seconds  
 
 ### Tufts student VM:
 #### Emulator:
-Midmark: 0.19 seconds
-Sandmark: 5.10 seconds
+Midmark: 0.19 seconds  
+Sandmark: 5.10 seconds  
 
 #### JIT Compiler:
-Midmark: 0.14 seconds
-Sandmark: 3.63 seconds
+Midmark: 0.14 seconds  
+Sandmark: 3.63 seconds  
 
 The apple hardware is significantly faster than my VM, even with the ARM hardware emulating x86. To get an idea of how much slower emulated x86 is than native ARM, I modified the emulator to run in native C and ran the program in 3 different environments
 1. Native MacOS (which forced me to compile with clang; gcc is my compiler of choice)
