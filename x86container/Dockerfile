@@ -16,11 +16,6 @@ RUN apt-get update && apt-get install -y \
     time \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# # Create a non-root user with macOS UID
-# RUN useradd -u 501 -m -s /bin/bash developer && \
-#     mkdir -p /home/developer && \
-#     chown -R developer:developer /home/developer
-
 # Create a non-root user without a specific UID
 RUN useradd -m -s /bin/bash developer && \
     mkdir -p /home/developer && \
@@ -32,8 +27,8 @@ WORKDIR /home/developer
 # Default to bash shell
 CMD ["/bin/bash"]
 
-# build image
+# NOTE: Command to build image (with name dev-tools-x86)
 # docker buildx build --platform=linux/amd64 -t dev-tools-x86 .
 
-# run container
+# NOTE: Command to run a container using this image
 # docker run --platform=linux/amd64 -it -v "$PWD/docker_shared:/home/developer/shared" dev-tools-x86
