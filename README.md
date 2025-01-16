@@ -9,7 +9,7 @@ The Universal Machine (or UM) is an simple virtual machine that all CS students 
 
 Students implement the UM as an emulator with a stack allocated array to store UM register contents and heap allocated memory segments.
 
-This implementation just-in-time compiles UM instructions to x86 machine code and executes it inline. The program result is exactly the same as a Universal Machine emulator, but runs 180% faster than my already aggressively profiled emulator.
+This implementation just-in-time compiles UM instructions to x86 machine code and executes it inline. The program result is exactly the same as a Universal Machine emulator, but runs 2.8 times faster than my already aggressively profiled emulator.
 
 ## Running the Program
 1. Download the source code
@@ -46,10 +46,9 @@ The source code can be found in /x86container/docker_shared/emulator/emulator.c
 The emulator uses a stack-allocated fixed size array to store register values and uses a dynamic array to store memory segment pointers.
 It unpacks 32-bit UM instructions and uses a big conditional statement to executes them based on the opcode and register/value contents.
 
-To see what UM programs the emulator can run, please see my demo video linked (HERE);
-
 ### Just-In-Time Compiler
 
+The key component of the JIT is that it uses the r8 - r15 machine registers to represent the r0 - r7 UM registers. The idea is that a UM instruction that adds two registers can be compiled to only a few bytes of machine code, and can therefore complete extremely fast. The entire program is built around the choice to use machine registers to represent UM registers. Most UM instructions are compiled into pure x86 machine code, but a few more complex ones (map segment, unmap segment, and load program) are compiled into machine code that loads the address of a C function and calls it inline.
 
 
 #### Why x86?
@@ -61,7 +60,28 @@ It's worth noting that the UM instruction set is so simple that the machine code
 
 I timed my program in two environments.
 First was in a docker container running x86_64 linux on my apple silicon mac
-The second was on my student VM on the Tufts department servers running x86_64 redhat linux
+The second was on my student VM on the Tufts department servers running x86_64 redhat linux.
+
+Here is the perfomance comparisons between the emulator and the JIT in these environemnts
+
+### x86 Container:
+#### Emulator:
+Midmark: 0.13 seconds
+Sandmark: 2.8 seconds
+
+#### JIT Compiler:
+In my x86 container
+Midmark: 0.09 seconds
+Sandmark: 1.01 seconds
+
+### Tufts student VM:
+#### Emulator:
+Midmark: 0.19 seconds
+Sandmark: 5.10 seconds
+
+#### JIT Compiler:
+Midmark: 0.14 seconds
+Sandmark: 3.63 seconds
 
 The apple hardware is significantly faster than my VM, even with the ARM hardware emulating x86. To get an idea of how much slower emulated x86 is than native ARM, I modified the emulator to run in native C and ran the program in 3 different environments
 1. Native MacOS (which forced me to compile with clang; gcc is my compiler of choice)
@@ -79,27 +99,6 @@ Based on these initial tests, I concluded 3 things:
 1. Apple makes excellent hardware
 2. The emulated x86_64 architecture running on the Apple hardware, is about 20% slower than the native ARM architecture
 3. Amazingly, Docker runs Aarch linux on Apple hardware faster than MacOS runs on Apple hardware. (Some of this is likely due to gcc being better optimized than clang).
-
-Here is the perfomance comparisons between the emulator and the JIT.
-
-### x86 container:
-#### Emulator
-Midmark: 0.13 seconds
-Sandmark: 2.8 seconds
-
-
-### JIT Compiler
-In my x86 container
-Midmark: 0.9 seconds
-Sandmark: 1.01 seconds
-
-### Tufts student VM:
-
-#### Emulator:
-TODO
-
-#### JIT Compiler:
-TODO
 
 ## Challenges
 This program is (of course) not portable, as it executes x86 machine code that will not run on another system.
