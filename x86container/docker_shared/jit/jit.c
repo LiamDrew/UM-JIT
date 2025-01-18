@@ -91,6 +91,9 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    uint32_t *hi = malloc(4294967296);
+    free(hi);
+
     // Setting the program counter to 0
     gs.pc = 0;
 
