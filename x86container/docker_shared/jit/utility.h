@@ -1,7 +1,6 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
-// #define CHUNK 40
 #define CHUNK 29
 
 // Huge thank you to Tom for showing me the way with this
@@ -14,7 +13,6 @@
 
 #ifndef __ASSEMBLER__
     void zero_regs(void);
-    // void run(uint8_t *zero, uint32_t pc);
     void run(uint8_t *zero);
 #endif
 

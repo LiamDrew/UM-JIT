@@ -90,9 +90,6 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    // uint32_t *hi = malloc(4294967296);
-    // free(hi);
-
     // Setting the program counter to 0
     gs.pc = 0;
 
@@ -108,9 +105,6 @@ int main(int argc, char *argv[])
     gs.rec_size = 0;
     gs.rec_cap = INIT_CAP;
     gs.rec_ids = calloc(gs.rec_cap, sizeof(uint32_t));
-
-    // Sequence of executable memory segments
-    gs.active = NULL;
 
     size_t fsize = 0;
     struct stat file_stat;
@@ -357,21 +351,6 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 
     *p++ = 0x90;
 
-    // *p++ = 0x90;
-    // *p++ = 0x90;
-    
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
     return CHUNK;
 }
 
@@ -416,25 +395,8 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-
     *p++ = 0x90;
     *p++ = 0x90;
-
-    // *p++ = 0x90;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x90;
 
     return CHUNK;
 }
@@ -484,22 +446,6 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xC0 | a;
 
-    // 11 No ops
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x90;
-    // *p++ = 0x90;
-
     return CHUNK;
 }
 
@@ -538,37 +484,30 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xC6 | (b << 3);
 
-    // mov edx, rCd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xC2 | (c << 3);
-
     // mov rax, [rax + edi*8]
     *p++ = 0x48;
     *p++ = 0x8B;
     *p++ = 0x04;
     *p++ = 0xF8;
 
-    // mov [rax + esi*4], edx
-    *p++ = 0x89;
-    *p++ = 0x14;
-    *p++ = 0xB0;
+    // // mov edx, rCd
+    // *p++ = 0x44;
+    // *p++ = 0x89;
+    // *p++ = 0xC2 | (c << 3);
 
-    // 11 No ops
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
+    // // mov [rax + esi*4], edx
+    // *p++ = 0x89;
+    // *p++ = 0x14;
+    // *p++ = 0xB0;
 
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
+    // mov [rax + esi*4], rCd
+    *p++ = 0x44;            // REX.R prefix
+    *p++ = 0x89;            // MOV opcode
+    *p++ = 0x04 | (c << 3); // ModRM byte (0x04 for SIB) with register in reg field
+    *p++ = 0xB0;            // SIB byte [rax + esi*4]
 
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x90;
-    // *p++ = 0x90;
+    *p++ = 0x90;
+    *p++ = 0x90;
 
     return CHUNK;
 }
@@ -613,25 +552,8 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-
     *p++ = 0x90;
     *p++ = 0x90;
-
-    // *p++ = 0x90;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x90;
 
     return CHUNK;
 }
@@ -676,25 +598,8 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-
     *p++ = 0x90;
     *p++ = 0x90;
-
-    // *p++ = 0x90;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x90;
 
     return CHUNK;
 }
@@ -742,25 +647,9 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-
     *p++ = 0x90;
     *p++ = 0x90;
     *p++ = 0x90;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x90;
-    // *p++ = 0x90;
 
     return CHUNK;
 }
@@ -812,23 +701,6 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
     *p++ = 0x90;
     *p++ = 0x90;
-
-    //____
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x90;
-    // *p++ = 0x90;
 
     return CHUNK;
 }
@@ -945,23 +817,7 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-
     *p++ = 0x90;
-
-    // *p++ = 0x90;
-    // *p++ = 0x90;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
 
     return CHUNK;
 }
@@ -1022,23 +878,7 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-
     *p++ = 0x90;
-
-    // *p++ = 0x90;
-    // *p++ = 0x90;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
 
     return CHUNK;
 }
@@ -1088,39 +928,13 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-
     *p++ = 0x90;
-
-    // *p++ = 0x90;
-    // *p++ = 0x90;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
 
     return CHUNK;
 }
 
-
-unsigned char read_char(void)
-{
-    int x = getc(stdin);
-    unsigned char c = (unsigned char)x;
-    return c;
-}
-
 size_t read_into_reg(void *zero, size_t offset, unsigned c)
 {
-    // void *read_char_addr = (void *)&read_char;
-
     uint8_t *p = (uint8_t *)zero + offset;
 
     // put the right opcode into rax
@@ -1163,21 +977,6 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
 
     *p++ = 0x90;
 
-    // *p++ = 0x90;
-    // *p++ = 0x90;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
     return CHUNK;
 }
 
@@ -1213,36 +1012,31 @@ void *load_program(uint32_t b_val)
     return new_zero;
 }
 
+// fast version
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // mov rbp, rCd (updating the program counter)
+    // mov rsi, rCd (updating the program counter)
     *p++ = 0x44;
     *p++ = 0x89;
-    *p++ = 0xc5 | (c << 3);
+    *p++ = 0xc6 | (c << 3);
 
-    // mov(64) rax, imm64
+    // mov %rbp, %rax
     *p++ = 0x48;
-    *p++ = 0xb8;
-    uint64_t addr = (uint64_t)&gs.active;
-    memcpy(p, &addr, sizeof(uint64_t));
-    p += sizeof(uint64_t);
-
-    // Just read from the address directly
-    // mov rax, [rax]
-    *p++ = 0x48;
-    *p++ = 0x8b;
-    *p++ = 0x00; // ModRM byte for [rax] with no offset
+    *p++ = 0x89;
+    *p++ = 0xe8;
 
     // test %rBd, %rBd
     *p++ = 0x45;
     *p++ = 0x85;
     *p++ = 0xc0 | (b << 3) | b;
 
-    // je
-    *p++ = 0x74;
-    *p++ = 0x07;
+    // jne
+    *p++ = 0x75;
+    *p++ = 0x01;
+
+    *p++ = 0xc3;
 
     // It makes zero sense that this program works without this instruction
     // mov edi, rBd
@@ -1260,71 +1054,109 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     // return (correct value is already in rax from load_program_addr)
     *p++ = 0xc3;
 
-    // 11 No ops
-
     return CHUNK;
 }
 
+// small version
 // size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 // {
-//     void *load_program_addr = (void *)&load_program;
-
 //     uint8_t *p = (uint8_t *)zero + offset;
 
-//     // There's going to be BIG improvements in this function. Stay tuned
+//     // mov rsi, rCd (updating the program counter)
+//     *p++ = 0x44;
+//     *p++ = 0x89;
+//     *p++ = 0xc6 | (c << 3);
 
+//     // mov %rbp, %rax
+//     *p++ = 0x48;
+//     *p++ = 0x89;
+//     *p++ = 0xe8;
+
+//     // It makes zero sense that this program works without this instruction
 //     // mov edi, rBd
 //     *p++ = 0x44;
 //     *p++ = 0x89;
 //     *p++ = 0xc7 | (b << 3);
 
-//     // mov esi, rCd
-//     *p++ = 0x44;
-//     *p++ = 0x89;
-//     *p++ = 0xc6 | (c << 3);
-
-//     // TODO: this is going to be the next domino to fall
-
-//     // Load the memory address of the program counter into rax
-//     // mov(64) rax, imm64
-//     *p++ = 0x48;
-//     *p++ = 0xb8;
-//     uint64_t addr = (uint64_t)&gs.pc;
-//     memcpy(p, &addr, sizeof(uint64_t));
-//     p += sizeof(uint64_t);
-
-//     // mov [rax], esi
-//     *p++ = 0x89;
-//     *p++ = 0x30;
-
 //     // test %edi, %edi  (test if b_val is 0)
 //     *p++ = 0x85;
 //     *p++ = 0xff;
 
-//     // jne (jump not equal) to the slow path
-//     *p++ = 0x75;
-//     *p++ = 0x05;
-
-//     // Fast path (b_val == 0)
-//     // Put gs.active in rax
-//     // mov rax, [rax + 4]
-//     *p++ = 0x48;
-//     *p++ = 0x8b;
-//     *p++ = 0x40;
+//     // je
+//     *p++ = 0x74;
 //     *p++ = 0x04;
 
-//     // return
+//     // call load program
+//     *p++ = 0xb0;
+//     *p++ = 0x00 | OP_DUPLICATE;
+
+//     *p++ = 0xff;
+//     *p++ = 0xd3;
+
+//     // return (correct value is already in rax from load_program_addr)
 //     *p++ = 0xc3;
 
-//     // Slow path (b_val != 0)
-//     // Load the load program function address into rax and call it
-//     // mov(64) rax, imm64
+//     return CHUNK;
+// }
+
+// Useful for debugging:
+// size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
+// {
+//     uint8_t *p = (uint8_t *)zero + offset;
+
+//     // mov rsi, rCd (updating the program counter)
+//     *p++ = 0x44;
+//     *p++ = 0x89;
+//     *p++ = 0xc6 | (c << 3);
+
+//     // // mov(64) rax, imm64
+//     // *p++ = 0x48;
+//     // *p++ = 0xb8;
+//     // uint64_t addr = (uint64_t)&gs.active;
+//     // memcpy(p, &addr, sizeof(uint64_t));
+//     // p += sizeof(uint64_t);
+
+//     // // // Just read from the address directly
+//     // // mov rax, [rax]
+//     // *p++ = 0x48;
+//     // *p++ = 0x8b;
+//     // *p++ = 0x00; // ModRM byte for [rax] with no offset
+
+//     // mov %rbp, %rax
 //     *p++ = 0x48;
-//     *p++ = 0xb8;
-//     memcpy(p, &load_program_addr, sizeof(load_program_addr));
-//     p += sizeof(load_program_addr);
+//     *p++ = 0x89;
+//     *p++ = 0xe8;
+
+//     // // Calling debug function
+//     // // call debug
+//     // *p++ = 0xb0;
+//     // *p++ = 0x00 | 6;
+
+//     // // call function
+//     // *p++ = 0xff;
+//     // *p++ = 0xd3;
+
+//     // test %rBd, %rBd
+//     *p++ = 0x45;
+//     *p++ = 0x85;
+//     *p++ = 0xc0 | (b << 3) | b;
+
+//     // je
+//     *p++ = 0x74;
+//     *p++ = 0x07;
+
+//     // It makes zero sense that this program works without this instruction
+//     // mov edi, rBd
+//     *p++ = 0x44;
+//     *p++ = 0x89;
+//     *p++ = 0xc7 | (b << 3);
+
+//     // call load program
+//     *p++ = 0xb0;
+//     *p++ = 0x00 | OP_DUPLICATE;
+
 //     *p++ = 0xff;
-//     *p++ = 0xd0;
+//     *p++ = 0xd3;
 
 //     // return (correct value is already in rax from load_program_addr)
 //     *p++ = 0xc3;
