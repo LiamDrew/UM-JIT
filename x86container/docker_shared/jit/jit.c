@@ -814,9 +814,7 @@ size_t handle_halt(void *zero, size_t offset)
     *p++ = 0x48;
     *p++ = 0x31;
     *p++ = 0xc0;
-
-    // return
-    *p++ = 0xc3;
+    *p++ = 0xc3; // return
 
     return CHUNK;
 }
@@ -935,71 +933,6 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 
     return CHUNK;
 }
-
-// size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
-// {
-//     void *map_segment_addr = (void *)&map_segment;
-
-//     uint8_t *p = (uint8_t *)zero + offset;
-
-//     // Move register c to be the function call argument
-//     // mov rC, rdi
-//     *p++ = 0x44;
-//     *p++ = 0x89;
-//     *p++ = 0xc7 | (c << 3);
-
-//     // push r8 - r11 onto the stack
-//     *p++ = 0x41;
-//     *p++ = 0x50;
-
-//     *p++ = 0x41;
-//     *p++ = 0x51;
-
-//     *p++ = 0x41;
-//     *p++ = 0x52;
-
-//     *p++ = 0x41;
-//     *p++ = 0x53;
-
-//     // Load the map segment function address into rax and call it
-//     // mov(64) rax, imm64
-//     *p++ = 0x48;
-//     *p++ = 0xb8;
-//     memcpy(p, &map_segment_addr, sizeof(void *));
-//     p += sizeof(void *);
-//     *p++ = 0xff;
-//     *p++ = 0xd0;
-
-//     // pop r11 - r8 off the stack
-//     *p++ = 0x41;
-//     *p++ = 0x5B;
-
-//     *p++ = 0x41;
-//     *p++ = 0x5A;
-
-//     *p++ = 0x41;
-//     *p++ = 0x59;
-
-//     *p++ = 0x41;
-//     *p++ = 0x58;
-
-//     // move return value from rax to reg b
-//     // mov rBd, eax
-//     *p++ = 0x41;
-//     *p++ = 0x89;
-//     *p++ = 0xc0 | b;
-
-//     // 6 No ops
-//     *p++ = 0x0F;
-//     *p++ = 0x1F;
-//     *p++ = 0x00;
-
-//     *p++ = 0x0F;
-//     *p++ = 0x1F;
-//     *p++ = 0x00;
-
-//     return CHUNK;
-// }
 
 void unmap_segment(uint32_t segmentId)
 {
@@ -1207,6 +1140,8 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
 
 void *load_program(uint32_t b_val)
 {
+    // test with midmark for now
+    // assert(false);
     /* The inline assembly for the load program sets the program counter gs.pc
      * and returns the correct address is b_val is 0. 
      * This function handles loading a non-zero segment into segment zero. */
@@ -1237,55 +1172,59 @@ void *load_program(uint32_t b_val)
 
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 {
-    void *load_program_addr = (void *)&load_program;
-
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // There's going to be BIG improvements in this function. Stay tuned
-
-    // RBP is what we are calling the program counter
-    // mov rbp, rCd
+    // mov rbp, rCd (updating the program counter)
     *p++ = 0x44;
     *p++ = 0x89;
     *p++ = 0xc5 | (c << 3);
 
+    // mov(64) rax, imm64
+    *p++ = 0x48;
+    *p++ = 0xb8;
+    uint64_t addr = (uint64_t)&gs.active;
+    memcpy(p, &addr, sizeof(uint64_t));
+    p += sizeof(uint64_t);
+
+    // Just read from the address directly
+    // mov rax, [rax]
+    *p++ = 0x48;
+    *p++ = 0x8b;
+    *p++ = 0x00; // ModRM byte for [rax] with no offset
+
+    // // mov rax, rsi
+    // *p++ = 0x48;
+    // *p++ = 0x89;
+    // *p++ = 0xf0; // ModRM byte for rsi->rax (11 110 000)
+
+    // test %rBd, %rBd
+    *p++ = 0x45;
+    *p++ = 0x85;
+    *p++ = 0xc0 | (b << 3) | b;
+
+    // test %edi, %edi  (test if b_val is 0)
+    // *p++ = 0x85;
+    // *p++ = 0xff;
+
+    // jump not equal
+    *p++ = 0x75;
+    *p++ = 0x01;
+
+    // return
+    *p++ = 0xc3;
+
+    // It makes zero sense that this program works without this instruction
     // mov edi, rBd
     *p++ = 0x44;
     *p++ = 0x89;
     *p++ = 0xc7 | (b << 3);
 
-    // test %edi, %edi  (test if b_val is 0)
-    *p++ = 0x85;
+    // call load program
+    *p++ = 0xb0;
+    *p++ = 0x00 | OP_DUPLICATE;
+
     *p++ = 0xff;
-
-    // jne (jump not equal) to the slow path
-    *p++ = 0x75;
-    *p++ = 0x05;
-
-    // mov address of active segment into rax
-
-    // Fast path (b_val == 0)
-    // Put gs.active in rax
-    // mov rax, [rax + 4]
-    *p++ = 0x48;
-    *p++ = 0x8b;
-    *p++ = 0x40;
-    *p++ = 0x04;
-
-    // return
-    *p++ = 0xc3;
-
-
-
-    // Slow path (b_val != 0)
-    // Load the load program function address into rax and call it
-    // mov(64) rax, imm64
-    *p++ = 0x48;
-    *p++ = 0xb8;
-    memcpy(p, &load_program_addr, sizeof(load_program_addr));
-    p += sizeof(load_program_addr);
-    *p++ = 0xff;
-    *p++ = 0xd0;
+    *p++ = 0xd3;
 
     // return (correct value is already in rax from load_program_addr)
     *p++ = 0xc3;

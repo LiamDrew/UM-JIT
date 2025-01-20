@@ -35,42 +35,37 @@ run:
     xor %r14, %r14
     xor %r15, %r15
 
-    # Load the address of the function global into rbx
-    # Use the instruction pointer for relative offset
+    # Load the address of the function global into RBX
     lea function(%rip), %rbx
 
-    mov $0, %rbp
+    # Set the 32-bit program pointer RBP to 0
+    movl $0, %ebp
 
-    # intial compiled zero segment is in rdi
-    # Potential optimization: have the program pointer live in a register
-    # during the program's execution?
-    # TODO: All C functions must be implemented in assembly before that can happen
+    # Put address of active segment to RSI
+    mov %rdi, %rsi
 
 loop:
     # Check if the program pointer to the zero segment is NULL
     test %rdi, %rdi
     jz done
 
-    # Load gs.pc from global memory
-    movl gs(%rip), %eax     # Load 32-bit gs.pc into eax
-    # movl %rbp, %eax
-
-    # NOTE: could make rsi the address of the current zero segment
+    # Move the program counter to eax
+    movl %ebp, %eax
 
     # Caclulate the address of the function we are going to be calling
     imul $CHUNK, %rax
     add %rdi, %rax
 
-
-    # Save any registers before executing the function
+    # Save registers
 
     # Call the function
     call *%rax
 
     # Restore registers
 
-    # Move the result into rdi
+    # Move the result into rdi and rsi
     mov %rax, %rdi
+    mov %rax, %rsi
 
     # Loop back
     jmp loop
@@ -102,7 +97,6 @@ function:
     push_regs
     call map_segment
     pop_regs
-
     # return address is in rax
 ret
 
@@ -113,20 +107,24 @@ ret
 ret
 
 .out:
+    # This will not work
     mov stdout(%rip), %rsi
 
     push_regs
     call fputc@PLT
     pop_regs
-    ret
+ret
+
 .load:
-    ret
+    push_regs
+
+
+    call load_program
+    pop_regs
+ret
+
 .in:
     push_regs
-    # call read_char
     call getchar@PLT
     pop_regs
-    ret
-
-.recompile:
-    ret
+ret
