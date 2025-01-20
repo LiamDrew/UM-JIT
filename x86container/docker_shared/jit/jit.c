@@ -324,10 +324,6 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = (value >> 16) & 0xFF;
     *p++ = (value >> 24) & 0xFF;
 
-    // 33 No Ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -335,6 +331,9 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = 0x1F;
     *p++ = 0x00;
 
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -365,10 +364,6 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xC0 | (b << 3) | a;
 
-    // 31 No Ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -376,6 +371,9 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -475,7 +473,6 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xC0 | a;
 
-    // 31 No Ops
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -490,7 +487,6 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
     
-
     return CHUNK;
 }
 
@@ -513,7 +509,6 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xC0 | a;
 
-    // 31 No Ops
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -556,7 +551,6 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xC0 | a;
 
-    // 28 No ops
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -596,7 +590,6 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xc0 | a;
 
-    // 28 no ops
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -701,13 +694,13 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xc0 | b;
 
-    // 30 No Ops
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
+
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -747,10 +740,6 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0xff;
     *p++ = 0xd3;
 
-    // 33 No Ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -758,6 +747,9 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -785,11 +777,6 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0xff;
     *p++ = 0xd3;
 
-    // 33 No Ops
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -797,6 +784,9 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -824,10 +814,6 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x89;
     *p++ = 0xC0 | c;
 
-    // 33 No Ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -835,6 +821,9 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0x00;
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -847,17 +836,12 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
 
 void *load_program(uint32_t b_val)
 {
-    // test with midmark for now
-    // assert(false);
-    /* The inline assembly for the load program sets the program counter gs.pc
-     * and returns the correct address is b_val is 0. 
-     * This function handles loading a non-zero segment into segment zero. */
-
+    // This function handles loading a non-zero segment into segment zero
     uint32_t new_seg_size = gs.seg_lens[b_val];
     uint32_t *new_vals = calloc(new_seg_size, sizeof(uint32_t));
     memcpy(new_vals, gs.val_seq[b_val], new_seg_size * sizeof(uint32_t));
 
-    /* Update the existing memory segment */
+    // Update the existing memory segment
     gs.val_seq[0] = new_vals;
     gs.seg_lens[0] = new_seg_size;
 
