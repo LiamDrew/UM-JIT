@@ -338,17 +338,8 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
+    *p++ = 0x90;
     *p++ = 0x90;
 
     return CHUNK;
@@ -388,15 +379,6 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x90;
-    *p++ = 0x90;
 
     return CHUNK;
 }
@@ -419,32 +401,17 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x8B;
     *p++ = 0x00;
 
-    // mov edi, rBd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xC7 | (b << 3);
+    // mov rax, [rax + rBd*8]
+    *p++ = 0x4A;                    // REX prefix: REX.W and REX.X
+    *p++ = 0x8B;                    // MOV opcode
+    *p++ = 0x04;                    // ModRM byte for SIB
+    *p++ = 0xC0 | (b << 3); // SIB: scale=3 (8), index=B's lower bits, base=rax
 
-    // mov esi, rCd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xC6 | (c << 3);
-
-    // mov rax, [rax + edi*8]
-    *p++ = 0x48;
-    *p++ = 0x8B;
-    *p++ = 0x04;
-    *p++ = 0xF8;
-
-    // mov rax, [rax + esi*4]
-    *p++ = 0x8B;
-    *p++ = 0x04;
-    *p++ = 0xB0;
-
-    // Store the segment value into register rA
-    // mov rAd, eax 
-    *p++ = 0x41;
-    *p++ = 0x89;
-    *p++ = 0xC0 | a;
+    // mov rAd, [rax + rCd*4]
+    *p++ = 0x46;                    // REX prefix: REX.R and REX.X
+    *p++ = 0x8B;                    // MOV opcode
+    *p++ = 0x04 | (a << 3);         // ModRM byte with register selection (a in reg field for destination)
+    *p++ = 0x80 | (c << 3); // SIB: scale=2 (4), index=C's lower bits, base=rax
 
     return CHUNK;
 }
@@ -474,40 +441,17 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x8B;
     *p++ = 0x00;
 
-    // mov edi, rAd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xC7 | (a << 3);
+    // mov rax, [rax + rAd*8]
+    *p++ = 0x4A;                    // REX prefix: REX.W and REX.X
+    *p++ = 0x8B;                    // MOV opcode
+    *p++ = 0x04;                    // ModRM byte for SIB
+    *p++ = 0xC0 | (a << 3); // SIB: scale=3 (8), index=A's lower bits, base=rax
 
-    // mov esi, rBd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xC6 | (b << 3);
-
-    // mov rax, [rax + edi*8]
-    *p++ = 0x48;
-    *p++ = 0x8B;
-    *p++ = 0x04;
-    *p++ = 0xF8;
-
-    // // mov edx, rCd
-    // *p++ = 0x44;
-    // *p++ = 0x89;
-    // *p++ = 0xC2 | (c << 3);
-
-    // // mov [rax + esi*4], edx
-    // *p++ = 0x89;
-    // *p++ = 0x14;
-    // *p++ = 0xB0;
-
-    // mov [rax + esi*4], rCd
-    *p++ = 0x44;            // REX.R prefix
-    *p++ = 0x89;            // MOV opcode
-    *p++ = 0x04 | (c << 3); // ModRM byte (0x04 for SIB) with register in reg field
-    *p++ = 0xB0;            // SIB byte [rax + esi*4]
-
-    *p++ = 0x90;
-    *p++ = 0x90;
+    // mov [rax + rBd*4], rCd
+    *p++ = 0x46;                    // REX prefix: REX.R and REX.X
+    *p++ = 0x89;                    // MOV opcode
+    *p++ = 0x04 | (c << 3);         // ModRM byte with register selection
+    *p++ = 0x80 | (b << 3); // SIB: scale=2 (4), index=B's lower bits, base=rax
 
     return CHUNK;
 }
@@ -545,15 +489,7 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x90;
-    *p++ = 0x90;
+    
 
     return CHUNK;
 }
@@ -591,15 +527,6 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x90;
-    *p++ = 0x90;
 
     return CHUNK;
 }
@@ -640,15 +567,6 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x90;
-    *p++ = 0x90;
     *p++ = 0x90;
 
     return CHUNK;
@@ -690,17 +608,6 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x90;
-    *p++ = 0x90;
 
     return CHUNK;
 }
@@ -807,16 +714,7 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
+    *p++ = 0x90;
     *p++ = 0x90;
 
     return CHUNK;
@@ -867,17 +765,8 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
+    *p++ = 0x90;
     *p++ = 0x90;
 
     return CHUNK;
@@ -885,8 +774,6 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
 
 size_t print_reg(void *zero, size_t offset, unsigned c)
 {
-    // void *putchar_addr = (void *)&putchar;
-
     uint8_t *p = (uint8_t *)zero + offset;
 
     // mov edi, rCd
@@ -917,17 +804,8 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
+    *p++ = 0x90;
     *p++ = 0x90;
 
     return CHUNK;
@@ -964,17 +842,8 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
+    *p++ = 0x90;
     *p++ = 0x90;
 
     return CHUNK;
@@ -1057,7 +926,7 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     return CHUNK;
 }
 
-// small version
+// // small version (18 bytes)
 // size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 // {
 //     uint8_t *p = (uint8_t *)zero + offset;

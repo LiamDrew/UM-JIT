@@ -1,7 +1,8 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
-#define CHUNK 29
+// #define CHUNK 29
+#define CHUNK 21
 
 // Huge thank you to Tom for showing me the way with this
 #define OP_MAP 0
