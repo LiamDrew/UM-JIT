@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include "utility.h"
 
 #define CHUNK 40
 #define MULT (CHUNK / 4)
@@ -134,19 +135,7 @@ int main(int argc, char *argv[])
     void *curr_seg = zero;
 
     // Zero out all registers r8-r15 for JIT use
-    asm volatile(
-        "movq $0, %%r8\n\t"
-        "movq $0, %%r9\n\t"
-        "movq $0, %%r10\n\t"
-        "movq $0, %%r11\n\t"
-        "movq $0, %%r12\n\t"
-        "movq $0, %%r13\n\t"
-        "movq $0, %%r14\n\t"
-        "movq $0, %%r15\n\t"
-        :
-        :
-        : "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15" // Clobber regs
-    );
+    zero_regs();
 
     while (curr_seg != NULL)
     {
