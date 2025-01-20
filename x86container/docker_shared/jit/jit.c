@@ -680,8 +680,6 @@ uint32_t map_segment(uint32_t size)
 
 size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 {
-    // void *map_segment_addr = (void *)&map_segment;
-
     uint8_t *p = (uint8_t *)zero + offset;
 
     // Move register c to be the function call argument
@@ -733,8 +731,6 @@ void unmap_segment(uint32_t segmentId)
 
 size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
 {
-    // void *unmap_segment_addr = (void *)&unmap_segment;
-
     uint8_t *p = (uint8_t *)zero + offset;
 
     // Move register c to be the function call argument
