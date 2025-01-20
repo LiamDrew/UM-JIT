@@ -1,8 +1,8 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
-#define CHUNK 40
-#define MULT (CHUNK / 4)
+// #define CHUNK 40
+#define CHUNK 29
 
 // Huge thank you to Tom for showing me the way with this
 #define OP_MAP 0

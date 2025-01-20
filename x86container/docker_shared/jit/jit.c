@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
     }
 
     // Initialize executable and non-executable memory for the zero segment
-    void *zero = initialize_zero_segment(fsize * MULT);
+    void *zero = initialize_zero_segment(fsize * ((CHUNK + 3) / 4));
     uint32_t *zero_vals = calloc(fsize, sizeof(uint32_t));
     load_zero_segment(zero, zero_vals, fp, fsize);
     fclose(fp);
@@ -354,19 +354,23 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    *p++ = 0x90;
+
+    // *p++ = 0x90;
+    // *p++ = 0x90;
+    
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
     return CHUNK;
 }
@@ -412,21 +416,25 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
     *p++ = 0x90;
+    *p++ = 0x90;
+
+    // *p++ = 0x90;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x90;
 
     return CHUNK;
 }
@@ -477,20 +485,20 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0xC0 | a;
 
     // 11 No ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
-    *p++ = 0x90;
-    *p++ = 0x90;
+    // *p++ = 0x90;
+    // *p++ = 0x90;
 
     return CHUNK;
 }
@@ -547,20 +555,20 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0xB0;
 
     // 11 No ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
-    *p++ = 0x90;
-    *p++ = 0x90;
+    // *p++ = 0x90;
+    // *p++ = 0x90;
 
     return CHUNK;
 }
@@ -605,21 +613,25 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
     *p++ = 0x90;
+    *p++ = 0x90;
+
+    // *p++ = 0x90;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x90;
 
     return CHUNK;
 }
@@ -664,21 +676,25 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
     *p++ = 0x90;
+    *p++ = 0x90;
+
+    // *p++ = 0x90;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x90;
 
     return CHUNK;
 }
@@ -725,22 +741,26 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
     *p++ = 0x90;
     *p++ = 0x90;
+    *p++ = 0x90;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x90;
+    // *p++ = 0x90;
 
     return CHUNK;
 }
@@ -773,9 +793,7 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
@@ -783,25 +801,35 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
 
     *p++ = 0x90;
     *p++ = 0x90;
+
+    //____
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x90;
+    // *p++ = 0x90;
+
     return CHUNK;
 }
 
@@ -917,19 +945,23 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    *p++ = 0x90;
+
+    // *p++ = 0x90;
+    // *p++ = 0x90;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
     return CHUNK;
 }
@@ -989,20 +1021,24 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    *p++ = 0x90;
+
+    // *p++ = 0x90;
+    // *p++ = 0x90;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
     return CHUNK;
 }
@@ -1051,20 +1087,24 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    *p++ = 0x90;
+
+    // *p++ = 0x90;
+    // *p++ = 0x90;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
     return CHUNK;
 }
@@ -1120,20 +1160,23 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    *p++ = 0x90;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // *p++ = 0x90;
+    // *p++ = 0x90;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
     return CHUNK;
 }
@@ -1192,19 +1235,10 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x8b;
     *p++ = 0x00; // ModRM byte for [rax] with no offset
 
-    // // mov rax, rsi    (copy from rsi to rax)
-    // *p++ = 0x48; // REX.W prefix for 64-bit operation
-    // *p++ = 0x89; // MOV opcode
-    // *p++ = 0xf0; // ModRM byte for rsi->rax (11 110 000)
-
     // test %rBd, %rBd
     *p++ = 0x45;
     *p++ = 0x85;
     *p++ = 0xc0 | (b << 3) | b;
-
-    // // test %edi, %edi  (test if b_val is 0)
-    // *p++ = 0x85;
-    // *p++ = 0xff;
 
     // je
     *p++ = 0x74;
@@ -1225,6 +1259,8 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 
     // return (correct value is already in rax from load_program_addr)
     *p++ = 0xc3;
+
+    // 11 No ops
 
     return CHUNK;
 }
