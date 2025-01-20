@@ -1192,9 +1192,9 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x8b;
     *p++ = 0x00; // ModRM byte for [rax] with no offset
 
-    // // mov rax, rsi
-    // *p++ = 0x48;
-    // *p++ = 0x89;
+    // // mov rax, rsi    (copy from rsi to rax)
+    // *p++ = 0x48; // REX.W prefix for 64-bit operation
+    // *p++ = 0x89; // MOV opcode
     // *p++ = 0xf0; // ModRM byte for rsi->rax (11 110 000)
 
     // test %rBd, %rBd
@@ -1202,16 +1202,13 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x85;
     *p++ = 0xc0 | (b << 3) | b;
 
-    // test %edi, %edi  (test if b_val is 0)
+    // // test %edi, %edi  (test if b_val is 0)
     // *p++ = 0x85;
     // *p++ = 0xff;
 
-    // jump not equal
-    *p++ = 0x75;
-    *p++ = 0x01;
-
-    // return
-    *p++ = 0xc3;
+    // je
+    *p++ = 0x74;
+    *p++ = 0x07;
 
     // It makes zero sense that this program works without this instruction
     // mov edi, rBd

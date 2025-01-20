@@ -12,9 +12,11 @@
     push %r11
     push %rcx
     push %rdx
+    push %rsi
 .endm
 
 .macro pop_regs
+    pop %rsi
     pop %rdx
     pop %rcx
     pop %r11
@@ -46,7 +48,8 @@ run:
 
 loop:
     # Check if the program pointer to the zero segment is NULL
-    test %rdi, %rdi
+    # test %rdi, %rdi
+    test %rsi, %rsi
     jz done
 
     # Move the program counter to eax
@@ -54,17 +57,20 @@ loop:
 
     # Caclulate the address of the function we are going to be calling
     imul $CHUNK, %rax
-    add %rdi, %rax
+    # add %rdi, %rax
+    add %rsi, %rax
 
     # Save registers
+    push %rsi
 
     # Call the function
     call *%rax
 
     # Restore registers
+    pop %rsi
 
     # Move the result into rdi and rsi
-    mov %rax, %rdi
+    # mov %rax, %rdi
     mov %rax, %rsi
 
     # Loop back
@@ -94,6 +100,7 @@ function:
     ret
 
 .map:
+
     push_regs
     call map_segment
     pop_regs
@@ -108,9 +115,8 @@ ret
 
 .out:
     # This will not work
-    mov stdout(%rip), %rsi
-
     push_regs
+    mov stdout(%rip), %rsi
     call fputc@PLT
     pop_regs
 ret
