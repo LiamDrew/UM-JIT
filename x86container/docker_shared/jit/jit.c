@@ -5,10 +5,6 @@
  * @brief 
  * A Just-In-Time compiler from Universal Machine assembly language to
  * x86 assembly language.
- * 
- * This JIT completes the sandmark in 1.02 seconds in an x86 docker container
- * running on an Apple Silicon Mac. It is nearly 3 times faster than the
- * benchmark emulator.
 */
 
 #include <stdio.h>
@@ -45,7 +41,7 @@ struct GlobalState gs;
 
 void initialize_instruction_bank();
 void *initialize_zero_segment(size_t fsize);
-void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t fsize);
+void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, uint32_t fsize);
 uint64_t make_word(uint64_t word, unsigned width, unsigned lsb, uint64_t value);
 
 size_t compile_instruction(void *zero, uint32_t word, size_t offset);
@@ -116,12 +112,13 @@ int main(int argc, char *argv[])
 
     // Initialize executable and non-executable memory for the zero segment
     void *zero = initialize_zero_segment(fsize * ((CHUNK + 3) / 4));
-    uint32_t *zero_vals = calloc(fsize, sizeof(uint32_t));
-    load_zero_segment(zero, zero_vals, fp, fsize);
+    uint32_t zero_size = fsize / 4;
+    uint32_t *zero_vals = calloc(zero_size, sizeof(uint32_t));
+    load_zero_segment(zero, zero_vals, fp, zero_size);
     fclose(fp);
 
     gs.val_seq[0] = zero_vals;
-    gs.seg_lens[0] = (fsize / 4);
+    gs.seg_lens[0] = zero_size;
     gs.seq_size++;
     gs.active = zero;
 
@@ -150,9 +147,9 @@ void *initialize_zero_segment(size_t asmbytes)
     return zero;
 }
 
-void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t fsize)
+void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, uint32_t zero_size)
 {
-    (void)fsize;
+    (void)zero_size;
     uint32_t word = 0;
     int c;
     int i = 0;
@@ -619,6 +616,37 @@ size_t handle_halt(void *zero, size_t offset)
     return CHUNK;
 }
 
+// uint32_t map_segment(uint32_t seg_size)
+// {
+//     // og_vals is the memory address of the first zero segment
+
+//     uint32_t eff_size = seg_size + 1;
+//     uint32_t *new_seg = calloc(eff_size, sizeof(uint32_t));
+//     new_seg[0] = seg_size;
+
+//     // printf("mapping segment with size %u\n", seg_size);
+//     // printf("mapping new segment with address %p\n", new_seg);
+
+//     uintptr_t differential = (uintptr_t)new_seg - upper_bits;
+
+//     // Add debugging before the assert fails
+//     if ((uint64_t)differential >= UINT32_MAX)
+//     {
+//         fprintf(stderr, "Segment allocation failed:\n");
+//         fprintf(stderr, "Initial upper_bits: 0x%lx\n", upper_bits);
+//         fprintf(stderr, "New segment addr: %p\n", (void *)new_seg);
+//         fprintf(stderr, "Differential: 0x%lx\n", differential);
+//         fprintf(stderr, "Segment size: %u\n", seg_size);
+//     }
+//     assert((uint64_t)differential < UINT32_MAX);
+
+//     uint32_t lower = (uint32_t)((uintptr_t)new_seg & 0xFFFFFFFF);
+//     uint32_t test = (uint32_t)differential;
+//     assert(test == lower);
+
+//     return lower;
+// }
+
 uint32_t map_segment(uint32_t size)
 {
     uint32_t new_seg_id;
@@ -710,6 +738,15 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 
     return CHUNK;
 }
+
+// void unmap_segment(uint32_t seg_addr)
+// {
+//     uintptr_t rec = upper_bits | seg_addr;
+//     uint32_t *p = (uint32_t *)rec;
+
+//     uint32_t *to_free = p;
+//     free(to_free);
+// }
 
 void unmap_segment(uint32_t segmentId)
 {
@@ -861,7 +898,7 @@ void *load_program(uint32_t b_val)
     return new_zero;
 }
 
-// fast version
+// small version (18 bytes)
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
@@ -876,22 +913,19 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x89;
     *p++ = 0xe8;
 
-    // test %rBd, %rBd
-    *p++ = 0x45;
-    *p++ = 0x85;
-    *p++ = 0xc0 | (b << 3) | b;
-
-    // jne
-    *p++ = 0x75;
-    *p++ = 0x01;
-
-    *p++ = 0xc3;
-
     // It makes zero sense that this program works without this instruction
     // mov edi, rBd
     *p++ = 0x44;
     *p++ = 0x89;
     *p++ = 0xc7 | (b << 3);
+
+    // test %edi, %edi  (test if b_val is 0)
+    *p++ = 0x85;
+    *p++ = 0xff;
+
+    // je
+    *p++ = 0x74;
+    *p++ = 0x04;
 
     // call load program
     *p++ = 0xb0;
@@ -906,7 +940,7 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     return CHUNK;
 }
 
-// // small version (18 bytes)
+// fast version (21 bytes)
 // size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 // {
 //     uint8_t *p = (uint8_t *)zero + offset;
@@ -921,19 +955,22 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 //     *p++ = 0x89;
 //     *p++ = 0xe8;
 
+//     // test %rBd, %rBd
+//     *p++ = 0x45;
+//     *p++ = 0x85;
+//     *p++ = 0xc0 | (b << 3) | b;
+
+//     // jne
+//     *p++ = 0x75;
+//     *p++ = 0x01;
+
+//     *p++ = 0xc3;
+
 //     // It makes zero sense that this program works without this instruction
 //     // mov edi, rBd
 //     *p++ = 0x44;
 //     *p++ = 0x89;
 //     *p++ = 0xc7 | (b << 3);
-
-//     // test %edi, %edi  (test if b_val is 0)
-//     *p++ = 0x85;
-//     *p++ = 0xff;
-
-//     // je
-//     *p++ = 0x74;
-//     *p++ = 0x04;
 
 //     // call load program
 //     *p++ = 0xb0;
