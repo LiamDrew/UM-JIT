@@ -39,6 +39,8 @@ struct GlobalState
 
 struct GlobalState gs;
 
+uintptr_t upper_bits;
+
 void initialize_instruction_bank();
 void *initialize_zero_segment(size_t fsize);
 void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, uint32_t fsize);
@@ -121,6 +123,8 @@ int main(int argc, char *argv[])
     gs.seg_lens[0] = zero_size;
     gs.seq_size++;
     gs.active = zero;
+
+    upper_bits = (uintptr_t)zero_vals;
 
     uint8_t *curr_seg = (uint8_t *)zero;
     run(curr_seg);
@@ -352,14 +356,11 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0xF8 | c;
     *p++ = 0x00;
 
-    // je (jump equal) 3 bytes
-    *p++ = 0x74;
-    *p++ = 0x03;
-
-    // mov rAd, rBd
-    *p++ = 0x45;
-    *p++ = 0x89;
-    *p++ = 0xC0 | (b << 3) | a;
+    // cmovne rAd, rBd
+    *p++ = 0x45;                // REX prefix for r8-r15 registers
+    *p++ = 0x0F;                // two-byte opcode prefix
+    *p++ = 0x45;                // CMOVNE opcode
+    *p++ = 0xC0 | (a << 3) | b; // ModR/M byte with rA as destination and rB as source
 
     *p++ = 0x0F;
     *p++ = 0x1F;
@@ -374,6 +375,8 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0x00;
+
+    *p++ = 0x90;
 
     return CHUNK;
 }
@@ -616,37 +619,6 @@ size_t handle_halt(void *zero, size_t offset)
     return CHUNK;
 }
 
-// uint32_t map_segment(uint32_t seg_size)
-// {
-//     // og_vals is the memory address of the first zero segment
-
-//     uint32_t eff_size = seg_size + 1;
-//     uint32_t *new_seg = calloc(eff_size, sizeof(uint32_t));
-//     new_seg[0] = seg_size;
-
-//     // printf("mapping segment with size %u\n", seg_size);
-//     // printf("mapping new segment with address %p\n", new_seg);
-
-//     uintptr_t differential = (uintptr_t)new_seg - upper_bits;
-
-//     // Add debugging before the assert fails
-//     if ((uint64_t)differential >= UINT32_MAX)
-//     {
-//         fprintf(stderr, "Segment allocation failed:\n");
-//         fprintf(stderr, "Initial upper_bits: 0x%lx\n", upper_bits);
-//         fprintf(stderr, "New segment addr: %p\n", (void *)new_seg);
-//         fprintf(stderr, "Differential: 0x%lx\n", differential);
-//         fprintf(stderr, "Segment size: %u\n", seg_size);
-//     }
-//     assert((uint64_t)differential < UINT32_MAX);
-
-//     uint32_t lower = (uint32_t)((uintptr_t)new_seg & 0xFFFFFFFF);
-//     uint32_t test = (uint32_t)differential;
-//     assert(test == lower);
-
-//     return lower;
-// }
-
 uint32_t map_segment(uint32_t size)
 {
     uint32_t new_seg_id;
@@ -698,6 +670,38 @@ uint32_t map_segment(uint32_t size)
 
     return new_seg_id;
 }
+
+// uint32_t map_segment(uint32_t seg_size)
+// {
+//     // og_vals is the memory address of the first zero segment
+//     uint32_t *new_seg = calloc(seg_size, sizeof(uint32_t));
+
+//     printf("mapping segment with size %u\n", seg_size);
+//     printf("mapping new segment with address %p\n", (void *)new_seg);
+
+//     uintptr_t differential = (uintptr_t)new_seg - upper_bits;
+
+//     // Add debugging before the assert fails
+//     if ((uint64_t)differential >= UINT32_MAX)
+//     {
+//         fprintf(stderr, "Segment allocation failed:\n");
+//         fprintf(stderr, "Initial upper_bits: 0x%lx\n", upper_bits);
+//         fprintf(stderr, "New segment addr: %p\n", (void *)new_seg);
+//         fprintf(stderr, "Differential: 0x%lx\n", differential);
+//         fprintf(stderr, "Segment size: %u\n", seg_size);
+//     }
+//     assert((uint64_t)differential < UINT32_MAX);
+
+//     uint32_t lower = (uint32_t)((uintptr_t)new_seg & 0xFFFFFFFF);
+//     uint32_t test = (uint32_t)differential;
+//     assert(test == lower);
+
+//     printf("Lower bits are %x\n", lower);
+
+//     assert(false);
+
+//     return lower;
+// }
 
 size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 {

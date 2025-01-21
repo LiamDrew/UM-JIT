@@ -10,9 +10,13 @@
     push %r9
     push %r10
     push %r11
+    push %rcx
+    push %rdx
 .endm
 
 .macro pop_regs
+    pop %rdx
+    pop %rcx
     pop %r11
     pop %r10
     pop %r9
@@ -37,11 +41,8 @@ run:
     # Set the 32-bit program pointer RSI to 0
     movl $0, %esi
 
-    # Address of active segment is currently in RDI
-    # Move that address into rbp
+    # Address of active segment into RBP
     mov %rdi, %rbp
-    # lea gs(%rip), %rbp
-
 
 loop:
     # Check if the program pointer to the zero segment is NULL
