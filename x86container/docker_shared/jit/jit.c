@@ -27,12 +27,14 @@ struct GlobalState
 {
     uint32_t pc;
     void *active;
-    uint32_t **val_seq;
+    // uint32_t **val_seq;
+    uint64_t **val_seq;
     uint32_t *seg_lens;
     uint32_t seq_size;
     uint32_t seq_cap;
 
-    uint32_t *rec_ids;
+    // uint32_t *rec_ids;
+    uint64_t *rec_ids;
     uint32_t rec_size;
     uint32_t rec_cap;
 } __attribute__((packed));
@@ -41,7 +43,9 @@ struct GlobalState gs;
 
 void initialize_instruction_bank();
 void *initialize_zero_segment(size_t fsize);
-void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, uint32_t fsize);
+// void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, uint32_t fsize);
+void load_zero_segment(void *zero, uint64_t *zero_vals, FILE *fp, uint32_t zero_size);
+
 uint64_t make_word(uint64_t word, unsigned width, unsigned lsb, uint64_t value);
 
 size_t compile_instruction(void *zero, uint32_t word, size_t offset);
@@ -92,7 +96,8 @@ int main(int argc, char *argv[])
     // Initializing the memory segment array
     gs.seq_size = 0;
     gs.seq_cap = INIT_CAP;
-    gs.val_seq = calloc(gs.seq_cap, sizeof(uint32_t *));
+    // gs.val_seq = calloc(gs.seq_cap, sizeof(uint32_t *));
+    gs.val_seq = calloc(gs.seq_cap, sizeof(uint64_t *));
 
     // Array of segment sizes
     gs.seg_lens = calloc(gs.seq_cap, sizeof(uint32_t));
@@ -100,7 +105,8 @@ int main(int argc, char *argv[])
     // Initializing the recycled segments array
     gs.rec_size = 0;
     gs.rec_cap = INIT_CAP;
-    gs.rec_ids = calloc(gs.rec_cap, sizeof(uint32_t));
+    // gs.rec_ids = calloc(gs.rec_cap, sizeof(uint32_t));
+    gs.rec_ids = calloc(gs.rec_cap, sizeof(uint64_t));
 
     size_t fsize = 0;
     struct stat file_stat;
@@ -113,7 +119,8 @@ int main(int argc, char *argv[])
     // Initialize executable and non-executable memory for the zero segment
     void *zero = initialize_zero_segment(fsize * ((CHUNK + 3) / 4));
     uint32_t zero_size = fsize / 4;
-    uint32_t *zero_vals = calloc(zero_size, sizeof(uint32_t));
+    // uint32_t *zero_vals = calloc(zero_size, sizeof(uint32_t));
+    uint64_t *zero_vals = calloc(zero_size, sizeof(uint64_t));
     load_zero_segment(zero, zero_vals, fp, zero_size);
     fclose(fp);
 
@@ -147,7 +154,8 @@ void *initialize_zero_segment(size_t asmbytes)
     return zero;
 }
 
-void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, uint32_t zero_size)
+// void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, uint32_t zero_size)
+void load_zero_segment(void *zero, uint64_t *zero_vals, FILE *fp, uint32_t zero_size)
 {
     (void)zero_size;
     uint32_t word = 0;
@@ -168,7 +176,8 @@ void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, uint32_t zero_
         else if (i % 4 == 3)
         {
             word = make_word(word, 8, 0, c_char);
-            zero_vals[i / 4] = word;
+            // zero_vals[i / 4] = word;
+            zero_vals[i / 4] = (uint64_t)word; // upper bits become zero
 
             // compile the UM word into machine code
             offset = compile_instruction(zero, word, offset);
@@ -402,11 +411,17 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x04;                    // ModRM byte for SIB
     *p++ = 0xC0 | (b << 3); // SIB: scale=3 (8), index=B's lower bits, base=rax
 
+    // // mov rAd, [rax + rCd*4]
+    // *p++ = 0x46;                    // REX prefix: REX.R and REX.X
+    // *p++ = 0x8B;                    // MOV opcode
+    // *p++ = 0x04 | (a << 3);         // ModRM byte with register selection (a in reg field for destination)
+    // *p++ = 0x80 | (c << 3); // SIB: scale=2 (4), index=C's lower bits, base=rax
+
     // mov rAd, [rax + rCd*4]
-    *p++ = 0x46;                    // REX prefix: REX.R and REX.X
-    *p++ = 0x8B;                    // MOV opcode
-    *p++ = 0x04 | (a << 3);         // ModRM byte with register selection (a in reg field for destination)
-    *p++ = 0x80 | (c << 3); // SIB: scale=2 (4), index=C's lower bits, base=rax
+    *p++ = 0x46;            // REX prefix: REX.R and REX.X
+    *p++ = 0x8B;            // MOV opcode
+    *p++ = 0x04 | (a << 3); // ModRM byte with register selection (a in reg field for destination)
+    *p++ = 0xC0 | (c << 3); // SIB: scale=2 (4), index=C's lower bits, base=rax
 
     return CHUNK;
 }
@@ -442,11 +457,17 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x04;                    // ModRM byte for SIB
     *p++ = 0xC0 | (a << 3); // SIB: scale=3 (8), index=A's lower bits, base=rax
 
+    // // mov [rax + rBd*4], rCd
+    // *p++ = 0x46;                    // REX prefix: REX.R and REX.X
+    // *p++ = 0x89;                    // MOV opcode
+    // *p++ = 0x04 | (c << 3);         // ModRM byte with register selection
+    // *p++ = 0x80 | (b << 3); // SIB: scale=2 (4), index=B's lower bits, base=rax
+
     // mov [rax + rBd*4], rCd
-    *p++ = 0x46;                    // REX prefix: REX.R and REX.X
-    *p++ = 0x89;                    // MOV opcode
-    *p++ = 0x04 | (c << 3);         // ModRM byte with register selection
-    *p++ = 0x80 | (b << 3); // SIB: scale=2 (4), index=B's lower bits, base=rax
+    *p++ = 0x46;            // REX prefix: REX.R and REX.X
+    *p++ = 0x89;            // MOV opcode
+    *p++ = 0x04 | (c << 3); // ModRM byte with register selection
+    *p++ = 0xC0 | (b << 3); // SIB: scale=2 (4), index=B's lower bits, base=rax
 
     return CHUNK;
 }
@@ -664,7 +685,8 @@ uint32_t map_segment(uint32_t size)
             assert(gs.seg_lens != NULL);
 
             // also need to init the memory segment
-            gs.val_seq = realloc(gs.val_seq, gs.seq_cap * sizeof(uint32_t *));
+            // gs.val_seq = realloc(gs.val_seq, gs.seq_cap * sizeof(uint32_t *));
+            gs.val_seq = realloc(gs.val_seq, gs.seq_cap * sizeof(uint64_t *));
             assert(gs.val_seq != NULL);
 
             // Initializing all reallocated memory
@@ -687,14 +709,16 @@ uint32_t map_segment(uint32_t size)
     // If the segment didn't previously exist or wasn't large enough
     if (gs.val_seq[new_seg_id] == NULL || size > gs.seg_lens[new_seg_id])
     {
-        gs.val_seq[new_seg_id] = realloc(gs.val_seq[new_seg_id], size * sizeof(uint32_t));
+        // gs.val_seq[new_seg_id] = realloc(gs.val_seq[new_seg_id], size * sizeof(uint32_t));
+        gs.val_seq[new_seg_id] = realloc(gs.val_seq[new_seg_id], size * sizeof(uint64_t));
         assert(gs.val_seq[new_seg_id] != NULL);
 
         gs.seg_lens[new_seg_id] = size;
     }
 
     // zero out the new segment
-    memset(gs.val_seq[new_seg_id], 0, size * sizeof(uint32_t));
+    // memset(gs.val_seq[new_seg_id], 0, size * sizeof(uint32_t));
+    memset(gs.val_seq[new_seg_id], 0, size * sizeof(uint64_t));
 
     return new_seg_id;
 }
@@ -873,12 +897,16 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
 
 void *load_program(uint32_t b_val)
 {
+    // assert(false);
     // This function handles loading a non-zero segment into segment zero
     uint32_t new_seg_size = gs.seg_lens[b_val];
-    uint32_t *new_vals = calloc(new_seg_size, sizeof(uint32_t));
-    memcpy(new_vals, gs.val_seq[b_val], new_seg_size * sizeof(uint32_t));
+    // uint32_t *new_vals = calloc(new_seg_size, sizeof(uint32_t));
+    uint64_t *new_vals = calloc(new_seg_size, sizeof(uint64_t));
 
-    // Update the existing memory segment
+    // memcpy(new_vals, gs.val_seq[b_val], new_seg_size * sizeof(uint32_t));
+    memcpy(new_vals, gs.val_seq[b_val], new_seg_size * sizeof(uint64_t));
+
+    // Update the existing memory segmentm
     gs.val_seq[0] = new_vals;
     gs.seg_lens[0] = new_seg_size;
 
