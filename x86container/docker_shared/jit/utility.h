@@ -13,7 +13,8 @@
 
 #ifndef __ASSEMBLER__
     void zero_regs(void);
-    void run(uint8_t *zero);
+    // void run(uint8_t *zero);
+    void run(uint8_t *zero, uint32_t *zero_vals);
 #endif
 
 #endif

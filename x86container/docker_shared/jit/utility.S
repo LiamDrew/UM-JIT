@@ -11,11 +11,11 @@
     push %r10
     push %r11
     push %rcx
-    push %rdx
+    push %rsi # for now
 .endm
 
 .macro pop_regs
-    pop %rdx
+    pop %rsi
     pop %rcx
     pop %r11
     pop %r10
@@ -35,42 +35,47 @@ run:
     xor %r14, %r14
     xor %r15, %r15
 
-    # Load the address of the function global into RBX
+    # Put address of global tag into RBX
     lea function(%rip), %rbx
 
-    # Set the 32-bit program pointer RSI to 0
-    movl $0, %esi
+    # Put address of active segment into RCX
+    mov %rdi, %rcx
 
-    # Address of active segment into RBP
-    mov %rdi, %rbp
+    # Put 0 into RDX (program pointer)
+    movl $0, %edx
+    
+    # Address of zero vals segment will live in RSI
+
+    # Upper bits will live in RBP
+    mov %rsi, %rbp
+    # Instead, load the mask into another register first:
+    mov $0xFFFFFFFF00000000, %rax    # Load mask into rax
+    and %rax, %rbp                    # Apply mask
 
 loop:
     # Check if the program pointer to the zero segment is NULL
-    test %rdi, %rdi
+    test %rcx, %rcx
+    
     jz done
 
     # Move the program counter to eax
-    movl %esi, %eax
+    movl %edx, %eax
 
     # Caclulate the address of the function we are going to be calling
     imul $CHUNK, %rax
-    add %rdi, %rax
+    add %rcx, %rax
 
     # Call the function
     call *%rax
 
-    # Move the result into rdi
-    mov %rax, %rdi
-    mov %rax, %rbp
+    # Move the result into rcx
+    mov %rax, %rcx
 
     # Loop back
     jmp loop
 
 done:
     ret
-
-# NOTE: I am going to try doing this Tom's way first to get it working
-# I will then see if it can be improved upon
 
 .global function
 function:
@@ -90,9 +95,8 @@ ret
 
 .map:
     push_regs
-    call map_segment
+    call map_segment    # puts correct return value in rax
     pop_regs
-    # return address is in rax
 ret
 
 .unmap:
@@ -102,19 +106,22 @@ ret
 ret
 
 .out:
+    push %rsi
     push_regs
     mov stdout(%rip), %rsi
     call fputc@PLT
     pop_regs
+    pop %rsi
 ret
 
 .load:
-    # RSI gets updated right before load_program gets called
-    push %rsi
+    # RDX (the program counter) gets updated right before load program gets
+    # called, so we have to save its value here only
+    push %rdx
     push_regs
     call load_program
     pop_regs
-    pop %rsi
+    pop %rdx
 ret
 
 .in:
