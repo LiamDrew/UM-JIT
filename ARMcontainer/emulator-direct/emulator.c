@@ -40,6 +40,8 @@ uint32_t *recycled_ids = NULL;
 uint32_t rec_size = 0;
 uint32_t rec_capacity = 0;
 
+uint32_t *first_heap_alloc = NULL;
+
 uint32_t *initialize_memory(FILE *fp, size_t fsize);
 uint64_t assemble_word(uint64_t word, unsigned width, unsigned lsb,
                        uint64_t value);
@@ -71,7 +73,25 @@ int main(int argc, char *argv[])
     if (stat(argv[1], &file_stat) == 0)
         fsize = file_stat.st_size;
 
+    /* New plan:
+     * Mmap 4GB of contiguous virtual memory, and from this memory, allocated
+     * segments for the UM to use.
+     * 
+     * Give segment 0 a large chunk of this memory (so that it can be reallocated in the future)
+     * 
+     * Give all future chunks of this memory
+     */
+
+
+
+
+
     uint32_t *zero_segment = initialize_memory(fp, fsize + sizeof(Instruction));
+    // printf("zero segment alloc is %p\n", zero_segment);
+
+    // first heap allocation (remember that 0 refers to the active memory segment)
+    first_heap_alloc = zero_segment;
+
     handle_instructions(zero_segment);
     return EXIT_SUCCESS;
 }
@@ -109,6 +129,7 @@ uint32_t *initialize_memory(FILE *fp, size_t fsize)
     }
 
     fclose(fp);
+
     segment_sequence[0] = zero;
     segment_lengths[0] = fsize;
     seq_size++;
@@ -170,11 +191,21 @@ static inline bool exec_instr(Instruction word, Instruction **pp,
 
     /* Segmented Load */
     if (__builtin_expect(opcode == 1, 1)) {
+        // TODO: update
+
+        // printf("First heap alloc is: %p\n", first_heap_alloc);
+        // assert(false);
         regs[a] = segment_sequence[regs[b]][regs[c]];
     }
 
     /* Segmented Store */
     else if (__builtin_expect(opcode == 2, 1)) {
+        // TODO: update
+        // NOTE: could there be another global variable that keeps track of the relative offset of the zero segment?
+
+        // printf("First heap alloc is: %p\n", first_heap_alloc);
+        // assert(false);
+
         segment_sequence[regs[a]][regs[b]] = regs[c];
     }
 
@@ -186,6 +217,7 @@ static inline bool exec_instr(Instruction word, Instruction **pp,
     /* Load Segment */
     else if (__builtin_expect(opcode == 12, 0))
     {
+        // TODO: update to new plan
         load_segment(regs[b], zero);
         *pp = segment_sequence[0] + regs[c];
     }
@@ -204,11 +236,13 @@ static inline bool exec_instr(Instruction word, Instruction **pp,
 
     /* Map Segment */
     else if (__builtin_expect(opcode == 8, 0)) {
+        // TODO: update to new plan
         regs[b] = map_segment(regs[c]);
     }
 
     /* Unmap Segment */
     else if (__builtin_expect(opcode == 9, 0)) {
+        // TODO: update to new plan
         unmap_segment(regs[c]);
     }
 
@@ -251,64 +285,88 @@ void handle_stop()
 
 uint32_t map_segment(uint32_t size)
 {
-    uint32_t new_seg_id;
+    uint32_t *new_segment = malloc(size * sizeof(uint32_t));
+    (void)new_segment;
 
-    /* If there are no available recycled segment ids, make a new one */
-    if (rec_size == 0)
-    {
-        if (seq_size == seq_capacity)
-        {
-            /* Expand the sequence if necessary */
-            seq_capacity = seq_capacity * 2 + 2;
-            segment_lengths = (uint32_t *)realloc(segment_lengths,
-                                                  (seq_capacity) * sizeof(uint32_t));
-            segment_sequence = (uint32_t **)realloc(segment_sequence,
-                                                    (seq_capacity) * sizeof(uint32_t *));
+    printf("New segment address is: %p\n", new_segment);
+    printf("Zero segment address is: %p\n", first_heap_alloc);
 
-            for (uint32_t i = seq_size; i < seq_capacity; i++)
-            {
-                segment_sequence[i] = NULL;
-                segment_lengths[i] = 0;
-            }
-        }
+    // the question is how to return the 64 bit address with only 32 bits
+    (void)size;
 
-        new_seg_id = seq_size++;
-    }
+    printf("confirming that we try to map before doing any storing\n");
+    assert(false);
+    // rely on the OS to malloc
 
-    /* Otherwise, reuse an old one */
-    else
-        new_seg_id = recycled_ids[--rec_size];
-
-    if (segment_sequence[new_seg_id] == NULL ||
-        size > segment_lengths[new_seg_id])
-    {
-        segment_sequence[new_seg_id] =
-            (uint32_t *)realloc(segment_sequence[new_seg_id],
-                                size * sizeof(uint32_t));
-        segment_lengths[new_seg_id] = size;
-    }
-
-    /* Zero out the segment */
-    memset(segment_sequence[new_seg_id], 0, size * sizeof(uint32_t));
-    return new_seg_id;
+    return 0;
 }
 
-void unmap_segment(uint32_t segment)
+void unmap_segment(uint32_t segmentID)
 {
-    if (rec_size == rec_capacity)
-    {
-        rec_capacity = rec_capacity * 2 + 2;
-        recycled_ids = (uint32_t *)realloc(recycled_ids, (rec_capacity) * sizeof(uint32_t));
-    }
-
-    recycled_ids[rec_size++] = segment;
+    (void)segmentID;
+    // rely on the OS to free (may want to use a data structure for cleanup later)
 }
+
+// uint32_t map_segment(uint32_t size)
+// {
+//     uint32_t new_seg_id;
+
+//     /* If there are no available recycled segment ids, make a new one */
+//     if (rec_size == 0)
+//     {
+//         if (seq_size == seq_capacity)
+//         {
+//             /* Expand the sequence if necessary */
+//             seq_capacity = seq_capacity * 2 + 2;
+//             segment_lengths = (uint32_t *)realloc(segment_lengths,
+//                                                   (seq_capacity) * sizeof(uint32_t));
+//             segment_sequence = (uint32_t **)realloc(segment_sequence,
+//                                                     (seq_capacity) * sizeof(uint32_t *));
+
+//             for (uint32_t i = seq_size; i < seq_capacity; i++)
+//             {
+//                 segment_sequence[i] = NULL;
+//                 segment_lengths[i] = 0;
+//             }
+//         }
+
+//         new_seg_id = seq_size++;
+//     }
+
+//     /* Otherwise, reuse an old one */
+//     else
+//         new_seg_id = recycled_ids[--rec_size];
+
+//     if (segment_sequence[new_seg_id] == NULL ||
+//         size > segment_lengths[new_seg_id])
+//     {
+//         segment_sequence[new_seg_id] =
+//             (uint32_t *)realloc(segment_sequence[new_seg_id],
+//                                 size * sizeof(uint32_t));
+//         segment_lengths[new_seg_id] = size;
+//     }
+
+//     /* Zero out the segment */
+//     memset(segment_sequence[new_seg_id], 0, size * sizeof(uint32_t));
+//     return new_seg_id;
+// }
+
+// void unmap_segment(uint32_t segment)
+// {
+//     if (rec_size == rec_capacity)
+//     {
+//         rec_capacity = rec_capacity * 2 + 2;
+//         recycled_ids = (uint32_t *)realloc(recycled_ids, (rec_capacity) * sizeof(uint32_t));
+//     }
+//     recycled_ids[rec_size++] = segment;
+// }
 
 void load_segment(uint32_t index, uint32_t *zero)
 {
     (void)zero;
     if (index > 0)
     {
+        assert(false);
         uint32_t copied_seq_size = segment_lengths[index];
 
         uint32_t *new_zero = malloc(copied_seq_size * sizeof(uint32_t));
