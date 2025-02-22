@@ -130,9 +130,13 @@ int main(int argc, char *argv[])
 
     uint8_t *curr_seg = (uint8_t *)zero;
     (void)curr_seg;
+
+    printf("Making it this far\n");
     
     // NOTE: here is the assembly entry point
-    // run(curr_seg);
+    run(curr_seg);
+    printf("\nFinished running the assembly code\n");
+    assert(false);
 
     // Free all program segments
     for (uint32_t i = 0; i < gs.seq_size; i++)

@@ -1,7 +1,7 @@
 src = $(wildcard *.c)
 obj = $(src:.c=.o)
 
-CC = gcc
+CC = gcc-14
 CFLAGS = -g -Wall -Wextra -Werror -O2
 LDFLAGS = -g
 
