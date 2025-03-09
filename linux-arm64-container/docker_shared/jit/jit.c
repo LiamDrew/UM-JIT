@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
 {
     if (argc != 2)
     {
-        fprintf(stderr, "Usage: ./um [executable.um]\n");
+        fprintf(stderr, "Usage: ./jit [executable.um]\n");
         return EXIT_FAILURE;
     }
 
@@ -86,9 +86,6 @@ int main(int argc, char *argv[])
         fprintf(stderr, "File %s could not be opened.\n", argv[1]);
         return EXIT_FAILURE;
     }
-
-    // Only needed for darwin
-    // pthread_jit_write_protect_np(0); // Disable write protect
 
     // Setting the program counter to 0
     gs.pc = 0;
@@ -129,12 +126,17 @@ int main(int argc, char *argv[])
     (void)curr_seg;
 
     printf("Making it this far\n");
+
+    Function fn = (Function)curr_seg;
+    fn();
+
     
     // NOTE: here is the assembly entry point
-    run(curr_seg);
+
+    // run(curr_seg);
+    // run(57);
 
     printf("\nFinished running the assembly code\n");
-    // assert(false);
 
     // Free all program segments
     for (uint32_t i = 0; i < gs.seq_size; i++)
@@ -207,6 +209,7 @@ uint64_t make_word(uint64_t word, unsigned width, unsigned lsb,
 size_t compile_instruction(void *zero, Instruction word, size_t offset)
 {
     uint32_t opcode = (word >> 28) & 0xF;
+    printf("Opcode is %u\n", opcode);
     uint32_t a = 0;
 
     // Load Value
@@ -321,34 +324,49 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // Load 32 bit value into register rA
-    // mov(32) rAd, imm32
-    *p++ = 0x41;
-    *p++ = 0xC7;
-    *p++ = 0xC0 | a;
+    /* NOTE: The very first thing I am going to do with this assembly stuff is
+     * to try to solve the function calling issue, which seems to be the main
+     * difficulty working with Arm assembly versus x86. This will be the first
+     * assembly instruction the program encounters, and all it will do is
+     * return.
+     */
 
-    *p++ = value & 0xFF;
-    *p++ = (value >> 8) & 0xFF;
-    *p++ = (value >> 16) & 0xFF;
-    *p++ = (value >> 24) & 0xFF;
+    uint32_t ret = 0xD65F0000;
+    *(uint32_t *)p = ret;
+    p += 4;
 
-    // 33 No Ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // // Load 32 bit value into register rA
+    // First instruction: MOVZ Wd, #(bottom 16 bits)
+    uint32_t instr1 = 0x52800000;      // Base opcode for MOVZ W, #imm
+    instr1 |= ((value & 0xFFFF) << 5); // Bottom 16 bits
+    instr1 |= (a + 19);                // Register (x19+a)
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    *(uint32_t *)p = instr1;
+    p += 4;
 
-    *p++ = 0x90;
-    *p++ = 0x90;
+    // Second instruction: MOVK Wd, #(top 16 bits), LSL #16
+    uint32_t instr2 = 0x72A00000;              // Base opcode for MOVK W, #imm, LSL #16
+    instr2 |= (((value >> 16) & 0xFFFF) << 5); // Top 16 bits
+    instr2 |= (a + 19);                        // Register (x19+a)
+
+    *(uint32_t *)p = instr2;
+    p += 4;
+
+
+    // NOP instruction encoding
+    uint32_t instr = 0xD503201F;
+
+    *(uint32_t *)p = instr;
+    p += 4;
+
+    *(uint32_t *)p = instr;
+    p += 4;
+
+    *(uint32_t *)p = instr;
+    p += 4;
+
+    // *(uint32_t *)p = instr;
+    // p += 4;
 
     return CHUNK;
 }

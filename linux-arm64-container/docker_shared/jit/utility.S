@@ -60,6 +60,9 @@ run:
     mov x25, XZR
     mov x26, XZR
 
+    // mov the memory address we want into x27
+    mov x27, x0
+
 loop:
     push_regs
     mov x0, #54
@@ -67,10 +70,10 @@ loop:
     pop_regs
 
     // past here we have problems
-    ldr x27, =handler
-    push_regs
+    // ldr x27, =handler
+    // push_regs
     blr x27
-    pop_regs
+    // pop_regs
 
     // Restore non-volatile registers in reverse order
     // NOTE: the fact that we have to do this is going to make the halt

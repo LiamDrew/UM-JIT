@@ -4,7 +4,7 @@
 // #include <stdio.h>
 
 // #define CHUNK 29
-#define CHUNK 21
+#define CHUNK 24
 
 // Huge thank you to Tom for showing me the way with this
 #define OP_MAP 0
@@ -16,6 +16,7 @@
 
 #ifndef __ASSEMBLER__
     void run(uint8_t *zero);
+    // void run(uint32_t num);
 #endif
 
 #endif
