@@ -22,7 +22,13 @@
 #define INIT_CAP 32500
 
 typedef uint32_t Instruction;
+// This will be necessary for when the function has to return the pointer to
+// the next executable memory. For now, we will let it be.
+// typedef void *(*Function)(void);
+
 typedef void *(*Function)(void);
+
+typedef int (*SimpleFunc)(void);
 
 struct GlobalState
 {
@@ -122,12 +128,50 @@ int main(int argc, char *argv[])
     gs.seq_size++;
     gs.active = zero;
 
+    void *mem = (void *)zero;
     uint8_t *curr_seg = (uint8_t *)zero;
     (void)curr_seg;
+    uint8_t *code = (uint8_t *)zero;
 
-    printf("Making it this far\n");
+    printf("\nNOTE: the address we are writing to is %p\n\n", (void *)code);
+
+    // The instruction we'll create: MOV X0, #42 followed by RET
+    // MOV X0, #42 (0xD2800540)
+    // code[0] = 0x40; // Least significant byte first (little-endian)
+    // code[1] = 0x05;
+    // code[2] = 0x80;
+    // code[3] = 0xD2;
+
+    // // RET instruction (0xD65F03C0)
+    // code[4] = 0xC0;
+    // code[5] = 0x03;
+    // code[6] = 0x5F;
+    // code[7] = 0xD6;
+
+    // Clear instruction cache to make sure CPU sees our new code
+    __builtin___clear_cache(mem, (char *)mem + 8);
+
+    // Cast the memory to a function pointer
+    SimpleFunc func = (SimpleFunc)mem;
+
+    // Call our dynamically created function
+    int result = func();
+
+    printf("The function returned: %d\n", result);
+
+    // // First write a NOP
+    // uint32_t nop = 0xD503201F; // NOP for ARM64
+    // *(uint32_t *)curr_seg = nop;
+
+    // // Then write a RET 4 bytes later
+    // uint32_t ret = 0xD65F0000; // RET for ARM64
+    // *(uint32_t *)(curr_seg + 4) = ret;
+
+    // Flush instruction cache
+    __builtin___clear_cache((char *)curr_seg, (char *)curr_seg + 4);
 
     Function fn = (Function)curr_seg;
+    printf("About to call function at %p\n", (void *)fn);
     fn();
 
     
@@ -156,7 +200,8 @@ void *initialize_zero_segment(size_t asmbytes)
                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     assert(zero != MAP_FAILED);
 
-    memset(zero, 0, asmbytes);
+    // TODO: Add this back in
+    // memset(zero, 0, asmbytes);
     return zero;
 }
 
@@ -323,6 +368,7 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
 size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 {
     uint8_t *p = (uint8_t *)zero + offset;
+    printf("Loading the reg is happening at addr %p\n", (void *)p);
 
     /* NOTE: The very first thing I am going to do with this assembly stuff is
      * to try to solve the function calling issue, which seems to be the main
@@ -331,39 +377,56 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
      * return.
      */
 
-    uint32_t ret = 0xD65F0000;
-    *(uint32_t *)p = ret;
-    p += 4;
+    (void)a;
+    (void)value;
 
-    // // Load 32 bit value into register rA
-    // First instruction: MOVZ Wd, #(bottom 16 bits)
-    uint32_t instr1 = 0x52800000;      // Base opcode for MOVZ W, #imm
-    instr1 |= ((value & 0xFFFF) << 5); // Bottom 16 bits
-    instr1 |= (a + 19);                // Register (x19+a)
+    // NOTE: successfully getting a bit of jitting going on
+    uint8_t *code = p;
 
-    *(uint32_t *)p = instr1;
-    p += 4;
+    code[0] = 0x40; // Least significant byte first (little-endian)
+    code[1] = 0x05;
+    code[2] = 0x80;
+    code[3] = 0xD2;
 
-    // Second instruction: MOVK Wd, #(top 16 bits), LSL #16
-    uint32_t instr2 = 0x72A00000;              // Base opcode for MOVK W, #imm, LSL #16
-    instr2 |= (((value >> 16) & 0xFFFF) << 5); // Top 16 bits
-    instr2 |= (a + 19);                        // Register (x19+a)
+    // RET instruction (0xD65F03C0)
+    code[4] = 0xC0;
+    code[5] = 0x03;
+    code[6] = 0x5F;
+    code[7] = 0xD6;
 
-    *(uint32_t *)p = instr2;
-    p += 4;
+    // uint32_t ret = 0xD65F0000;
+    // *(uint32_t *)p = ret;
+    // p += 4;
+
+    // // // Load 32 bit value into register rA
+    // // First instruction: MOVZ Wd, #(bottom 16 bits)
+    // uint32_t instr1 = 0x52800000;      // Base opcode for MOVZ W, #imm
+    // instr1 |= ((value & 0xFFFF) << 5); // Bottom 16 bits
+    // instr1 |= (a + 19);                // Register (x19+a)
+
+    // *(uint32_t *)p = instr1;
+    // p += 4;
+
+    // // Second instruction: MOVK Wd, #(top 16 bits), LSL #16
+    // uint32_t instr2 = 0x72A00000;              // Base opcode for MOVK W, #imm, LSL #16
+    // instr2 |= (((value >> 16) & 0xFFFF) << 5); // Top 16 bits
+    // instr2 |= (a + 19);                        // Register (x19+a)
+
+    // *(uint32_t *)p = instr2;
+    // p += 4;
 
 
-    // NOP instruction encoding
-    uint32_t instr = 0xD503201F;
+    // // NOP instruction encoding
+    // uint32_t instr = 0xD503201F;
 
-    *(uint32_t *)p = instr;
-    p += 4;
+    // *(uint32_t *)p = instr;
+    // p += 4;
 
-    *(uint32_t *)p = instr;
-    p += 4;
+    // *(uint32_t *)p = instr;
+    // p += 4;
 
-    *(uint32_t *)p = instr;
-    p += 4;
+    // *(uint32_t *)p = instr;
+    // p += 4;
 
     // *(uint32_t *)p = instr;
     // p += 4;
