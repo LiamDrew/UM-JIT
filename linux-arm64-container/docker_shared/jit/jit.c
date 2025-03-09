@@ -128,55 +128,23 @@ int main(int argc, char *argv[])
     gs.seq_size++;
     gs.active = zero;
 
-    void *mem = (void *)zero;
     uint8_t *curr_seg = (uint8_t *)zero;
     (void)curr_seg;
-    uint8_t *code = (uint8_t *)zero;
-
-    printf("\nNOTE: the address we are writing to is %p\n\n", (void *)code);
-
-    // The instruction we'll create: MOV X0, #42 followed by RET
-    // MOV X0, #42 (0xD2800540)
-    // code[0] = 0x40; // Least significant byte first (little-endian)
-    // code[1] = 0x05;
-    // code[2] = 0x80;
-    // code[3] = 0xD2;
-
-    // // RET instruction (0xD65F03C0)
-    // code[4] = 0xC0;
-    // code[5] = 0x03;
-    // code[6] = 0x5F;
-    // code[7] = 0xD6;
 
     // Clear instruction cache to make sure CPU sees our new code
-    __builtin___clear_cache(mem, (char *)mem + 8);
+    __builtin___clear_cache((char *)curr_seg, (char *)curr_seg + 8);
 
-    // Cast the memory to a function pointer
-    SimpleFunc func = (SimpleFunc)mem;
-
-    // Call our dynamically created function
-    int result = func();
-
-    printf("The function returned: %d\n", result);
-
-    // // First write a NOP
-    // uint32_t nop = 0xD503201F; // NOP for ARM64
-    // *(uint32_t *)curr_seg = nop;
-
-    // // Then write a RET 4 bytes later
-    // uint32_t ret = 0xD65F0000; // RET for ARM64
-    // *(uint32_t *)(curr_seg + 4) = ret;
-
-    // Flush instruction cache
-    __builtin___clear_cache((char *)curr_seg, (char *)curr_seg + 4);
+    // SimpleFunc func = (SimpleFunc)(void *)curr_seg;
+    // int result = func();
+    // printf("The function returned: %d\n", result);
 
     Function fn = (Function)curr_seg;
     printf("About to call function at %p\n", (void *)fn);
-    fn();
+    void *output = fn();
 
-    
+    printf("\nRETURN ADDRESS IS: %p\n", output);
+    assert(output == NULL);
     // NOTE: here is the assembly entry point
-
     // run(curr_seg);
     // run(57);
 
@@ -375,24 +343,70 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
      * difficulty working with Arm assembly versus x86. This will be the first
      * assembly instruction the program encounters, and all it will do is
      * return.
+     * 
+     * As with x86, the machine code must be written byte by byte in little
+     * endian order.
      */
 
     (void)a;
     (void)value;
+    printf("Value result should be %u\n", value);
 
-    // NOTE: successfully getting a bit of jitting going on
-    uint8_t *code = p;
+    // // xor x0, x0
+    // *p++ = 0x00;
+    // *p++ = 0x00;
+    // *p++ = 0x00;
+    // *p++ = 0xCA;
 
-    code[0] = 0x40; // Least significant byte first (little-endian)
-    code[1] = 0x05;
-    code[2] = 0x80;
-    code[3] = 0xD2;
+    /* For reference:
+        7a4:	2a1503e1 	mov	w1, w21
+    7a8:	2a1503e0 	mov	w0, w21
+    7ac:	2a1403e0 	mov	w0, w20
+    7b0:	2a1303e0 	mov	w0, w19
+    7b4:	d65f03c0 	ret
 
-    // RET instruction (0xD65F03C0)
-    code[4] = 0xC0;
-    code[5] = 0x03;
-    code[6] = 0x5F;
-    code[7] = 0xD6;
+    all bits zero:
+    79c:	52800013 	mov	w19, #0x0                   	// #0
+    7a0:	72a00013 	movk	w19, #0x0, lsl #16
+
+    all bits one:
+    79c:	529ffff3 	mov	w19, #0xffff                	// #65535
+    7a0:	72bffff3 	movk	w19, #0xffff, lsl #16
+
+    lower bits one:
+    79c:	529ffff3 	mov	w19, #0xffff                	// #65535
+    7a0:	72a00013 	movk	w19, #0x0, lsl #16
+
+    upper bits one:
+    79c:	52800013 	mov	w19, #0x0                   	// #0
+    7a0:	72bffff3 	movk	w19, #0xffff, lsl #16
+    */
+
+    // mov w19, 0x0000
+    *p++ = 0x13; // moving to register 19 (13 in hex)
+    *p++ = 0x00;
+    *p++ = 0x80;
+    *p++ = 0x52; // 32 bit move
+
+    // movk w19, #0x0000, lsl 16
+    *p++ = 0x13;
+    *p++ = 0x00;
+    *p++ = 0xa0;
+    *p++ = 0x72;
+
+
+
+    // MOV w19, w0
+    *p++ = 0xE0; // destination register is E0
+    *p++ = 0x03;
+    *p++ = 0x13; // source register is w19
+    *p++ = 0x2A; // 32 bit move
+
+    // ret
+    *p++ = 0xC0;
+    *p++ = 0x03;
+    *p++ = 0x5F;
+    *p++ = 0xD6;
 
     // uint32_t ret = 0xD65F0000;
     // *(uint32_t *)p = ret;
@@ -704,12 +718,17 @@ size_t handle_halt(void *zero, size_t offset)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // Set rax to 0 (NULL);
-    // xor rax,rax
-    *p++ = 0x48;
-    *p++ = 0x31;
-    *p++ = 0xc0;
-    *p++ = 0xc3; // return
+    // xor x0, x0
+    *p++ = 0x00;
+    *p++ = 0x00;
+    *p++ = 0x00;
+    *p++ = 0xCA;
+
+    // ret
+    *p++ = 0xC0;
+    *p++ = 0x03;
+    *p++ = 0x5F;
+    *p++ = 0xD6;
 
     return CHUNK;
 }
