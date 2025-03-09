@@ -4,11 +4,7 @@
  * @date January 2025
  * @brief
  * A Just-In-Time compiler from Universal Machine assembly language to
- * x86 assembly language.
- *
- * This JIT completes the sandmark in 1.02 seconds in an x86 docker container
- * running on an Apple Silicon Mac. It is nearly 3 times faster than the
- * benchmark emulator.
+ * ARM assembly language.
  */
 
 #include <stdio.h>
@@ -20,7 +16,7 @@
 #include <stdbool.h>
 #include "utility.h"
 #include <sys/mman.h>
-#include <pthread.h>    // Need this to remove write protection
+// #include <pthread.h>    // Need this to remove write protection
 
 #define OPS 15
 #define INIT_CAP 32500
@@ -91,7 +87,8 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    pthread_jit_write_protect_np(0); // Disable write protect
+    // Only needed for darwin
+    // pthread_jit_write_protect_np(0); // Disable write protect
 
     // Setting the program counter to 0
     gs.pc = 0;
@@ -135,8 +132,9 @@ int main(int argc, char *argv[])
     
     // NOTE: here is the assembly entry point
     run(curr_seg);
+
     printf("\nFinished running the assembly code\n");
-    assert(false);
+    // assert(false);
 
     // Free all program segments
     for (uint32_t i = 0; i < gs.seq_size; i++)
@@ -153,9 +151,7 @@ int main(int argc, char *argv[])
 void *initialize_zero_segment(size_t asmbytes)
 {
     void *zero = mmap(NULL, asmbytes, PROT_READ | PROT_WRITE | PROT_EXEC,
-                      MAP_PRIVATE | MAP_ANONYMOUS | MAP_JIT, -1, 0);
-    // void *zero = mmap(NULL, asmbytes, PROT_READ | MAP_JIT | PROT_WRITE | PROT_EXEC,
-    //                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     assert(zero != MAP_FAILED);
 
     memset(zero, 0, asmbytes);

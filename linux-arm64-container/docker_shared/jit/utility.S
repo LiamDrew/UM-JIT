@@ -40,9 +40,15 @@
  * Non-volatile general-purpose registers are x19-x28
  */
 
-.global _run
-_run:
+.global run
+run:
     function_start
+
+    stp x19, x20, [sp, #-16]!
+    stp x21, x22, [sp, #-16]!
+    stp x23, x24, [sp, #-16]!
+    stp x25, x26, [sp, #-16]!
+    stp x27, x28, [sp, #-16]!
 
     // Zero out the first 8 non-volatile registers
     mov x19, XZR
@@ -54,38 +60,35 @@ _run:
     mov x25, XZR
     mov x26, XZR
 
-    // Load the address of the function global in x27
-
-    // Storing x30 on the stack for future use
-
 loop:
-    ; Need to update this such that it calls the executable memory as a function
+    push_regs
+    mov x0, #54
+    bl putchar      // Should print 6
+    pop_regs
 
-    ; push_regs
-    ; mov x0, #54
-    ; bl _putchar      // Will return value in x0
-    ; pop_regs
-    
+    // past here we have problems
     ldr x27, =handler
-
-    ; push_regs
-
+    push_regs
     blr x27
+    pop_regs
 
-    ; pop_regs
+    // Restore non-volatile registers in reverse order
+    // NOTE: the fact that we have to do this is going to make the halt
+    // instruction trickier. No biggie.
+    ldp x27, x28, [sp], #16
+    ldp x25, x26, [sp], #16
+    ldp x23, x24, [sp], #16
+    ldp x21, x22, [sp], #16
+    ldp x19, x20, [sp], #16
 
     function_end
 
 .global handler
 handler:
-
-    ; push_regs
     function_start
-    mov x0, #54
-    bl _putchar      // Will return value in x0
+    mov x0, #55
+    bl putchar      // Should print 7
     function_end
-    ; pop_regs
-    ret
 
 
 
