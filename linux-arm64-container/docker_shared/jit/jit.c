@@ -1,7 +1,7 @@
 /**
  * @file jit.c
  * @author Liam Drew
- * @date January 2025
+ * @date March 2025
  * @brief
  * A Just-In-Time compiler from Universal Machine assembly language to
  * ARM assembly language.
@@ -16,7 +16,6 @@
 #include <stdbool.h>
 #include "utility.h"
 #include <sys/mman.h>
-// #include <pthread.h>    // Need this to remove write protection
 
 #define OPS 15
 #define INIT_CAP 32500
@@ -46,6 +45,16 @@ struct GlobalState
 
 struct GlobalState gs;
 
+// Add this to your C file
+void print_address(void *addr)
+{
+    printf("Address: %p\n", addr);
+}
+
+void print_hex_value(uint64_t value)
+{
+    printf("Value at address: 0x%lx\n", value);
+}
 
 // void initialize_instruction_bank();
 void *initialize_zero_segment(size_t fsize);
@@ -129,24 +138,18 @@ int main(int argc, char *argv[])
     gs.active = zero;
 
     uint8_t *curr_seg = (uint8_t *)zero;
-    (void)curr_seg;
 
+    // NOTE: I'm suspecting this cache stuff is not necessary
     // Clear instruction cache to make sure CPU sees our new code
-    __builtin___clear_cache((char *)curr_seg, (char *)curr_seg + 8);
+    // __builtin___clear_cache((char *)curr_seg, (char *)curr_seg + 8);
 
-    // SimpleFunc func = (SimpleFunc)(void *)curr_seg;
-    // int result = func();
-    // printf("The function returned: %d\n", result);
+    // Function fn = (Function)curr_seg;
+    // void *output = fn();
+    // printf("\nRETURN ADDRESS IS: %p\n", output);
+    // assert(output == NULL);
 
-    Function fn = (Function)curr_seg;
-    printf("About to call function at %p\n", (void *)fn);
-    void *output = fn();
-
-    printf("\nRETURN ADDRESS IS: %p\n", output);
-    assert(output == NULL);
     // NOTE: here is the assembly entry point
-    // run(curr_seg);
-    // run(57);
+    run(curr_seg);
 
     printf("\nFinished running the assembly code\n");
 
@@ -336,21 +339,51 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
 size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 {
     uint8_t *p = (uint8_t *)zero + offset;
-    printf("Loading the reg is happening at addr %p\n", (void *)p);
-
-    /* NOTE: The very first thing I am going to do with this assembly stuff is
-     * to try to solve the function calling issue, which seems to be the main
-     * difficulty working with Arm assembly versus x86. This will be the first
-     * assembly instruction the program encounters, and all it will do is
-     * return.
-     * 
-     * As with x86, the machine code must be written byte by byte in little
-     * endian order.
-     */
 
     (void)a;
-    (void)value;
-    printf("Value result should be %u\n", value);
+
+    // ARM64 opcode structured as follows:
+    // 0111 0010 101-0 0000 000-0  0000  000-1  0011
+
+    // mov w19, 0x0000
+    uint32_t lower_mov = 0x52800000;    // base opcode for lower 16 bit MOV
+    lower_mov |= (value & 0xFFFF) << 5; // Position lower 16 bits
+    lower_mov |= BR; // (Update this to be 19 + reg number)
+    // lower_mov |= BR + a; // (Update this to be 19 + reg number)
+
+    *p++ = lower_mov & 0xFF;
+    *p++ = (lower_mov >> 8) & 0xFF;
+    *p++ = (lower_mov >> 16) & 0xFF;
+    *p++ = (lower_mov >> 24) & 0xFF;
+
+    // movk w19, #0x0000, lsl 16
+    uint32_t upper_mov = 0x72A00000;
+    upper_mov |= ((value >> 16) & 0xFFFF) << 5;
+    upper_mov |= BR; // update this to be 19 + reg number
+    // upper_mov |= BR + a; // update this to be 19 + reg number
+
+    *p++ = upper_mov & 0xFF;
+    *p++ = (upper_mov >> 8) & 0xFF;
+    *p++ = (upper_mov >> 16) & 0xFF;
+    *p++ = (upper_mov >> 24) & 0xFF;
+
+    // 64-bit ARM (AArch64) NOP
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
+    // NOTE: we made not need the below instructions anymore, which is awesome
+    // // MOV w19, w0
+    // *p++ = 0xE0; // destination register is E0
+    // *p++ = 0x03;
+    // *p++ = 0x13; // source register is w19
+    // *p++ = 0x2A; // 32 bit move
 
     // // xor x0, x0
     // *p++ = 0x00;
@@ -358,92 +391,11 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     // *p++ = 0x00;
     // *p++ = 0xCA;
 
-    /* For reference:
-        7a4:	2a1503e1 	mov	w1, w21
-    7a8:	2a1503e0 	mov	w0, w21
-    7ac:	2a1403e0 	mov	w0, w20
-    7b0:	2a1303e0 	mov	w0, w19
-    7b4:	d65f03c0 	ret
-
-    all bits zero:
-    79c:	52800013 	mov	w19, #0x0                   	// #0
-    7a0:	72a00013 	movk	w19, #0x0, lsl #16
-
-    all bits one:
-    79c:	529ffff3 	mov	w19, #0xffff                	// #65535
-    7a0:	72bffff3 	movk	w19, #0xffff, lsl #16
-
-    lower bits one:
-    79c:	529ffff3 	mov	w19, #0xffff                	// #65535
-    7a0:	72a00013 	movk	w19, #0x0, lsl #16
-
-    upper bits one:
-    79c:	52800013 	mov	w19, #0x0                   	// #0
-    7a0:	72bffff3 	movk	w19, #0xffff, lsl #16
-    */
-
-    // mov w19, 0x0000
-    *p++ = 0x13; // moving to register 19 (13 in hex)
-    *p++ = 0x00;
-    *p++ = 0x80;
-    *p++ = 0x52; // 32 bit move
-
-    // movk w19, #0x0000, lsl 16
-    *p++ = 0x13;
-    *p++ = 0x00;
-    *p++ = 0xa0;
-    *p++ = 0x72;
-
-
-
-    // MOV w19, w0
-    *p++ = 0xE0; // destination register is E0
-    *p++ = 0x03;
-    *p++ = 0x13; // source register is w19
-    *p++ = 0x2A; // 32 bit move
-
-    // ret
-    *p++ = 0xC0;
-    *p++ = 0x03;
-    *p++ = 0x5F;
-    *p++ = 0xD6;
-
-    // uint32_t ret = 0xD65F0000;
-    // *(uint32_t *)p = ret;
-    // p += 4;
-
-    // // // Load 32 bit value into register rA
-    // // First instruction: MOVZ Wd, #(bottom 16 bits)
-    // uint32_t instr1 = 0x52800000;      // Base opcode for MOVZ W, #imm
-    // instr1 |= ((value & 0xFFFF) << 5); // Bottom 16 bits
-    // instr1 |= (a + 19);                // Register (x19+a)
-
-    // *(uint32_t *)p = instr1;
-    // p += 4;
-
-    // // Second instruction: MOVK Wd, #(top 16 bits), LSL #16
-    // uint32_t instr2 = 0x72A00000;              // Base opcode for MOVK W, #imm, LSL #16
-    // instr2 |= (((value >> 16) & 0xFFFF) << 5); // Top 16 bits
-    // instr2 |= (a + 19);                        // Register (x19+a)
-
-    // *(uint32_t *)p = instr2;
-    // p += 4;
-
-
-    // // NOP instruction encoding
-    // uint32_t instr = 0xD503201F;
-
-    // *(uint32_t *)p = instr;
-    // p += 4;
-
-    // *(uint32_t *)p = instr;
-    // p += 4;
-
-    // *(uint32_t *)p = instr;
-    // p += 4;
-
-    // *(uint32_t *)p = instr;
-    // p += 4;
+    // // ret
+    // *p++ = 0xC0;
+    // *p++ = 0x03;
+    // *p++ = 0x5F;
+    // *p++ = 0xD6;
 
     return CHUNK;
 }
@@ -451,6 +403,24 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
+
+    // // xor x0, x0
+    // *p++ = 0x00;
+    // *p++ = 0x00;
+    // *p++ = 0x00;
+    // *p++ = 0xCA;
+
+    // // MOV w19, w0
+    // *p++ = 0xE0; // destination register is E0
+    // *p++ = 0x03;
+    // *p++ = 0x13; // source register is w19
+    // *p++ = 0x2A; // 32 bit move
+
+    // // ret
+    // *p++ = 0xC0;
+    // *p++ = 0x03;
+    // *p++ = 0x5F;
+    // *p++ = 0xD6;
 
     // if rC != 0, rA = rB
     // cmp rCd, 0
@@ -563,35 +533,61 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // mov eax, rBd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xC0 | (b << 3);
+    // In arm, we can do this with one instruction. unbelievable. I love arm
 
-    // add eax, rCd
-    *p++ = 0x44;
-    *p++ = 0x01;
-    *p++ = 0xC0 | (c << 3);
+    // add wA, wB, wC
+    uint32_t add_instr = 0x0B000000;
+    add_instr |= (BR + a);
+    add_instr |= ((BR + b) << 5);
+    add_instr |= ((BR + c) << 16);
 
-    // mov rAd, eax
-    *p++ = 0x41;
-    *p++ = 0x89;
-    *p++ = 0xC0 | a;
+    *p++ = add_instr & 0xFF;
+    *p++ = (add_instr >> 8) & 0xFF;
+    *p++ = (add_instr >> 16) & 0xFF;
+    *p++ = (add_instr >> 24) & 0xFF;
 
-    // 31 No Ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // mov w0, wA
+    // mov w0, wA (using the ORR instruction under the hood)
+    uint32_t mov_instr = 0x2A0003E0; // Base encoding for ORR w0, wzr, wX
+    mov_instr |= ((BR + c) << 16);   // Put the source register (wA) in the right bit position
+    *p++ = mov_instr & 0xFF;
+    *p++ = (mov_instr >> 8) & 0xFF;
+    *p++ = (mov_instr >> 16) & 0xFF;
+    *p++ = (mov_instr >> 24) & 0xFF;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // ret
+    *p++ = 0xC0;
+    *p++ = 0x03;
+    *p++ = 0x5F;
+    *p++ = 0xD6;
+
+    // No ops
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5; // D5 03 20 1F in byte-reversed order
+
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
+
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
+
+    // // xor x0, x0
+    // *p++ = 0x00;
+    // *p++ = 0x00;
+    // *p++ = 0x00;
+    // *p++ = 0xCA;
+
+    // // ret
+    // *p++ = 0xC0;
+    // *p++ = 0x03;
+    // *p++ = 0x5F;
+    // *p++ = 0xD6;
 
     return CHUNK;
 }
@@ -717,6 +713,19 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 size_t handle_halt(void *zero, size_t offset)
 {
     uint8_t *p = (uint8_t *)zero + offset;
+
+    // Nonsense testing
+    // // mov w19, 0x0000
+    // uint32_t value = 1;
+    // uint32_t lower_mov = 0x52800000;    // base opcode for lower 16 bit MOV
+    // lower_mov |= (value & 0xFFFF) << 5; // Position lower 16 bits
+    // lower_mov |= 0;                    // (Update this to be 19 + reg number)
+    // // lower_mov |= BR + a; // (Update this to be 19 + reg number)
+
+    // *p++ = lower_mov & 0xFF;
+    // *p++ = (lower_mov >> 8) & 0xFF;
+    // *p++ = (lower_mov >> 16) & 0xFF;
+    // *p++ = (lower_mov >> 24) & 0xFF;
 
     // xor x0, x0
     *p++ = 0x00;
@@ -879,37 +888,31 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // mov edi, rCd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xc7 | (c << 3);
+    (void)c;
 
-    // load immediate value into al
-    *p++ = 0xb0;
-    *p++ = 0x00 | OP_OUT;
+    // mov w0, wC
+    *p++ = 0xE0;
+    *p++ = 0x03;
+    *p++ = BR + c;
+    *p++ = 0x2A;
 
-    // Jump to address in rbx
-    *p++ = 0xff;
-    *p++ = 0xd3;
-
-    // 33 No Ops
-
+    // Save x30 to stack
+    *p++ = 0xFE; // str x30, [sp, #-16]!
     *p++ = 0x0F;
     *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    *p++ = 0xF8;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // blr x28
+    *p++ = 0x80;
+    *p++ = 0x03;
+    *p++ = 0x3F;
+    *p++ = 0xD6;
 
-    *p++ = 0x90;
-    *p++ = 0x90;
+    // Restore x30 from stack
+    *p++ = 0xFE; // ldr x30, [sp], #16
+    *p++ = 0x07;
+    *p++ = 0x41;
+    *p++ = 0xF8;
 
     return CHUNK;
 }

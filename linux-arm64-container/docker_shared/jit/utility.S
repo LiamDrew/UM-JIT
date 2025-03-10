@@ -50,48 +50,55 @@ run:
     stp x25, x26, [sp, #-16]!
     stp x27, x28, [sp, #-16]!
 
-    // Zero out the first 8 non-volatile registers
-    mov x19, XZR
-    mov x20, XZR
-    mov x21, XZR
-    mov x22, XZR
-    mov x23, XZR
-    mov x24, XZR
-    mov x25, XZR
-    mov x26, XZR
+
+    // Zero out the first 8 non-volatile registers for the UM
+    mov x19, xzr
+    mov x20, xzr
+    mov x21, xzr
+    mov x22, xzr
+    mov x23, xzr
+    mov x24, xzr
+    mov x25, xzr
+    mov x26, xzr
 
     // mov the memory address we want into x27
     mov x27, x0
 
+    // put the address of the large op function handler in x28
+    ldr x28, =large_op
+
+    // mov x0, x28
+    // bl print_address
+
 loop:
-    push_regs
-    mov x0, #54
-    bl putchar      // Should print 6
-    pop_regs
 
-    // past here we have problems
-    // ldr x27, =handler
-    // push_regs
+    // Calling the executable memory
     blr x27
-    // pop_regs
 
-    // Restore non-volatile registers in reverse order
-    // NOTE: the fact that we have to do this is going to make the halt
-    // instruction trickier. No biggie.
+    mov x15, x0
+    bl print_hex_value
+    mov x0, x15
+    cbnz x0, loop
+
+done:
+    // Printing a success message to show signs of life
+    mov x0, #50  // '2'
+    bl putchar
+
+    // Restore non-volatile registers before returning to main
     ldp x27, x28, [sp], #16
     ldp x25, x26, [sp], #16
     ldp x23, x24, [sp], #16
     ldp x21, x22, [sp], #16
     ldp x19, x20, [sp], #16
-
+    
     function_end
 
-.global handler
-handler:
+.global large_op
+large_op:
     function_start
-    mov x0, #55
-    bl putchar      // Should print 7
+
+    bl print_hex_value
+
+    bl putchar      // Should print 6
     function_end
-
-
-

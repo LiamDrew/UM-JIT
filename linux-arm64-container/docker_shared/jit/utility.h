@@ -1,10 +1,8 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
-// #include <stdio.h>
-
-// #define CHUNK 29
-#define CHUNK 32
+#define CHUNK 16 // will have to be expanded
+#define BR 19 // base general purpose register
 
 // Huge thank you to Tom for showing me the way with this
 #define OP_MAP 0
@@ -16,7 +14,6 @@
 
 #ifndef __ASSEMBLER__
     void run(uint8_t *zero);
-    // void run(uint32_t num);
 #endif
 
 #endif
