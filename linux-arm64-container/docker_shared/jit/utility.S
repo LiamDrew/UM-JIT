@@ -75,15 +75,15 @@ loop:
     // Calling the executable memory
     blr x27
 
-    mov x15, x0
-    bl print_hex_value
-    mov x0, x15
+    // mov x15, x0
+    // bl print_hex_value
+    // mov x0, x15
     cbnz x0, loop
 
 done:
     // Printing a success message to show signs of life
-    mov x0, #50  // '2'
-    bl putchar
+    // mov x0, #50  // '2'
+    // bl putchar
 
     // Restore non-volatile registers before returning to main
     ldp x27, x28, [sp], #16
@@ -98,7 +98,7 @@ done:
 large_op:
     function_start
 
-    bl print_hex_value
+    // bl print_hex_value
 
     bl putchar      // Should print 6
     function_end

@@ -225,7 +225,7 @@ uint64_t make_word(uint64_t word, unsigned width, unsigned lsb,
 size_t compile_instruction(void *zero, Instruction word, size_t offset)
 {
     uint32_t opcode = (word >> 28) & 0xF;
-    printf("Opcode is %u\n", opcode);
+    // printf("Opcode is %u\n", opcode);
     uint32_t a = 0;
 
     // Load Value
@@ -340,16 +340,13 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    (void)a;
-
     // ARM64 opcode structured as follows:
     // 0111 0010 101-0 0000 000-0  0000  000-1  0011
 
     // mov w19, 0x0000
     uint32_t lower_mov = 0x52800000;    // base opcode for lower 16 bit MOV
     lower_mov |= (value & 0xFFFF) << 5; // Position lower 16 bits
-    lower_mov |= BR; // (Update this to be 19 + reg number)
-    // lower_mov |= BR + a; // (Update this to be 19 + reg number)
+    lower_mov |= BR + a; // (Update this to be 19 + reg number)
 
     *p++ = lower_mov & 0xFF;
     *p++ = (lower_mov >> 8) & 0xFF;
@@ -359,15 +356,14 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     // movk w19, #0x0000, lsl 16
     uint32_t upper_mov = 0x72A00000;
     upper_mov |= ((value >> 16) & 0xFFFF) << 5;
-    upper_mov |= BR; // update this to be 19 + reg number
-    // upper_mov |= BR + a; // update this to be 19 + reg number
+    upper_mov |= BR + a; // update this to be 19 + reg number
 
     *p++ = upper_mov & 0xFF;
     *p++ = (upper_mov >> 8) & 0xFF;
     *p++ = (upper_mov >> 16) & 0xFF;
     *p++ = (upper_mov >> 24) & 0xFF;
 
-    // 64-bit ARM (AArch64) NOP
+    // 2 No Ops
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -377,25 +373,6 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = 0x20;
     *p++ = 0x03;
     *p++ = 0xD5;
-
-    // NOTE: we made not need the below instructions anymore, which is awesome
-    // // MOV w19, w0
-    // *p++ = 0xE0; // destination register is E0
-    // *p++ = 0x03;
-    // *p++ = 0x13; // source register is w19
-    // *p++ = 0x2A; // 32 bit move
-
-    // // xor x0, x0
-    // *p++ = 0x00;
-    // *p++ = 0x00;
-    // *p++ = 0x00;
-    // *p++ = 0xCA;
-
-    // // ret
-    // *p++ = 0xC0;
-    // *p++ = 0x03;
-    // *p++ = 0x5F;
-    // *p++ = 0xD6;
 
     return CHUNK;
 }
@@ -546,48 +523,21 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (add_instr >> 16) & 0xFF;
     *p++ = (add_instr >> 24) & 0xFF;
 
-    // mov w0, wA
-    // mov w0, wA (using the ORR instruction under the hood)
-    uint32_t mov_instr = 0x2A0003E0; // Base encoding for ORR w0, wzr, wX
-    mov_instr |= ((BR + c) << 16);   // Put the source register (wA) in the right bit position
-    *p++ = mov_instr & 0xFF;
-    *p++ = (mov_instr >> 8) & 0xFF;
-    *p++ = (mov_instr >> 16) & 0xFF;
-    *p++ = (mov_instr >> 24) & 0xFF;
-
-    // ret
-    *p++ = 0xC0;
+    // 3 No ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
     *p++ = 0x03;
-    *p++ = 0x5F;
-    *p++ = 0xD6;
+    *p++ = 0xD5;
 
-    // No ops
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5; // D5 03 20 1F in byte-reversed order
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5;
-
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5;
-
-    // // xor x0, x0
-    // *p++ = 0x00;
-    // *p++ = 0x00;
-    // *p++ = 0x00;
-    // *p++ = 0xCA;
-
-    // // ret
-    // *p++ = 0xC0;
-    // *p++ = 0x03;
-    // *p++ = 0x5F;
-    // *p++ = 0xD6;
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
     return CHUNK;
 }
