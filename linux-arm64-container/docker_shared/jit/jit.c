@@ -148,7 +148,6 @@ int main(int argc, char *argv[])
     // printf("\nRETURN ADDRESS IS: %p\n", output);
     // assert(output == NULL);
 
-    // NOTE: here is the assembly entry point
     run(curr_seg);
 
     printf("\nFinished running the assembly code\n");
@@ -225,7 +224,7 @@ uint64_t make_word(uint64_t word, unsigned width, unsigned lsb,
 size_t compile_instruction(void *zero, Instruction word, size_t offset)
 {
     uint32_t opcode = (word >> 28) & 0xF;
-    // printf("Opcode is %u\n", opcode);
+    printf("Opcode is %u\n", opcode);
     uint32_t a = 0;
 
     // Load Value
@@ -381,59 +380,40 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // // xor x0, x0
-    // *p++ = 0x00;
-    // *p++ = 0x00;
-    // *p++ = 0x00;
-    // *p++ = 0xCA;
+    // First you need to compare rC with 0
+    uint32_t cmp_instr = 0x6B00001F; // Base encoding for CMP wX, #0 (implemented as SUBS wzr, wX, #0)
+    cmp_instr |= ((BR + c) << 5);    // Put register C in the right bit position
+    *p++ = cmp_instr & 0xFF;
+    *p++ = (cmp_instr >> 8) & 0xFF;
+    *p++ = (cmp_instr >> 16) & 0xFF;
+    *p++ = (cmp_instr >> 24) & 0xFF;
 
-    // // MOV w19, w0
-    // *p++ = 0xE0; // destination register is E0
-    // *p++ = 0x03;
-    // *p++ = 0x13; // source register is w19
-    // *p++ = 0x2A; // 32 bit move
+    // Then use CSEL with the NE (not equal) condition
+    uint32_t csel_instr = 0x1A800000; // Base encoding for CSEL
+    csel_instr |= ((BR + a));         // Destination register (rA)
+    csel_instr |= ((BR + b) << 5);    // First source register (rB) - selected if condition is true
+    csel_instr |= ((BR + a) << 16);   // Second source register (rA) - selected if condition is false (keeps original value)
+    csel_instr |= (0x1 << 12);        // Condition code NE (not equal) is 0x1
+    *p++ = csel_instr & 0xFF;
+    *p++ = (csel_instr >> 8) & 0xFF;
+    *p++ = (csel_instr >> 16) & 0xFF;
+    *p++ = (csel_instr >> 24) & 0xFF;
 
-    // // ret
-    // *p++ = 0xC0;
-    // *p++ = 0x03;
-    // *p++ = 0x5F;
-    // *p++ = 0xD6;
-
-    // if rC != 0, rA = rB
-    // cmp rCd, 0
-    *p++ = 0x41;
-    *p++ = 0x83;
-    *p++ = 0xF8 | c;
-    *p++ = 0x00;
-
-    // je (jump equal) 3 bytes
-    *p++ = 0x74;
+    // 2 No Ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
     *p++ = 0x03;
+    *p++ = 0xD5;
 
-    // mov rAd, rBd
-    *p++ = 0x45;
-    *p++ = 0x89;
-    *p++ = 0xC0 | (b << 3) | a;
-
-    // 31 No Ops
-    *p++ = 0x0F;
     *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
     return CHUNK;
 }
 
-// inject segmented load
+// TODO: this will have to be addressed
 size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
@@ -466,14 +446,7 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return CHUNK;
 }
 
-/*
- * NOTE: This JIT is not configured to handle a self-modifying UM program
- * In order to do this, this segmented store compilation function would need to
- * be updated so that it compiles any value loaded into the zero segment into
- * machine code. This requires an inline function call to a C function, which
- * slows the program down. This implementation omits such a call, but
- * INSERT OTHER VERSION HERE handles this.
- */
+// TODO: address this later
 size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
@@ -510,8 +483,6 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // In arm, we can do this with one instruction. unbelievable. I love arm
-
     // add wA, wB, wC
     uint32_t add_instr = 0x0B000000;
     add_instr |= (BR + a);
@@ -546,35 +517,34 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // mov eax, rBd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xC0 | (b << 3);
+    // wA = wB x wC
+    uint32_t mul_instr = 0x1B000000; // Base opcode for MUL instruction
+    mul_instr |= (BR + a);           // Destination register Rd
+    mul_instr |= ((BR + b) << 5);    // First source register Rn
+    mul_instr |= ((BR + c) << 16);   // Second source register Rm
+    mul_instr |= (0x1F << 10);       // The "1F" in bits 10-14 is part of MUL encoding
 
-    // mul eax, rCd
-    *p++ = 0x41;
-    *p++ = 0xF7;
-    *p++ = 0xE0 | c;
+    // Write the instruction bytes in little-endian order
+    *p++ = mul_instr & 0xFF;
+    *p++ = (mul_instr >> 8) & 0xFF;
+    *p++ = (mul_instr >> 16) & 0xFF;
+    *p++ = (mul_instr >> 24) & 0xFF;
 
-    // mov rAd, eax
-    *p++ = 0x41;
-    *p++ = 0x89;
-    *p++ = 0xC0 | a;
+    // 3 No ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
-    // 31 No Ops
-    *p++ = 0x0F;
     *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
-    *p++ = 0x0F;
     *p++ = 0x1F;
-    *p++ = 0x00;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -583,39 +553,34 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // xor rdx, rdx
-    *p++ = 0x48;
-    *p++ = 0x31;
-    *p++ = 0xD2;
+    // wA = wB / wC
+    // udiv wA, wB, wC
+    uint32_t udiv_instr = 0x1AC00800; // Base opcode for UDIV instruction
+    udiv_instr |= (BR + a);           // Destination register Rd
+    udiv_instr |= ((BR + b) << 5);    // Dividend register Rn
+    udiv_instr |= ((BR + c) << 16);   // Divisor register Rm
 
-    // put the dividend (reg b) in eax
-    // mov eax, rBd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xC0 | (b << 3);
+    // Write the instruction bytes in little-endian order
+    *p++ = udiv_instr & 0xFF;
+    *p++ = (udiv_instr >> 8) & 0xFF;
+    *p++ = (udiv_instr >> 16) & 0xFF;
+    *p++ = (udiv_instr >> 24) & 0xFF;
 
-    // div rax, rC
-    *p++ = 0x49;
-    *p++ = 0xF7;
-    *p++ = 0xF0 | c;
-
-    // mov rAd, eax
-    *p++ = 0x41;
-    *p++ = 0x89;
-    *p++ = 0xC0 | a;
-
-    // 28 No ops
-    *p++ = 0x0F;
+    // 3 No ops
     *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
-    *p++ = 0x90;
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -624,38 +589,73 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // mov eax, rBd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xc0 | (b << 3);
+    // wA = NOT(wB AND wC)
 
-    // and eax, rcd
-    *p++ = 0x44;
-    *p++ = 0x21;
-    *p++ = 0xc0 | (c << 3);
+    // AND w9, wB, wC  (using w9 as temporary)
+    uint32_t and_instr = 0x0A000000; // Base opcode for AND instruction
+    and_instr |= 9;                  // w9 as destination (not using BR offset)
+    and_instr |= ((BR + b) << 5);    // First source register
+    and_instr |= ((BR + c) << 16);   // Second source register
 
-    // not eax
-    *p++ = 0x40;
-    *p++ = 0xf7;
-    *p++ = 0xd0;
+    // Write the AND instruction
+    *p++ = and_instr & 0xFF;
+    *p++ = (and_instr >> 8) & 0xFF;
+    *p++ = (and_instr >> 16) & 0xFF;
+    *p++ = (and_instr >> 24) & 0xFF;
 
-    // mov rAd, eax
-    *p++ = 0x41;
-    *p++ = 0x89;
-    *p++ = 0xc0 | a;
+    // EOR wA, w9, #0xFFFFFFFF  (XOR with all 1's)
+    uint32_t eor_instr = 0x52800000 | (0xFFFF << 5); // Base opcode for EOR with immediate 0xFFFFFFFF
+    eor_instr |= (BR + a);                           // Destination register
+    eor_instr |= (9 << 5);                           // Source register (w9)
 
-    // 28 no ops
-    *p++ = 0x0F;
+    // Write the EOR instruction
+    *p++ = eor_instr & 0xFF;
+    *p++ = (eor_instr >> 8) & 0xFF;
+    *p++ = (eor_instr >> 16) & 0xFF;
+    *p++ = (eor_instr >> 24) & 0xFF;
+
     *p++ = 0x1F;
-    *p++ = 0x00;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
-    *p++ = 0x0F;
     *p++ = 0x1F;
-    *p++ = 0x00;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // // mov eax, rBd
+    // *p++ = 0x44;
+    // *p++ = 0x89;
+    // *p++ = 0xc0 | (b << 3);
+
+    // // and eax, rcd
+    // *p++ = 0x44;
+    // *p++ = 0x21;
+    // *p++ = 0xc0 | (c << 3);
+
+    // // not eax
+    // *p++ = 0x40;
+    // *p++ = 0xf7;
+    // *p++ = 0xd0;
+
+    // // mov rAd, eax
+    // *p++ = 0x41;
+    // *p++ = 0x89;
+    // *p++ = 0xc0 | a;
+
+    // // 28 no ops
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
+
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0x00;
 
     return CHUNK;
 }
@@ -663,19 +663,6 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 size_t handle_halt(void *zero, size_t offset)
 {
     uint8_t *p = (uint8_t *)zero + offset;
-
-    // Nonsense testing
-    // // mov w19, 0x0000
-    // uint32_t value = 1;
-    // uint32_t lower_mov = 0x52800000;    // base opcode for lower 16 bit MOV
-    // lower_mov |= (value & 0xFFFF) << 5; // Position lower 16 bits
-    // lower_mov |= 0;                    // (Update this to be 19 + reg number)
-    // // lower_mov |= BR + a; // (Update this to be 19 + reg number)
-
-    // *p++ = lower_mov & 0xFF;
-    // *p++ = (lower_mov >> 8) & 0xFF;
-    // *p++ = (lower_mov >> 16) & 0xFF;
-    // *p++ = (lower_mov >> 24) & 0xFF;
 
     // xor x0, x0
     *p++ = 0x00;
