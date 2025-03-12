@@ -4,7 +4,7 @@
  * @date March 2025
  * @brief
  * A Just-In-Time compiler from Universal Machine assembly language to
- * ARM assembly language.
+ * Arm assembly language.
  */
 
 #include <stdio.h>
@@ -362,7 +362,12 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = (upper_mov >> 16) & 0xFF;
     *p++ = (upper_mov >> 24) & 0xFF;
 
-    // 2 No Ops
+    // 3 No Ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -399,7 +404,12 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (csel_instr >> 16) & 0xFF;
     *p++ = (csel_instr >> 24) & 0xFF;
 
-    // 2 No Ops
+    // 3 No Ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -494,7 +504,12 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (add_instr >> 16) & 0xFF;
     *p++ = (add_instr >> 24) & 0xFF;
 
-    // 3 No ops
+    // 4 No ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -530,7 +545,12 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (mul_instr >> 16) & 0xFF;
     *p++ = (mul_instr >> 24) & 0xFF;
 
-    // 3 No ops
+    // 4 No ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -566,7 +586,12 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (udiv_instr >> 16) & 0xFF;
     *p++ = (udiv_instr >> 24) & 0xFF;
 
-    // 3 No ops
+    // 4 No ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -603,17 +628,18 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (and_instr >> 16) & 0xFF;
     *p++ = (and_instr >> 24) & 0xFF;
 
-    // EOR wA, w9, #0xFFFFFFFF  (XOR with all 1's)
-    uint32_t eor_instr = 0x52800000 | (0xFFFF << 5); // Base opcode for EOR with immediate 0xFFFFFFFF
-    eor_instr |= (BR + a);                           // Destination register
-    eor_instr |= (9 << 5);                           // Source register (w9)
+    // MVN wA, w9 (Move Not - bitwise NOT)
+    uint32_t mvn_instr = 0x2A2003E0; // Base opcode for MVN (NOT)
+    mvn_instr |= (BR + a);           // Destination register
+    mvn_instr |= (9 << 16);          // Source register (w9)
 
-    // Write the EOR instruction
-    *p++ = eor_instr & 0xFF;
-    *p++ = (eor_instr >> 8) & 0xFF;
-    *p++ = (eor_instr >> 16) & 0xFF;
-    *p++ = (eor_instr >> 24) & 0xFF;
+    // Write the MVN instruction
+    *p++ = mvn_instr & 0xFF;
+    *p++ = (mvn_instr >> 8) & 0xFF;
+    *p++ = (mvn_instr >> 16) & 0xFF;
+    *p++ = (mvn_instr >> 24) & 0xFF;
 
+    // 3 No Ops
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -624,38 +650,10 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    // // mov eax, rBd
-    // *p++ = 0x44;
-    // *p++ = 0x89;
-    // *p++ = 0xc0 | (b << 3);
-
-    // // and eax, rcd
-    // *p++ = 0x44;
-    // *p++ = 0x21;
-    // *p++ = 0xc0 | (c << 3);
-
-    // // not eax
-    // *p++ = 0x40;
-    // *p++ = 0xf7;
-    // *p++ = 0xd0;
-
-    // // mov rAd, eax
-    // *p++ = 0x41;
-    // *p++ = 0x89;
-    // *p++ = 0xc0 | a;
-
-    // // 28 no ops
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -825,13 +823,22 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    (void)c;
-
     // mov w0, wC
     *p++ = 0xE0;
     *p++ = 0x03;
     *p++ = BR + c;
     *p++ = 0x2A;
+
+    // Move enum code for print reg into w1
+    // mov w1, OP_OUT
+    uint32_t mov = 0x52800000;
+    mov |= (OP_OUT & 0xFFFF) << 5;
+    mov |= 1;
+
+    *p++ = mov & 0xFF;
+    *p++ = (mov >> 8) & 0xFF;
+    *p++ = (mov >> 16) & 0xFF;
+    *p++ = (mov >> 24) & 0xFF;
 
     // Save x30 to stack
     *p++ = 0xFE; // str x30, [sp, #-16]!
@@ -857,6 +864,40 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
 size_t read_into_reg(void *zero, size_t offset, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
+
+    // put the right opcode in w1
+    // Move enum code for read reg into w1
+    // mov w1, OP_OUT
+    uint32_t mov = 0x52800000;
+    mov |= (OP_IN & 0xFFFF) << 5;
+    mov |= 1;
+
+    *p++ = mov & 0xFF;
+    *p++ = (mov >> 8) & 0xFF;
+    *p++ = (mov >> 16) & 0xFF;
+    *p++ = (mov >> 24) & 0xFF;
+
+    // Save x30 to stack
+    *p++ = 0xFE; // str x30, [sp, #-16]!
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0xF8;
+
+    // blr x28
+    *p++ = 0x80;
+    *p++ = 0x03;
+    *p++ = 0x3F;
+    *p++ = 0xD6;
+
+    // Restore x30 from stack
+    *p++ = 0xFE; // ldr x30, [sp], #16
+    *p++ = 0x07;
+    *p++ = 0x41;
+    *p++ = 0xF8;
+
+    // mov result into reg c
+
+    
 
     // put the right opcode into rax
     *p++ = 0xb0;

@@ -1,7 +1,7 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
-#define CHUNK 16 // will have to be expanded
+#define CHUNK 20 // will have to be expanded
 #define BR 19 // base general purpose register
 
 // Huge thank you to Tom for showing me the way with this

@@ -97,8 +97,17 @@ done:
 .global large_op
 large_op:
     function_start
+    cmp x1, #OP_IN
+    beq .in
+    
+    cmp x1, #OP_OUT
+    beq .out
 
-    // bl print_hex_value
 
-    bl putchar      // Should print 6
-    function_end
+.out:
+    bl putchar
+function_end
+
+.in:
+function_end
+
