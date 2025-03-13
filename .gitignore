@@ -2,3 +2,6 @@
 .vscode/
 /x86container/docker_shared/um-jit-master
 /experiments
+*.o
+linux-arm64-container/docker_shared/jit/jit
+*.o

@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
     // printf("\nRETURN ADDRESS IS: %p\n", output);
     // assert(output == NULL);
 
-    run(curr_seg);
+    run(curr_seg, gs.val_seq);
 
     printf("\nFinished running the assembly code\n");
 
@@ -378,6 +378,11 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = 0x03;
     *p++ = 0xD5;
 
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     return CHUNK;
 }
 
@@ -404,7 +409,12 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (csel_instr >> 16) & 0xFF;
     *p++ = (csel_instr >> 24) & 0xFF;
 
-    // 3 No Ops
+    // 4 No Ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -423,68 +433,121 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return CHUNK;
 }
 
-// TODO: this will have to be addressed
 size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // Load address of val_seq into rax
-    // mov(64) rax, imm64
-    *p++ = 0x48;
-    *p++ = 0xB8;
-    uint64_t addr = (uint64_t)&gs.val_seq;
-    memcpy(p, &addr, sizeof(addr));
-    p += 8;
+    // The address of val_seq is in x15
 
-    // mov rax, [rax]
-    *p++ = 0x48;
-    *p++ = 0x8B;
-    *p++ = 0x00;
+    // put the address of the segment we want in x9
+    // assembling the instruction machine code
+    // Set destination register x9
 
-    // mov rax, [rax + rBd*8]
-    *p++ = 0x4A;            // REX prefix: REX.W and REX.X
-    *p++ = 0x8B;            // MOV opcode
-    *p++ = 0x04;            // ModRM byte for SIB
-    *p++ = 0xC0 | (b << 3); // SIB: scale=3 (8), index=B's lower bits, base=rax
+    // ldr x9, [x15, wB * 8]
+    // ldr x9, [x15, wB, UXTW #3]
+    // this one was a bitch to figure out
+    *p++ = 0xE9;
+    *p++ = 0x59;
+    *p++ = 0x60 + (BR + b);
+    *p++ = 0xf8;
 
-    // mov rAd, [rax + rCd*4]
-    *p++ = 0x46;            // REX prefix: REX.R and REX.X
-    *p++ = 0x8B;            // MOV opcode
-    *p++ = 0x04 | (a << 3); // ModRM byte with register selection (a in reg field for destination)
-    *p++ = 0x80 | (c << 3); // SIB: scale=2 (4), index=C's lower bits, base=rax
+    // load the value from the index in the target segment to register wA
+    // ldr wA, [x9, wC * 4]
+    // ldr wA, [x9, wC, UXTW #2]
+    *p++ = 0x20 + (BR + a); // dest register
+    *p++ = 0x59;
+    *p++ = 0x60 + (BR + c); // using C as an index
+    *p++ = 0xb8;
+
+    // 4 No Ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
     return CHUNK;
 }
 
-// TODO: address this later
 size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // Load address of val_seq into rax
-    // mov(64) rax, imm64
-    *p++ = 0x48;
+    // load the address of the segment we want into x9
+    // ldr x9, [x15, wA, UXTW #3]
+    // this one was a bitch to figure out
+    *p++ = 0xE9;
+    *p++ = 0x59;
+    *p++ = 0x60 + (BR + a);
+    *p++ = 0xf8;
+
+    // store what we want to store at the right address
+    // str wC, [x9, wB, uxtw #2]
+
+    *p++ = 0x20 + (BR + c);
+    *p++ = 0x59;
+    *p++ = 0x20 + (BR + b);
     *p++ = 0xB8;
-    uint64_t addr = (uint64_t)&gs.val_seq;
-    memcpy(p, &addr, sizeof(addr));
-    p += sizeof(addr);
 
-    // mov rax, [rax]
-    *p++ = 0x48;
-    *p++ = 0x8B;
-    *p++ = 0x00;
+    // 4 No Ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
-    // mov rax, [rax + rAd*8]
-    *p++ = 0x4A;            // REX prefix: REX.W and REX.X
-    *p++ = 0x8B;            // MOV opcode
-    *p++ = 0x04;            // ModRM byte for SIB
-    *p++ = 0xC0 | (a << 3); // SIB: scale=3 (8), index=A's lower bits, base=rax
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
-    // mov [rax + rBd*4], rCd
-    *p++ = 0x46;            // REX prefix: REX.R and REX.X
-    *p++ = 0x89;            // MOV opcode
-    *p++ = 0x04 | (c << 3); // ModRM byte with register selection
-    *p++ = 0x80 | (b << 3); // SIB: scale=2 (4), index=B's lower bits, base=rax
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
+    // // Load address of val_seq into rax
+    // // mov(64) rax, imm64
+    // *p++ = 0x48;
+    // *p++ = 0xB8;
+    // uint64_t addr = (uint64_t)&gs.val_seq;
+    // memcpy(p, &addr, sizeof(addr));
+    // p += sizeof(addr);
+
+    // // mov rax, [rax]
+    // *p++ = 0x48;
+    // *p++ = 0x8B;
+    // *p++ = 0x00;
+
+    // // mov rax, [rax + rAd*8]
+    // *p++ = 0x4A;            // REX prefix: REX.W and REX.X
+    // *p++ = 0x8B;            // MOV opcode
+    // *p++ = 0x04;            // ModRM byte for SIB
+    // *p++ = 0xC0 | (a << 3); // SIB: scale=3 (8), index=A's lower bits, base=rax
+
+    // // mov [rax + rBd*4], rCd
+    // *p++ = 0x46;            // REX prefix: REX.R and REX.X
+    // *p++ = 0x89;            // MOV opcode
+    // *p++ = 0x04 | (c << 3); // ModRM byte with register selection
+    // *p++ = 0x80 | (b << 3); // SIB: scale=2 (4), index=B's lower bits, base=rax
 
     return CHUNK;
 }
@@ -504,7 +567,12 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (add_instr >> 16) & 0xFF;
     *p++ = (add_instr >> 24) & 0xFF;
 
-    // 4 No ops
+    // 5 No ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -545,7 +613,12 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (mul_instr >> 16) & 0xFF;
     *p++ = (mul_instr >> 24) & 0xFF;
 
-    // 4 No ops
+    // 5 No ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -586,7 +659,12 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (udiv_instr >> 16) & 0xFF;
     *p++ = (udiv_instr >> 24) & 0xFF;
 
-    // 4 No ops
+    // 5 No ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -639,7 +717,12 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (mvn_instr >> 16) & 0xFF;
     *p++ = (mvn_instr >> 24) & 0xFF;
 
-    // 3 No Ops
+    // 4 No Ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -734,37 +817,49 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     uint8_t *p = (uint8_t *)zero + offset;
 
     // Move register c to be the function call argument
-    // mov rC, rdi
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xc7 | (c << 3);
+    // mov w0, wC
+    *p++ = 0xE0;
+    *p++ = 0x03;
+    *p++ = BR + c;
+    *p++ = 0x2A;
 
-    // call map segment
-    *p++ = 0xb0;
-    *p++ = 0x00 | OP_MAP;
+    // load correct opcode
+    // Move enum code for print reg into w1
+    // mov w1, OP_OUT
+    uint32_t mov = 0x52800000;
+    mov |= (OP_MAP & 0xFFFF) << 5;
+    mov |= 1;
 
-    *p++ = 0xff;
-    *p++ = 0xd3;
+    *p++ = mov & 0xFF;
+    *p++ = (mov >> 8) & 0xFF;
+    *p++ = (mov >> 16) & 0xFF;
+    *p++ = (mov >> 24) & 0xFF;
 
-    // move return value from rax to reg b
-    // mov rBd, eax
+    // call map segment function
+    // Save x30 to stack
+    *p++ = 0xFE; // str x30, [sp, #-16]!
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0xF8;
+
+    // blr x28
+    *p++ = 0x80;
+    *p++ = 0x03;
+    *p++ = 0x3F;
+    *p++ = 0xD6;
+
+    // Restore x30 from stack
+    *p++ = 0xFE; // ldr x30, [sp], #16
+    *p++ = 0x07;
     *p++ = 0x41;
-    *p++ = 0x89;
-    *p++ = 0xc0 | b;
+    *p++ = 0xF8;
 
-    // 30 No Ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
+    // mov result into reg c
+    // mov return value from x0 to wB
+    *p++ = 0xf3 + b; // TODO: fix this to be modular
+    *p++ = 0x03;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-
-    *p++ = 0x90;
-    *p++ = 0x90;
+    *p++ = 0x2A;
 
     return CHUNK;
 }
@@ -785,36 +880,48 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     uint8_t *p = (uint8_t *)zero + offset;
 
     // Move register c to be the function call argument
-    // mov edi, rCd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xc7 | (c << 3);
+    // mov w0, wC
+    *p++ = 0xE0;
+    *p++ = 0x03;
+    *p++ = BR + c;
+    *p++ = 0x2A;
 
     // load correct opcode
-    *p++ = 0xb0;
-    *p++ = 0x00 | OP_UNMAP;
+    // Move enum code for print reg into w1
+    // mov w1, OP_OUT
+    uint32_t mov = 0x52800000;
+    mov |= (OP_UNMAP & 0xFFFF) << 5;
+    mov |= 1;
+
+    *p++ = mov & 0xFF;
+    *p++ = (mov >> 8) & 0xFF;
+    *p++ = (mov >> 16) & 0xFF;
+    *p++ = (mov >> 24) & 0xFF;
 
     // call unmap segment function
-    *p++ = 0xff;
-    *p++ = 0xd3;
+    // Save x30 to stack
+    *p++ = 0xFE; // str x30, [sp, #-16]!
+    *p++ = 0x0F;
+    *p++ = 0x1F;
+    *p++ = 0xF8;
 
-    // 33 No Ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // blr x28
+    *p++ = 0x80;
+    *p++ = 0x03;
+    *p++ = 0x3F;
+    *p++ = 0xD6;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // Restore x30 from stack
+    *p++ = 0xFE; // ldr x30, [sp], #16
+    *p++ = 0x07;
+    *p++ = 0x41;
+    *p++ = 0xF8;
 
-    *p++ = 0x90;
-    *p++ = 0x90;
+    // 1 No op
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -840,23 +947,48 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = (mov >> 16) & 0xFF;
     *p++ = (mov >> 24) & 0xFF;
 
-    // Save x30 to stack
-    *p++ = 0xFE; // str x30, [sp, #-16]!
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0xF8;
+    // save current instruction pointer to x13
+    // // 1000002d
+    *p++ = 0x4d;
+    *p++ = 0x00;
+    *p++ = 0x00;
+    *p++ = 0x10;
 
-    // blr x28
+    // br x28
     *p++ = 0x80;
     *p++ = 0x03;
-    *p++ = 0x3F;
+    *p++ = 0x1F;
     *p++ = 0xD6;
 
-    // Restore x30 from stack
-    *p++ = 0xFE; // ldr x30, [sp], #16
-    *p++ = 0x07;
-    *p++ = 0x41;
-    *p++ = 0xF8;
+    // NOTE: This code works, but modification to the out tag is required
+    // // Save x30 to stack
+    // *p++ = 0xFE; // str x30, [sp, #-16]!
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0xF8;
+
+    // // blr x28
+    // *p++ = 0x80;
+    // *p++ = 0x03;
+    // *p++ = 0x3F;
+    // *p++ = 0xD6;
+
+    // // Restore x30 from stack
+    // *p++ = 0xFE; // ldr x30, [sp], #16
+    // *p++ = 0x07;
+    // *p++ = 0x41;
+    // *p++ = 0xF8;
+
+    // 2 No op
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -877,58 +1009,62 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
     *p++ = (mov >> 16) & 0xFF;
     *p++ = (mov >> 24) & 0xFF;
 
-    // Save x30 to stack
-    *p++ = 0xFE; // str x30, [sp, #-16]!
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0xF8;
+    // I think I see a way to save some bytes here by moving some instructions
+    // to the utility file instead of writing them inline
 
-    // blr x28
+    // we could save the current instruction pointer into a temp register,
+    // branch to x28, and then from the assembly file branch back. This may
+    // not be worth the effort but worth considering
+
+    // save current instruction pointer to x13
+    // // 1000002d
+    *p++ = 0x4d;
+    *p++ = 0x00;
+    *p++ = 0x00;
+    *p++ = 0x10;
+
+    // br x28
     *p++ = 0x80;
     *p++ = 0x03;
-    *p++ = 0x3F;
+    *p++ = 0x1F;
     *p++ = 0xD6;
 
-    // Restore x30 from stack
-    *p++ = 0xFE; // ldr x30, [sp], #16
-    *p++ = 0x07;
-    *p++ = 0x41;
-    *p++ = 0xF8;
+    // // Save x30 to stack
+    // *p++ = 0xFE; // str x30, [sp, #-16]!
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0xF8;
+
+    // // blr x28
+    // *p++ = 0x80;
+    // *p++ = 0x03;
+    // *p++ = 0x3F;
+    // *p++ = 0xD6;
+
+    // // Restore x30 from stack
+    // *p++ = 0xFE; // ldr x30, [sp], #16
+    // *p++ = 0x07;
+    // *p++ = 0x41;
+    // *p++ = 0xF8;
 
     // mov result into reg c
-
-    
-
-    // put the right opcode into rax
-    *p++ = 0xb0;
-    *p++ = 0x00 | OP_IN;
-
-    // call the function
-    *p++ = 0xff;
-    *p++ = 0xd3;
-
-    // mov rCd, eax
-    *p++ = 0x41;
-    *p++ = 0x89;
-    *p++ = 0xC0 | c;
-
-    // 33 No Ops
-    *p++ = 0x0F;
-    *p++ = 0x1F;
+    // *p++ = 0xf3 + c; // TODO: fix this to be modular
+    *p++ = 0xE0 + (BR + c);
+    *p++ = 0x03;
     *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    *p++ = 0x2A;
 
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0x00;
+    // 1 no op
 
-    *p++ = 0x90;
-    *p++ = 0x90;
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -936,6 +1072,7 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
 void *load_program(uint32_t b_val)
 {
     // test with midmark for now
+    printf("Making it into load program here\n");
     // assert(false);
     /* The inline assembly for the load program sets the program counter gs.pc
      * and returns the correct address is b_val is 0.
@@ -968,44 +1105,66 @@ void *load_program(uint32_t b_val)
 // fast version
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 {
+    (void)b;
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // mov rsi, rCd (updating the program counter)
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xc6 | (c << 3);
+    // move the program counter into x27
+    *p++ = 0xFB;
+    *p++ = 0x03;
+    // *p++ = 0x13 + c; // TODO: Fix this to be modular
+    *p++ = 0x00 + (BR + c); // TODO: Fix this to be modular
+    *p++ = 0x2A;
 
-    // mov %rbp, %rax
-    *p++ = 0x48;
-    *p++ = 0x89;
-    *p++ = 0xe8;
+    // NOTE: I could imagine saving some space here by having the executable
+    // memory live permanently in x14, so that this move was not necessary.
+    // This would a require an architectural change to this function, handle
+    // halt, and the assembly utility for this to all work correctly. This
+    // actually isn't the craziest idea though. I would like to get this working
+    // first and then experiment with it.
 
-    // test %rBd, %rBd
-    *p++ = 0x45;
-    *p++ = 0x85;
-    *p++ = 0xc0 | (b << 3) | b;
+    // move the address of the current executable segment from x14 into x0
+    // mov x0, x14
+    *p++ = 0xE0;
+    *p++ = 0x03;
+    *p++ = 0x0E;
+    *p++ = 0xAA;
 
-    // jne
-    *p++ = 0x75;
-    *p++ = 0x01;
+    // mov the opcode for duplicate into the correct register
 
-    *p++ = 0xc3;
+    // put the right opcode in w1
+    // Move enum code for read reg into w1
+    // mov w1, OP_OUT
+    uint32_t mov = 0x52800000;
+    mov |= (OP_DUPLICATE & 0xFFFF) << 5;
+    mov |= 1;
 
-    // It makes zero sense that this program works without this instruction
-    // mov edi, rBd
-    *p++ = 0x44;
-    *p++ = 0x89;
-    *p++ = 0xc7 | (b << 3);
+    *p++ = mov & 0xFF;
+    *p++ = (mov >> 8) & 0xFF;
+    *p++ = (mov >> 16) & 0xFF;
+    *p++ = (mov >> 24) & 0xFF;
 
-    // call load program
-    *p++ = 0xb0;
-    *p++ = 0x00 | OP_DUPLICATE;
+    // check if the segment being loaded is segment 0
+    // if wB is 0, jump straight to the return
+    // cbz wB, +8
+    *p++ = 0x40 + (BR + b);
+    *p++ = 0x00;
+    *p++ = 0x00;
+    *p++ = 0x34;
 
-    *p++ = 0xff;
-    *p++ = 0xd3;
+    // else, jump to the inline assembly meant to handle this.
+    // more testing with stack pointer, ect has to be done here
+    // br x28 (We will do the return from the inline assembly)
+    *p++ = 0x80;
+    *p++ = 0x03;
+    *p++ = 0x1F;
+    *p++ = 0xD6;
 
-    // return (correct value is already in rax from load_program_addr)
-    *p++ = 0xc3;
+    // if yes, just return
+    // ret
+    *p++ = 0xC0;
+    *p++ = 0x03;
+    *p++ = 0x5F;
+    *p++ = 0xD6;
 
     return CHUNK;
 }

@@ -17,8 +17,9 @@ int main(int argc, char *argv[]) {
     // void *dense = &test;
     // Function fn = (Function)dense;
     // fn();
-    
-    unsigned x = test();
+
+    int arr[10];
+    unsigned x = test(arr);
     printf("The value of x is %u\n", x);
 
     return 0;
