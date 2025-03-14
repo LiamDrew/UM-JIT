@@ -39,5 +39,9 @@ test:
 
     mov w0, w19
     mov w0, w26
+
+    mov w19, w0
+    mov w26, w0
+    mov w0, w0
     
     ret

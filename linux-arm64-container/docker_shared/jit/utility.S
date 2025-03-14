@@ -177,6 +177,8 @@ ret
 .dup:
     function_start
     push_regs
+    mov w0, w20 // this should not be necessary
+    // bl putchar
     bl load_program
     pop_regs
     function_end

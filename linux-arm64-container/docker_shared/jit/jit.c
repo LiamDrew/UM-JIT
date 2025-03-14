@@ -224,7 +224,7 @@ uint64_t make_word(uint64_t word, unsigned width, unsigned lsb,
 size_t compile_instruction(void *zero, Instruction word, size_t offset)
 {
     uint32_t opcode = (word >> 28) & 0xF;
-    printf("Opcode is %u\n", opcode);
+    // printf("Opcode is %u\n", opcode);
     uint32_t a = 0;
 
     // Load Value
@@ -447,6 +447,10 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
+    (void)a;
+    (void)b;
+    (void)c;
+
     // The address of val_seq is in x15
 
     // put the address of the segment we want in x9
@@ -468,6 +472,16 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x59;
     *p++ = 0x60 + (BR + c); // using C as an index
     *p++ = 0xb8;
+
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
+
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
 
     // 4 No Ops
     *p++ = 0x1F;
@@ -502,6 +516,10 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
+    (void)a;
+    (void)b;
+    (void)c;
+
     // load the address of the segment we want into x9
     // ldr x9, [x15, wA, UXTW #3]
     // this one was a bitch to figure out
@@ -517,6 +535,16 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x59;
     *p++ = 0x20 + (BR + b);
     *p++ = 0xB8;
+
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
+
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
 
     // 4 No Ops
     *p++ = 0x1F;
@@ -896,10 +924,14 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 
     // mov result into reg c
     // mov return value from x0 to wB
-    *p++ = 0xf3 + b; // TODO: fix this to be modular
+
+    // *p++ = 0xf3 + b; // TODO: fix this to be modular
+    *p++ = 0xE0 + (BR + b);
     *p++ = 0x03;
     *p++ = 0x00;
     *p++ = 0x2A;
+
+    // 1 No op
 
     *p++ = 0x1F;
     *p++ = 0x20;
@@ -1104,29 +1136,20 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
 void *load_program(uint32_t b_val)
 {
     // test with midmark for now
-    printf("Making it into load program here\n");
+    // printf("\nLoading program from segment %u\n", b_val);
+
     // assert(false);
     /* The inline assembly for the load program sets the program counter gs.pc
      * and returns the correct address is b_val is 0.
      * This function handles loading a non-zero segment into segment zero. */
 
-    printf("Printing before segfault\n");
-
-    
-    printf("bval is %u\n", b_val);
-
     uint32_t new_seg_size = gs.seg_lens[b_val];
-    // printf("here1\n");
     uint32_t *new_vals = calloc(new_seg_size, sizeof(uint32_t));
-    // printf("here2\n");
     memcpy(new_vals, gs.val_seq[b_val], new_seg_size * sizeof(uint32_t));
-    // printf("here3\n");
 
     /* Update the existing memory segment */
     gs.val_seq[0] = new_vals;
     gs.seg_lens[0] = new_seg_size;
-
-    // printf("here?2\n");
 
     // Allocate new executable memory for the segment being mapped
     void *new_zero = mmap(NULL, new_seg_size * CHUNK,
@@ -1141,7 +1164,7 @@ void *load_program(uint32_t b_val)
     }
 
     gs.active = new_zero;
-    printf("Finishing load program\n");
+    // printf("Finishing load program\n");
     return new_zero;
 }
 
@@ -1184,8 +1207,11 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = (mov >> 16) & 0xFF;
     *p++ = (mov >> 24) & 0xFF;
 
-    // check if the segment being loaded is segment 0
-    // if wB is 0, jump straight to the return
+    // TODO: the solution to my problems is so close. it's within this function
+    // right here
+
+    // // check if the segment being loaded is segment 0
+    // // if wB is 0, jump straight to the return
     // cbz wB, +8
     *p++ = 0x60 + (BR + b);
     *p++ = 0x00;
