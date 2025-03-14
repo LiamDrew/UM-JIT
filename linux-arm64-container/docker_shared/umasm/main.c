@@ -24,63 +24,60 @@ int main(int argc, char *argv[])
     (void)argc;
     (void)argv;
 
-    const char *filename = "bigadd.um";
+    const char *filename = "sub.um";
 
     FILE *fp = fopen(filename, "wb");
     assert(fp != NULL);
 
     // use fwrite()
 
-    Instruction words[15] = {0};
+    Instruction words[8] = {0};
 
-    size_t bw = 14;
+    size_t bw = 8;
 
-    // r3 = 1
-    words[0] = load_val(13, 1, 3);
+    // r3 = 8
+    words[0] = load_val(13, 8, 3);
 
-    // load 67 into r2
-    words[1] = load_val(13, 67, 2);
+    // nand r1 with r1 and put result in r4
+    words[2] = three_reg(6, 4, 1, 1);
 
-    // nand r6 with r6 and put result in r1
-    words[2] = three_reg(6, 1, 6, 6);
+    // r4 = r3 + r4
+    words[3] = three_reg(3, 4, 3, 4);
 
-    // print out r1 result
-    words[3] = three_reg(10, 0, 0, 1);
+    // load 48 into r6
+    words[4] = load_val(13, 48, 6);
 
-    // add r1 to r2, store in r2
-    words[4] = three_reg(3, 2, 2, 1);
+    // r6 = r6 + r4
+    words[5] = three_reg(3, 6, 6, 4);
 
-    // print out r2 result
-    words[5] = three_reg(10, 0, 0, 2);
+    // output r6
+    words[6] = three_reg(10, 0, 0, 6);
 
-    // r7 = 2
-    words[6] = load_val(13, 2, 7);
+    // halt
+    words[7] = three_reg(7, 0, 0, 0);
 
-    // r0 = r2 nand r2
-    words[7] = three_reg(6, 0, 2, 2);
+    // // printout r0
+    // words[8] = three_reg(10, 0, 0, 0);
 
-    // printout r0
-    words[8] = three_reg(10, 0, 0, 0);
+    // // r7 = r7 + r0
+    // words[9] = three_reg(3, 7, 7, 0);
 
-    // r7 = r7 + r0
-    words[9] = three_reg(3, 7, 7, 0);
+    // // printout r7
+    // // words[10] = three_reg(10, 0, 0, 7);
 
-    // printout r7
-    // words[10] = three_reg(10, 0, 0, 7);
+    // words[10] = three_reg(0, 0, 0, 0);
 
-    words[10] = three_reg(0, 0, 0, 0);
+    // // The isse is the ORDER of operations for addition. Say what?
+    // //r7 = r3 + r7
+    // // r7 = r7 + r3
+    // words[11] = three_reg(3, 7, 3, 7);
 
-    // The isse is the ORDER of operations for addition. Say what?
-    //r7 = r3 + r7
-    // r7 = r7 + r3
-    words[11] = three_reg(3, 7, 3, 7);
+    // // printout r7
+    // words[12] = three_reg(10, 0, 0, 7);
 
-    // printout r7
-    words[12] = three_reg(10, 0, 0, 7);
-
-    // load program to print out value
-    words[13] = three_reg(7, 0, 0, 0);
-    // words[13] = three_reg(12, 0, 4, 7);
+    // // load program to print out value
+    // words[13] = three_reg(7, 0, 0, 0);
+    // // words[13] = three_reg(12, 0, 4, 7);
 
 
 

@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include "utility.h"
+#include "stdint.h"
 
 typedef void *(*Function)(void);
 
@@ -18,9 +19,16 @@ int main(int argc, char *argv[]) {
     // Function fn = (Function)dense;
     // fn();
 
-    int arr[10];
-    unsigned x = test(arr);
-    printf("The value of x is %u\n", x);
+    // int arr[10];
+    // unsigned x = test(arr);
+    // printf("The value of x is %u\n", x);
+
+    uint32_t x = 19;
+    uint32_t y = ~x + 1; // to convert to negative, flip the bits and add 1
+
+    setvbuf(stdout, NULL, _IONBF, 0);
+
+    printf("Y value is %d\n", y);
 
     return 0;
 }

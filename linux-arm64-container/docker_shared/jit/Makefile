@@ -1,5 +1,5 @@
 CC = clang
-CFLAGS = -Wall -Wextra -Werror -Wpedantic -O2
+CFLAGS = -g -Wall -Wextra -Werror -Wpedantic -O2
 LDFLAGS =
 
 jit: jit.o utility.o

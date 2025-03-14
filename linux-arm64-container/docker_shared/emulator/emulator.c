@@ -52,6 +52,16 @@ uint32_t map_segment(uint32_t size);
 void unmap_segment(uint32_t segment);
 void load_segment(uint32_t index, uint32_t *zero);
 
+void print_registers(uint32_t *regs, uint32_t pc)
+{
+    printf("\n");
+    for (uint32_t i = 0; i < 8; i++) {
+        printf("r%u = %u\n", i, regs[i]);
+    }
+    printf("\n");
+    printf("PC = %u\n", pc);
+}
+
 int main(int argc, char *argv[])
 {
     if (argc != 2)
@@ -196,6 +206,7 @@ static inline bool exec_instr(Instruction word, Instruction **pp,
     {
         load_segment(regs[b], zero);
         *pp = segment_sequence[0] + regs[c];
+        print_registers(regs, regs[c]);
     }
 
     /* Addition */

@@ -20,11 +20,11 @@
 .endm
 
 .macro extra_push
-    stp x12, x13, [sp, #-16]!   // Push x14 and x15 onto stack
+    stp x12, x13, [sp, #-16]!   // Push x12 and x13 onto stack
 .endm
 
 .macro extra_pop
-    ldp x12, x13, [sp], #16     // Pop x14 and x15 from stack
+    ldp x12, x13, [sp], #16     // Pop x12 and x13 from stack
 .endm
 
 .macro function_start
@@ -103,6 +103,15 @@ loop:
     // Calling the executable memory
     blr x0
 
+    // mov x12, x0
+    // push_regs
+    // extra_push
+    // bl print_registers_w19_to_w26
+    // extra_pop
+    // pop_regs
+    // mov x0, x12
+
+
     // Jump back to the beginning of the loop
     b loop
 done:
@@ -150,26 +159,30 @@ ret
 
 .out:
     // Writing out the function start macro because the end is different
-    stp x29, x30, [sp, #-16]!   // Save frame pointer and link register
-    mov x29, sp                 // Set up frame pointer
+    // stp x29, x30, [sp, #-16]!   // Save frame pointer and link register
+    // mov x29, sp                 // Set up frame pointer
+    function_start
     push_regs
     extra_push // saving regs x12 and x13 for a special short-term purpose
     bl putchar
     extra_pop // restoring regs x12 and x13
     pop_regs
-    ldp x29, x30, [sp], #16     // Restore frame pointer and link register
+    function_end
+    // ldp x29, x30, [sp], #16     // Restore frame pointer and link register
     br x13
 
 .in:
 // function_start
-    stp x29, x30, [sp, #-16]!   // Save frame pointer and link register
-    mov x29, sp                 // Set up frame pointer
+    // stp x29, x30, [sp, #-16]!   // Save frame pointer and link register
+    // mov x29, sp                 // Set up frame pointer
+    function_start
     push_regs
     extra_push
     bl getchar
     extra_pop
     pop_regs
-    ldp x29, x30, [sp], #16     // Restore frame pointer and link register
+    function_end
+    // ldp x29, x30, [sp], #16     // Restore frame pointer and link register
     br x13
 // function_end
 
