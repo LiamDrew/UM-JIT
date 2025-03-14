@@ -5,3 +5,11 @@
 *.o
 linux-arm64-container/docker_shared/jit/jit
 *.o
+*.txt
+linux-arm64-container/docker_shared/jit/unrolled_sandmark_jit.um
+linux-x86-64-container/docker_shared/umasm/unrolled_sandmark.um
+linux-x86-64-container/docker_shared/umasm/unrolled_sandmark_jit.um
+linux-x86-64-container/docker_shared/umasm/unrolled_tuffer.um
+linux-arm64-container/docker_shared/emulator/unrolled_sandmark.um
+linux-arm64-container/docker_shared/jit/ref.txt
+linux-arm64-container/docker_shared/jit/ours.txt

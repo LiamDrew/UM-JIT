@@ -22,6 +22,7 @@
 #include <assert.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 #define NUM_REGISTERS 8
 #define POWER ((uint64_t)1 << 32) // for preventing overflow with add and div
@@ -342,5 +343,30 @@ void load_segment(uint32_t index, uint32_t *zero)
         memcpy(new_zero, segment_sequence[index],
                copied_seq_size * sizeof(uint32_t));
         segment_sequence[0] = new_zero;
+
+        // open new file
+        const char *filename = "unrolled_sandmark.um";
+
+        FILE *fp = fopen(filename, "wb");
+        assert(fp != NULL);
+
+        // put everything in the list in big endian order
+
+        for (size_t i = 0; i < copied_seq_size; i++) {
+            new_zero[i] = htonl(new_zero[i]);
+        }
+
+        fwrite(new_zero, sizeof(Instruction), copied_seq_size, fp);
+
+        fclose(fp);
+
+
+
+        // write bytes to the file in big endian order
+
+        assert(false);
+        
+
+        printf("Finishing load program\n");
     }
 }

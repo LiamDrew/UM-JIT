@@ -111,7 +111,6 @@ loop:
     // pop_regs
     // mov x0, x12
 
-
     // Jump back to the beginning of the loop
     b loop
 done:
@@ -193,5 +192,5 @@ ret
     bl load_program
     pop_regs
     function_end
-    ret // this should return to the original loop
+ret // this should return to the original loop
 

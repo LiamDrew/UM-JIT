@@ -17,6 +17,8 @@
 #include "utility.h"
 #include <sys/mman.h>
 
+#include <arpa/inet.h>
+
 #define OPS 15
 #define INIT_CAP 32500
 
@@ -1107,13 +1109,34 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
 
 void *load_program(uint32_t b_val)
 {
+    printf("Load program was called\n");
     /* The inline assembly for the load program sets the program counter gs.pc
      * and returns the correct address is b_val is 0.
      * This function handles loading a non-zero segment into segment zero. */
+    assert(b_val != 0);
 
     uint32_t new_seg_size = gs.seg_lens[b_val];
     uint32_t *new_vals = calloc(new_seg_size, sizeof(uint32_t));
     memcpy(new_vals, gs.val_seq[b_val], new_seg_size * sizeof(uint32_t));
+
+    // // open new file
+    // const char *filename = "unrolled_sandmark_jit.um";
+
+    // FILE *fp = fopen(filename, "wb");
+    // assert(fp != NULL);
+
+    // // put everything in the list in big endian order
+
+    // for (size_t i = 0; i < new_seg_size; i++)
+    // {
+    //     new_vals[i] = htonl(new_vals[i]);
+    // }
+
+    // fwrite(new_vals, sizeof(Instruction), new_seg_size, fp);
+
+    // fclose(fp);
+
+    // assert(false);
 
     /* Update the existing memory segment */
     gs.val_seq[0] = new_vals;
@@ -1132,7 +1155,7 @@ void *load_program(uint32_t b_val)
     }
 
     gs.active = new_zero;
-    // printf("Finishing load program\n");
+    printf("Finishing load program\n");
     return new_zero;
 }
 
