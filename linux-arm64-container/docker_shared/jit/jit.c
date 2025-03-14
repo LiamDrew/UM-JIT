@@ -381,9 +381,6 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // ARM64 opcode structured as follows:
-    // 0111 0010 101-0 0000 000-0  0000  000-1  0011
-
     // mov w19, 0x0000
     uint32_t lower_mov = 0x52800000;    // base opcode for lower 16 bit MOV
     lower_mov |= (value & 0xFFFF) << 5; // Position lower 16 bits
@@ -404,7 +401,7 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = (upper_mov >> 16) & 0xFF;
     *p++ = (upper_mov >> 24) & 0xFF;
 
-    // 3 No Ops
+    // 4 No Ops
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -420,15 +417,10 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -436,16 +428,6 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
 size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
-
-    // NOTE: this conditional move was the source of the bug. Hopefully can fix
-
-    // First you need to compare rC with 0
-    // uint32_t cmp_instr = 0x6B00001F; // Base encoding for CMP wX, #0 (implemented as SUBS wzr, wX, #0)
-    // cmp_instr |= ((BR + c) << 5);    // Put register C in the right bit position
-    // *p++ = cmp_instr & 0xFF;
-    // *p++ = (cmp_instr >> 8) & 0xFF;
-    // *p++ = (cmp_instr >> 16) & 0xFF;
-    // *p++ = (cmp_instr >> 24) & 0xFF;
 
     // cmp w0, #0x0
     uint32_t cmp_instr = 0x7100001F;
@@ -482,15 +464,10 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -531,15 +508,10 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -562,7 +534,7 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x20 + (BR + b);
     *p++ = 0xB8;
 
-    // 5 No Ops
+    // 4 No Ops
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -578,15 +550,10 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -627,15 +594,10 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -678,15 +640,11 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
 
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -729,15 +687,10 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -787,15 +740,10 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -804,11 +752,11 @@ size_t handle_halt(void *zero, size_t offset)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // xor x0, x0
+    // mov x27, #0
+    *p++ = 0x1B;
     *p++ = 0x00;
-    *p++ = 0x00;
-    *p++ = 0x00;
-    *p++ = 0xCA;
+    *p++ = 0x80;
+    *p++ = 0xD2;
 
     // ret
     *p++ = 0xC0;
@@ -882,28 +830,34 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = BR + c;
     *p++ = 0x2A;
 
-    // load correct opcode
-    // Move enum code for print reg into w1
-    // mov w1, OP_OUT
-    uint32_t mov = 0x52800000;
-    mov |= (OP_MAP & 0xFFFF) << 5;
-    mov |= 1;
+    // // load correct opcode
+    // // Move enum code for print reg into w1
+    // // mov w1, OP_OUT
+    // uint32_t mov = 0x52800000;
+    // mov |= (OP_MAP & 0xFFFF) << 5;
+    // mov |= OP_REG;
 
-    *p++ = mov & 0xFF;
-    *p++ = (mov >> 8) & 0xFF;
-    *p++ = (mov >> 16) & 0xFF;
-    *p++ = (mov >> 24) & 0xFF;
+    // *p++ = mov & 0xFF;
+    // *p++ = (mov >> 8) & 0xFF;
+    // *p++ = (mov >> 16) & 0xFF;
+    // *p++ = (mov >> 24) & 0xFF;
 
     // call map segment function
+
+    // doing this the address way is significantly slower than just using the
+    // standard calling convention, which makes relatively little sense
+    // time is ~0.80 vs ~0.87, which is non trivial for a small instruction
+    // like this
+
     // Save x30 to stack
     *p++ = 0xFE; // str x30, [sp, #-16]!
     *p++ = 0x0F;
     *p++ = 0x1F;
     *p++ = 0xF8;
 
-    // blr x28
+    // blr x12
     *p++ = 0x80;
-    *p++ = 0x03;
+    *p++ = 0x01;
     *p++ = 0x3F;
     *p++ = 0xD6;
 
@@ -915,27 +869,16 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 
     // mov result into reg c
     // mov return value from x0 to wB
-
-    // *p++ = 0xf3 + b; // TODO: fix this to be modular
     *p++ = 0xE0 + (BR + b);
     *p++ = 0x03;
     *p++ = 0x00;
     *p++ = 0x2A;
-
-    // 1 No op
-
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
 
     return CHUNK;
 }
 
 void unmap_segment(uint32_t segmentId)
 {
-    // assert(false);
-
     if (gs.rec_size == gs.rec_cap)
     {
         gs.rec_cap *= 2;
@@ -961,7 +904,7 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     // mov w1, OP_OUT
     uint32_t mov = 0x52800000;
     mov |= (OP_UNMAP & 0xFFFF) << 5;
-    mov |= 1;
+    mov |= OP_REG;
 
     *p++ = mov & 0xFF;
     *p++ = (mov >> 8) & 0xFF;
@@ -969,6 +912,19 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = (mov >> 24) & 0xFF;
 
     // call unmap segment function
+
+    // // adr x14, +8
+    // *p++ = 0x4E;
+    // *p++ = 0x00;
+    // *p++ = 0x00;
+    // *p++ = 0x10;
+
+    // // br x28
+    // *p++ = 0x80;
+    // *p++ = 0x03;
+    // *p++ = 0x1F;
+    // *p++ = 0xD6;
+
     // Save x30 to stack
     *p++ = 0xFE; // str x30, [sp, #-16]!
     *p++ = 0x0F;
@@ -987,16 +943,16 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0x41;
     *p++ = 0xF8;
 
-    // 2 No op
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
+    // // 1 No ops
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
 
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -1015,7 +971,7 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     // mov w1, OP_OUT
     uint32_t mov = 0x52800000;
     mov |= (OP_OUT & 0xFFFF) << 5;
-    mov |= 1;
+    mov |= OP_REG;
 
     *p++ = mov & 0xFF;
     *p++ = (mov >> 8) & 0xFF;
@@ -1024,7 +980,7 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
 
     // save current instruction pointer (+8 bytes) to x13
     // adr x13, +8
-    *p++ = 0x4d;
+    *p++ = 0x4D;
     *p++ = 0x00;
     *p++ = 0x00;
     *p++ = 0x10;
@@ -1035,21 +991,16 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x1F;
     *p++ = 0xD6;
 
-    // 3 No op
+    // 2 No op
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -1062,7 +1013,7 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
     // mov w1, OP_OUT
     uint32_t mov = 0x52800000;
     mov |= (OP_IN & 0xFFFF) << 5;
-    mov |= 1;
+    mov |= OP_REG;
 
     *p++ = mov & 0xFF;
     *p++ = (mov >> 8) & 0xFF;
@@ -1071,7 +1022,7 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
 
     // save current instruction pointer to x13
     // adr x13, +8
-    *p++ = 0x4d;
+    *p++ = 0x4D;
     *p++ = 0x00;
     *p++ = 0x00;
     *p++ = 0x10;
@@ -1088,21 +1039,16 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x00;
     *p++ = 0x2A;
 
-    // 3 no op
+    // 2 no op
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -1118,25 +1064,6 @@ void *load_program(uint32_t b_val)
     uint32_t new_seg_size = gs.seg_lens[b_val];
     uint32_t *new_vals = calloc(new_seg_size, sizeof(uint32_t));
     memcpy(new_vals, gs.val_seq[b_val], new_seg_size * sizeof(uint32_t));
-
-    // // open new file
-    // const char *filename = "unrolled_sandmark_jit.um";
-
-    // FILE *fp = fopen(filename, "wb");
-    // assert(fp != NULL);
-
-    // // put everything in the list in big endian order
-
-    // for (size_t i = 0; i < new_seg_size; i++)
-    // {
-    //     new_vals[i] = htonl(new_vals[i]);
-    // }
-
-    // fwrite(new_vals, sizeof(Instruction), new_seg_size, fp);
-
-    // fclose(fp);
-
-    // assert(false);
 
     /* Update the existing memory segment */
     gs.val_seq[0] = new_vals;
@@ -1159,46 +1086,17 @@ void *load_program(uint32_t b_val)
     return new_zero;
 }
 
-/* NOTE: I'm suspecting that something may be wrong with this function:
- * sandmark works properly when it is unrolled, written to disk, and then run,
- * but it's not working properly when run here*/
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 {
     (void)b;
     uint8_t *p = (uint8_t *)zero + offset;
 
-    /* NOTE: I could imagine saving some space here by having the executable
-     * memory live permanently in x14, so that this move was not necessary.
-     * This would a require an architectural change to this function, handle
-     * halt, and the assembly utility for this to all work correctly. This
-     * actually isn't the craziest idea though. I would like to get this working
-     * first and then experiment with it. */
-
-    // move the 32-bit program counter into x27
-    // mov w27, wC
-    *p++ = 0xFB;
+    // mov the 32-bit program counter into x10
+    // mov x10, wC
+    *p++ = 0xEA;
     *p++ = 0x03;
     *p++ = 0x00 + (BR + c);
     *p++ = 0x2A;
-
-    // move the address of the current executable segment from x14 into x0
-    // mov x0, x14
-    *p++ = 0xE0;
-    *p++ = 0x03;
-    *p++ = 0x0E;
-    *p++ = 0xAA;
-
-    // mov the opcode for duplicate into w1
-    // mov w1, OP_OUT
-    uint32_t mov = 0x52800000;
-    mov |= (OP_DUPLICATE & 0xFFFF) << 5;
-    mov |= 1;
-
-    *p++ = mov & 0xFF;
-    *p++ = (mov >> 8) & 0xFF;
-    *p++ = (mov >> 16) & 0xFF;
-    *p++ = (mov >> 24) & 0xFF;
-
 
     // // check if the segment being loaded is segment 0
     // // if wB is 0, jump straight to the return
