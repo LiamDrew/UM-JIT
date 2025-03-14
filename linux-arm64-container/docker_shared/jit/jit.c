@@ -1159,6 +1159,9 @@ void *load_program(uint32_t b_val)
     return new_zero;
 }
 
+/* NOTE: I'm suspecting that something may be wrong with this function:
+ * sandmark works properly when it is unrolled, written to disk, and then run,
+ * but it's not working properly when run here*/
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 {
     (void)b;

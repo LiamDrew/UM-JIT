@@ -103,6 +103,8 @@ loop:
     // Calling the executable memory
     blr x0
 
+    mov x14, x0
+
     // mov x12, x0
     // push_regs
     // extra_push
