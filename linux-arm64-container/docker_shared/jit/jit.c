@@ -1173,18 +1173,19 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     (void)b;
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // move the program counter into x27
+    /* NOTE: I could imagine saving some space here by having the executable
+     * memory live permanently in x14, so that this move was not necessary.
+     * This would a require an architectural change to this function, handle
+     * halt, and the assembly utility for this to all work correctly. This
+     * actually isn't the craziest idea though. I would like to get this working
+     * first and then experiment with it. */
+
+    // move the 32-bit program counter into x27
+    // mov w27, wC
     *p++ = 0xFB;
     *p++ = 0x03;
     *p++ = 0x00 + (BR + c);
     *p++ = 0x2A;
-
-    // NOTE: I could imagine saving some space here by having the executable
-    // memory live permanently in x14, so that this move was not necessary.
-    // This would a require an architectural change to this function, handle
-    // halt, and the assembly utility for this to all work correctly. This
-    // actually isn't the craziest idea though. I would like to get this working
-    // first and then experiment with it.
 
     // move the address of the current executable segment from x14 into x0
     // mov x0, x14
@@ -1193,10 +1194,7 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x0E;
     *p++ = 0xAA;
 
-    // mov the opcode for duplicate into the correct register
-
-    // put the right opcode in w1
-    // Move enum code for read reg into w1
+    // mov the opcode for duplicate into w1
     // mov w1, OP_OUT
     uint32_t mov = 0x52800000;
     mov |= (OP_DUPLICATE & 0xFFFF) << 5;
@@ -1207,20 +1205,18 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = (mov >> 16) & 0xFF;
     *p++ = (mov >> 24) & 0xFF;
 
-    // TODO: the solution to my problems is so close. it's within this function
-    // right here
 
     // // check if the segment being loaded is segment 0
     // // if wB is 0, jump straight to the return
-    // cbz wB, +8
+    // // cbz wB, +8
     *p++ = 0x60 + (BR + b);
     *p++ = 0x00;
     *p++ = 0x00;
     *p++ = 0x34;
 
-    // mov x0, wB
+    // mov w0, wB
     *p++ = 0xE0;
-    *p++ = 0x30;
+    *p++ = 0x03;
     *p++ = 0x00 + (BR + b);
     *p++ = 0x2A;
 

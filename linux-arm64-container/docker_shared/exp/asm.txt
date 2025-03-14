@@ -151,7 +151,7 @@ Disassembly of section .text:
  77c:	b90007e0 	str	w0, [sp, #4]
  780:	b94007e1 	ldr	w1, [sp, #4]
  784:	90000000 	adrp	x0, 0 <__abi_tag-0x278>
- 788:	9120b000 	add	x0, x0, #0x82c
+ 788:	9120a000 	add	x0, x0, #0x828
  78c:	97ffffa9 	bl	630 <printf@plt>
  790:	b94003e0 	ldr	w0, [sp]
  794:	a9447bfd 	ldp	x29, x30, [sp, #64]
@@ -184,16 +184,15 @@ Disassembly of section .text:
  7f8:	d61f0380 	br	x28
  7fc:	2a1303e0 	mov	w0, w19
  800:	2a1a03e0 	mov	w0, w26
- 804:	2a0003f3 	mov	w19, w0
- 808:	2a0003fa 	mov	w26, w0
- 80c:	2a0003e0 	mov	w0, w0
- 810:	d65f03c0 	ret
+ 804:	2a0003e0 	mov	w0, w0
+ 808:	2a1403e0 	mov	w0, w20
+ 80c:	d65f03c0 	ret
 
 Disassembly of section .fini:
 
-0000000000000814 <_fini>:
- 814:	d503201f 	nop
- 818:	a9bf7bfd 	stp	x29, x30, [sp, #-16]!
- 81c:	910003fd 	mov	x29, sp
- 820:	a8c17bfd 	ldp	x29, x30, [sp], #16
- 824:	d65f03c0 	ret
+0000000000000810 <_fini>:
+ 810:	d503201f 	nop
+ 814:	a9bf7bfd 	stp	x29, x30, [sp, #-16]!
+ 818:	910003fd 	mov	x29, sp
+ 81c:	a8c17bfd 	ldp	x29, x30, [sp], #16
+ 820:	d65f03c0 	ret
