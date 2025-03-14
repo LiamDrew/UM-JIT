@@ -32,6 +32,12 @@ test:
 
     adr x13, +4
     adr x13, +8
+    
+    cbz w0, +12
+    cbz w1, +12
     br x28
+
+    mov w0, w19
+    mov w0, w26
     
     ret

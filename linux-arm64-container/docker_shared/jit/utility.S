@@ -34,7 +34,6 @@
 
 .macro function_end
     ldp x29, x30, [sp], #16     // Restore frame pointer and link register
-    ret
 .endm
 
 /* Arm special registers are:
@@ -113,7 +112,8 @@ done:
     ldp x23, x24, [sp], #16
     ldp x21, x22, [sp], #16
     ldp x19, x20, [sp], #16    
-function_end
+    function_end
+ret
 
 .global large_op
 large_op:
@@ -133,18 +133,20 @@ large_op:
     beq .dup
 
 .map:
-function_start
+    function_start
     push_regs
     bl map_segment
     pop_regs
-function_end
+    function_end
+ret
 
 .unmap:
-function_start
+    function_start
     push_regs
     bl unmap_segment
     pop_regs
-function_end
+    function_end
+ret
 
 .out:
     // Writing out the function start macro because the end is different
@@ -171,12 +173,12 @@ function_end
     br x13
 // function_end
 
+// NOTE: this one needs help
 .dup:
     function_start
     push_regs
-    // call the function
     bl load_program
     pop_regs
     function_end
-    // retm
+    ret // this should return to the original loop
 

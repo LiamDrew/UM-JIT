@@ -171,7 +171,7 @@ void *initialize_zero_segment(size_t asmbytes)
     assert(zero != MAP_FAILED);
 
     // TODO: Add this back in
-    // memset(zero, 0, asmbytes);
+    memset(zero, 0, asmbytes);
     return zero;
 }
 
@@ -383,6 +383,11 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = 0x03;
     *p++ = 0xD5;
 
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     return CHUNK;
 }
 
@@ -410,6 +415,11 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (csel_instr >> 24) & 0xFF;
 
     // 4 No Ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -480,6 +490,11 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     return CHUNK;
 }
 
@@ -504,6 +519,11 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0xB8;
 
     // 4 No Ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -593,6 +613,11 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     return CHUNK;
 }
 
@@ -614,6 +639,11 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (mul_instr >> 24) & 0xFF;
 
     // 5 No ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -685,6 +715,11 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     return CHUNK;
 }
 
@@ -718,6 +753,11 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (mvn_instr >> 24) & 0xFF;
 
     // 4 No Ops
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -861,6 +901,11 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x00;
     *p++ = 0x2A;
 
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     return CHUNK;
 }
 
@@ -917,7 +962,12 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0x41;
     *p++ = 0xF8;
 
-    // 1 No op
+    // 2 No op
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -979,7 +1029,12 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     // *p++ = 0x41;
     // *p++ = 0xF8;
 
-    // 2 No op
+    // 3 No op
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -997,7 +1052,6 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
-    // put the right opcode in w1
     // Move enum code for read reg into w1
     // mov w1, OP_OUT
     uint32_t mov = 0x52800000;
@@ -1009,15 +1063,8 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
     *p++ = (mov >> 16) & 0xFF;
     *p++ = (mov >> 24) & 0xFF;
 
-    // I think I see a way to save some bytes here by moving some instructions
-    // to the utility file instead of writing them inline
-
-    // we could save the current instruction pointer into a temp register,
-    // branch to x28, and then from the assembly file branch back. This may
-    // not be worth the effort but worth considering
-
     // save current instruction pointer to x13
-    // // 1000002d
+    // adr x13, +8
     *p++ = 0x4d;
     *p++ = 0x00;
     *p++ = 0x00;
@@ -1029,32 +1076,17 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x1F;
     *p++ = 0xD6;
 
-    // // Save x30 to stack
-    // *p++ = 0xFE; // str x30, [sp, #-16]!
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0xF8;
-
-    // // blr x28
-    // *p++ = 0x80;
-    // *p++ = 0x03;
-    // *p++ = 0x3F;
-    // *p++ = 0xD6;
-
-    // // Restore x30 from stack
-    // *p++ = 0xFE; // ldr x30, [sp], #16
-    // *p++ = 0x07;
-    // *p++ = 0x41;
-    // *p++ = 0xF8;
-
     // mov result into reg c
-    // *p++ = 0xf3 + c; // TODO: fix this to be modular
     *p++ = 0xE0 + (BR + c);
     *p++ = 0x03;
     *p++ = 0x00;
     *p++ = 0x2A;
 
-    // 1 no op
+    // 3 no op
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
 
     *p++ = 0x1F;
     *p++ = 0x20;
@@ -1078,13 +1110,23 @@ void *load_program(uint32_t b_val)
      * and returns the correct address is b_val is 0.
      * This function handles loading a non-zero segment into segment zero. */
 
+    printf("Printing before segfault\n");
+
+    
+    printf("bval is %u\n", b_val);
+
     uint32_t new_seg_size = gs.seg_lens[b_val];
+    // printf("here1\n");
     uint32_t *new_vals = calloc(new_seg_size, sizeof(uint32_t));
+    // printf("here2\n");
     memcpy(new_vals, gs.val_seq[b_val], new_seg_size * sizeof(uint32_t));
+    // printf("here3\n");
 
     /* Update the existing memory segment */
     gs.val_seq[0] = new_vals;
     gs.seg_lens[0] = new_seg_size;
+
+    // printf("here?2\n");
 
     // Allocate new executable memory for the segment being mapped
     void *new_zero = mmap(NULL, new_seg_size * CHUNK,
@@ -1099,10 +1141,10 @@ void *load_program(uint32_t b_val)
     }
 
     gs.active = new_zero;
+    printf("Finishing load program\n");
     return new_zero;
 }
 
-// fast version
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 {
     (void)b;
@@ -1111,8 +1153,7 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     // move the program counter into x27
     *p++ = 0xFB;
     *p++ = 0x03;
-    // *p++ = 0x13 + c; // TODO: Fix this to be modular
-    *p++ = 0x00 + (BR + c); // TODO: Fix this to be modular
+    *p++ = 0x00 + (BR + c);
     *p++ = 0x2A;
 
     // NOTE: I could imagine saving some space here by having the executable
@@ -1146,10 +1187,16 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     // check if the segment being loaded is segment 0
     // if wB is 0, jump straight to the return
     // cbz wB, +8
-    *p++ = 0x40 + (BR + b);
+    *p++ = 0x60 + (BR + b);
     *p++ = 0x00;
     *p++ = 0x00;
     *p++ = 0x34;
+
+    // mov x0, wB
+    *p++ = 0xE0;
+    *p++ = 0x30;
+    *p++ = 0x00 + (BR + b);
+    *p++ = 0x2A;
 
     // else, jump to the inline assembly meant to handle this.
     // more testing with stack pointer, ect has to be done here
@@ -1168,6 +1215,76 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 
     return CHUNK;
 }
+
+// // fast version
+// size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
+// {
+//     (void)b;
+//     uint8_t *p = (uint8_t *)zero + offset;
+
+//     // move the program counter into x27
+//     *p++ = 0xFB;
+//     *p++ = 0x03;
+//     *p++ = 0x00 + (BR + c);
+//     *p++ = 0x2A;
+
+//     // NOTE: I could imagine saving some space here by having the executable
+//     // memory live permanently in x14, so that this move was not necessary.
+//     // This would a require an architectural change to this function, handle
+//     // halt, and the assembly utility for this to all work correctly. This
+//     // actually isn't the craziest idea though. I would like to get this working
+//     // first and then experiment with it.
+
+//     // move the address of the current executable segment from x14 into x0
+//     // mov x0, x14
+//     *p++ = 0xE0;
+//     *p++ = 0x03;
+//     *p++ = 0x0E;
+//     *p++ = 0xAA;
+
+//     // mov the opcode for duplicate into the correct register
+
+//     // put the right opcode in w1
+//     // Move enum code for read reg into w1
+//     // mov w1, OP_OUT
+//     uint32_t mov = 0x52800000;
+//     mov |= (OP_DUPLICATE & 0xFFFF) << 5;
+//     mov |= 1;
+
+//     *p++ = mov & 0xFF;
+//     *p++ = (mov >> 8) & 0xFF;
+//     *p++ = (mov >> 16) & 0xFF;
+//     *p++ = (mov >> 24) & 0xFF;
+
+//     // check if the segment being loaded is segment 0
+//     // if wB is 0, jump straight to the return
+//     // cbz wB, +8
+//     *p++ = 0x40 + (BR + b);
+//     *p++ = 0x00;
+//     *p++ = 0x00;
+//     *p++ = 0x34;
+
+//     // mov x0, wB
+
+
+
+//     // else, jump to the inline assembly meant to handle this.
+//     // more testing with stack pointer, ect has to be done here
+//     // br x28 (We will do the return from the inline assembly)
+//     *p++ = 0x80;
+//     *p++ = 0x03;
+//     *p++ = 0x1F;
+//     *p++ = 0xD6;
+
+//     // if yes, just return
+//     // ret
+//     *p++ = 0xC0;
+//     *p++ = 0x03;
+//     *p++ = 0x5F;
+//     *p++ = 0xD6;
+
+//     return CHUNK;
+// }
 
 // // small version (18 bytes)
 // size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
