@@ -192,7 +192,7 @@ int main(int argc, char *argv[])
 
     run(curr_seg, gs.val_seq);
 
-    printf("\nFinished running the assembly code\n");
+    // printf("\nFinished running the assembly code\n");
 
     // Free all program segments
     for (uint32_t i = 0; i < gs.seq_size; i++)
@@ -417,11 +417,6 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5;
-
     return CHUNK;
 }
 
@@ -464,11 +459,6 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5;
-
     return CHUNK;
 }
 
@@ -508,11 +498,6 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5;
-
     return CHUNK;
 }
 
@@ -549,11 +534,6 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x20;
     *p++ = 0x03;
     *p++ = 0xD5;
-
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -593,11 +573,6 @@ size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x20;
     *p++ = 0x03;
     *p++ = 0xD5;
-
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -640,12 +615,6 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5;
-
-
     return CHUNK;
 }
 
@@ -686,11 +655,6 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x20;
     *p++ = 0x03;
     *p++ = 0xD5;
-
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -739,11 +703,6 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x20;
     *p++ = 0x03;
     *p++ = 0xD5;
-
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -830,24 +789,7 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = BR + c;
     *p++ = 0x2A;
 
-    // // load correct opcode
-    // // Move enum code for print reg into w1
-    // // mov w1, OP_OUT
-    // uint32_t mov = 0x52800000;
-    // mov |= (OP_MAP & 0xFFFF) << 5;
-    // mov |= OP_REG;
-
-    // *p++ = mov & 0xFF;
-    // *p++ = (mov >> 8) & 0xFF;
-    // *p++ = (mov >> 16) & 0xFF;
-    // *p++ = (mov >> 24) & 0xFF;
-
     // call map segment function
-
-    // doing this the address way is significantly slower than just using the
-    // standard calling convention, which makes relatively little sense
-    // time is ~0.80 vs ~0.87, which is non trivial for a small instruction
-    // like this
 
     // Save x30 to stack
     *p++ = 0xFE; // str x30, [sp, #-16]!
@@ -855,6 +797,8 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0xF8;
 
+    // since this call is common, we are giving it it's own register to play
+    // with since Arm is rich in registers and we want things to go fast
     // blr x12
     *p++ = 0x80;
     *p++ = 0x01;
@@ -913,18 +857,6 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
 
     // call unmap segment function
 
-    // // adr x14, +8
-    // *p++ = 0x4E;
-    // *p++ = 0x00;
-    // *p++ = 0x00;
-    // *p++ = 0x10;
-
-    // // br x28
-    // *p++ = 0x80;
-    // *p++ = 0x03;
-    // *p++ = 0x1F;
-    // *p++ = 0xD6;
-
     // Save x30 to stack
     *p++ = 0xFE; // str x30, [sp, #-16]!
     *p++ = 0x0F;
@@ -942,17 +874,6 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0x07;
     *p++ = 0x41;
     *p++ = 0xF8;
-
-    // // 1 No ops
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5;
-
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -997,11 +918,6 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5;
-
     return CHUNK;
 }
 
@@ -1045,17 +961,12 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5;
-
     return CHUNK;
 }
 
 void *load_program(uint32_t b_val)
 {
-    printf("Load program was called\n");
+    // printf("Load program was called\n");
     /* The inline assembly for the load program sets the program counter gs.pc
      * and returns the correct address is b_val is 0.
      * This function handles loading a non-zero segment into segment zero. */
@@ -1082,7 +993,7 @@ void *load_program(uint32_t b_val)
     }
 
     gs.active = new_zero;
-    printf("Finishing load program\n");
+    // printf("Finishing load program\n");
     return new_zero;
 }
 
@@ -1100,11 +1011,18 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
 
     // // check if the segment being loaded is segment 0
     // // if wB is 0, jump straight to the return
-    // // cbz wB, +8
-    *p++ = 0x60 + (BR + b);
+    // // cbnz wB, +8
+    *p++ = 0x40 + (BR + b);
     *p++ = 0x00;
     *p++ = 0x00;
-    *p++ = 0x34;
+    *p++ = 0x35;
+
+    // if yes, just return
+    // ret
+    *p++ = 0xC0;
+    *p++ = 0x03;
+    *p++ = 0x5F;
+    *p++ = 0xD6;
 
     // mov w0, wB
     *p++ = 0xE0;
@@ -1112,19 +1030,10 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x00 + (BR + b);
     *p++ = 0x2A;
 
-    // else, jump to the inline assembly meant to handle this.
-    // more testing with stack pointer, ect has to be done here
     // br x28 (We will do the return from the inline assembly)
     *p++ = 0x80;
     *p++ = 0x03;
     *p++ = 0x1F;
-    *p++ = 0xD6;
-
-    // if yes, just return
-    // ret
-    *p++ = 0xC0;
-    *p++ = 0x03;
-    *p++ = 0x5F;
     *p++ = 0xD6;
 
     return CHUNK;

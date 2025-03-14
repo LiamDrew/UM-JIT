@@ -16,7 +16,7 @@ Disassembly of section .plt:
 
 0000000000000650 <.plt>:
  650:	a9bf7bf0 	stp	x16, x30, [sp, #-16]!
- 654:	90000090 	adrp	x16, 10000 <__FRAME_END__+0xf620>
+ 654:	90000090 	adrp	x16, 10000 <__FRAME_END__+0xf610>
  658:	f947fe11 	ldr	x17, [x16, #4088]
  65c:	913fe210 	add	x16, x16, #0xff8
  660:	d61f0220 	br	x17
@@ -70,7 +70,7 @@ Disassembly of section .text:
  710:	f94003e1 	ldr	x1, [sp]
  714:	910023e2 	add	x2, sp, #0x8
  718:	910003e6 	mov	x6, sp
- 71c:	90000080 	adrp	x0, 10000 <__FRAME_END__+0xf620>
+ 71c:	90000080 	adrp	x0, 10000 <__FRAME_END__+0xf610>
  720:	f947ec00 	ldr	x0, [x0, #4056]
  724:	d2800003 	mov	x3, #0x0                   	// #0
  728:	d2800004 	mov	x4, #0x0                   	// #0
@@ -78,7 +78,7 @@ Disassembly of section .text:
  730:	97ffffe0 	bl	6b0 <abort@plt>
 
 0000000000000734 <call_weak_fn>:
- 734:	90000080 	adrp	x0, 10000 <__FRAME_END__+0xf620>
+ 734:	90000080 	adrp	x0, 10000 <__FRAME_END__+0xf610>
  738:	f947e800 	ldr	x0, [x0, #4048]
  73c:	b4000040 	cbz	x0, 744 <call_weak_fn+0x10>
  740:	17ffffd8 	b	6a0 <__gmon_start__@plt>
@@ -93,7 +93,7 @@ Disassembly of section .text:
  75c:	91010021 	add	x1, x1, #0x40
  760:	eb00003f 	cmp	x1, x0
  764:	540000c0 	b.eq	77c <deregister_tm_clones+0x2c>  // b.none
- 768:	90000081 	adrp	x1, 10000 <__FRAME_END__+0xf620>
+ 768:	90000081 	adrp	x1, 10000 <__FRAME_END__+0xf610>
  76c:	f947dc21 	ldr	x1, [x1, #4024]
  770:	b4000061 	cbz	x1, 77c <deregister_tm_clones+0x2c>
  774:	aa0103f0 	mov	x16, x1
@@ -110,7 +110,7 @@ Disassembly of section .text:
  798:	8b810c41 	add	x1, x2, x1, asr #3
  79c:	9341fc21 	asr	x1, x1, #1
  7a0:	b40000c1 	cbz	x1, 7b8 <register_tm_clones+0x38>
- 7a4:	90000082 	adrp	x2, 10000 <__FRAME_END__+0xf620>
+ 7a4:	90000082 	adrp	x2, 10000 <__FRAME_END__+0xf610>
  7a8:	f947f042 	ldr	x2, [x2, #4064]
  7ac:	b4000062 	cbz	x2, 7b8 <register_tm_clones+0x38>
  7b0:	aa0203f0 	mov	x16, x2
@@ -125,7 +125,7 @@ Disassembly of section .text:
  7cc:	b0000093 	adrp	x19, 11000 <__libc_start_main@GLIBC_2.34>
  7d0:	39410260 	ldrb	w0, [x19, #64]
  7d4:	35000140 	cbnz	w0, 7fc <__do_global_dtors_aux+0x3c>
- 7d8:	90000080 	adrp	x0, 10000 <__FRAME_END__+0xf620>
+ 7d8:	90000080 	adrp	x0, 10000 <__FRAME_END__+0xf610>
  7dc:	f947e000 	ldr	x0, [x0, #4032]
  7e0:	b4000080 	cbz	x0, 7f0 <__do_global_dtors_aux+0x30>
  7e4:	b0000080 	adrp	x0, 11000 <__libc_start_main@GLIBC_2.34>
@@ -158,7 +158,7 @@ Disassembly of section .text:
  840:	2a2803e8 	mvn	w8, w8
  844:	11000508 	add	w8, w8, #0x1
  848:	b9000be8 	str	w8, [sp, #8]
- 84c:	90000088 	adrp	x8, 10000 <__FRAME_END__+0xf620>
+ 84c:	90000088 	adrp	x8, 10000 <__FRAME_END__+0xf610>
  850:	f947e508 	ldr	x8, [x8, #4040]
  854:	f9400100 	ldr	x0, [x8]
  858:	aa1f03e1 	mov	x1, xzr
@@ -167,7 +167,7 @@ Disassembly of section .text:
  864:	97ffff8b 	bl	690 <setvbuf@plt>
  868:	b9400be1 	ldr	w1, [sp, #8]
  86c:	90000000 	adrp	x0, 0 <__abi_tag-0x278>
- 870:	91236000 	add	x0, x0, #0x8d8
+ 870:	9123a000 	add	x0, x0, #0x8e8
  874:	97ffff93 	bl	6c0 <printf@plt>
  878:	b94007e0 	ldr	w0, [sp, #4]
  87c:	a9427bfd 	ldp	x29, x30, [sp, #32]
@@ -188,13 +188,17 @@ Disassembly of section .text:
  8b0:	7100001f 	cmp	w0, #0x0
  8b4:	7100027f 	cmp	w19, #0x0
  8b8:	1a801000 	csel	w0, w0, w0, ne  // ne = any
- 8bc:	d65f03c0 	ret
+ 8bc:	35000040 	cbnz	w0, 8c4 <test+0x3c>
+ 8c0:	34000040 	cbz	w0, 8c8 <test+0x40>
+ 8c4:	34000040 	cbz	w0, 8cc <test+0x44>
+ 8c8:	34000060 	cbz	w0, 8d4 <_fini+0x4>
+ 8cc:	d65f03c0 	ret
 
 Disassembly of section .fini:
 
-00000000000008c0 <_fini>:
- 8c0:	d503201f 	nop
- 8c4:	a9bf7bfd 	stp	x29, x30, [sp, #-16]!
- 8c8:	910003fd 	mov	x29, sp
- 8cc:	a8c17bfd 	ldp	x29, x30, [sp], #16
- 8d0:	d65f03c0 	ret
+00000000000008d0 <_fini>:
+ 8d0:	d503201f 	nop
+ 8d4:	a9bf7bfd 	stp	x29, x30, [sp, #-16]!
+ 8d8:	910003fd 	mov	x29, sp
+ 8dc:	a8c17bfd 	ldp	x29, x30, [sp], #16
+ 8e0:	d65f03c0 	ret

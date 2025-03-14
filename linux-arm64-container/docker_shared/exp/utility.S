@@ -24,5 +24,10 @@ test:
     CMP w0, #0
     CMP w19, #0
     CSEL w0, w0, w0, NE
+
+    cbnz w0, +8
+    cbz w0, +8
+    cbz w0, +8
+    cbz w0, +12
     
     ret
