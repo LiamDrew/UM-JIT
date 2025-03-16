@@ -462,6 +462,10 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return CHUNK;
 }
 
+
+// NOTE: update these two functions to use x28 instead of x15 for storing the
+// the segment address we want.
+
 size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
@@ -746,6 +750,8 @@ uint32_t map_segment(uint32_t size)
             gs.val_seq = realloc(gs.val_seq, gs.seq_cap * sizeof(uint32_t *));
             assert(gs.val_seq != NULL);
 
+            // NOTE: need to update the register that contains the value sequence in the case of recallocing.
+
             // Initializing all reallocated memory
             for (uint32_t i = gs.seq_size; i < gs.seq_cap; i++)
             {
@@ -993,7 +999,7 @@ void *load_program(uint32_t b_val)
     }
 
     gs.active = new_zero;
-    // printf("Finishing load program\n");
+    printf("Finishing load program\n");
     return new_zero;
 }
 

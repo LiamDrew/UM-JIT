@@ -75,18 +75,26 @@ run:
     mov x25, xzr
     mov x26, xzr
 
+    // NOTE: It would be ideal to use register x28 to store address of the
+    // segment sequence, since that way it could be updated in the map_segment
+    // function call with inline assembly.
+
+
+    // put the address of the large op function handler in x28
+    ldr x28, =large_op
+
+    // store the address of the segment currently being executed
+    mov x27, x0
+
     // store the address of the value sequence
     mov x15, x1
 
     // store the default value of the large op in w14
     mov w14, #OP_DUPLICATE
 
-    // store the address of the segment currently being executed
-    mov x27, x0
+    // x13 will be used to store instruction pointer addresses when doing jumps
 
-    // put the address of the large op function handler in x28
-    ldr x28, =large_op
-
+    // put the address of the handle_map function in x12
     ldr x12, =handle_map
 
     // set the 32-bit program pointer to 0
@@ -108,6 +116,16 @@ loop:
 
     // Calling the executable memory
     blr x0
+
+
+    // stp x9, x10, [sp, #-16]!
+    // push_regs
+    // extra_push
+    // bl print_registers_w19_to_w26
+    // extra_pop
+    // pop_regs
+    // ldp x9, x10, [sp], #16
+
 
     // Jump back to the beginning of the loop
     b loop
@@ -134,8 +152,6 @@ handle_map:
     function_end
 
     // restore_default_opcode
-    // br maybe?
-    // br x13
 ret
 
 
@@ -145,21 +161,6 @@ large_op:
     /* Plan: have x14 become the new opcode getting checked. The JITted code
      * will preserve #OP_DUPLICATE as the default, saving us an instruction in
      * the inject load program function */
-
-    // cmp x1, #OP_MAP
-    // beq .map
-
-    // cmp x1, #OP_UNMAP
-    // beq .unmap
-
-    // cmp x1, #OP_IN
-    // beq .in
-
-    // cmp x1, #OP_OUT
-    // beq .out
-
-    // cmp x1, #OP_DUPLICATE
-    // beq .dup
 
     // cmp x14, #OP_MAP
     // beq .map
@@ -252,6 +253,16 @@ ret
 
     // pop x10
     ldp x9, x10, [sp], #16
+
+    stp x9, x10, [sp, #-16]!
+    push_regs
+    extra_push
+    bl print_registers_w19_to_w26
+    extra_pop
+    pop_regs
+    ldp x9, x10, [sp], #16
+
+
 
     function_end
 ret // this should return to the original loop
