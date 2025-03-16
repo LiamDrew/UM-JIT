@@ -241,13 +241,13 @@ ret
     // pop x10
     ldp x9, x10, [sp], #16
 
-    stp x9, x10, [sp, #-16]!
-    push_regs
-    extra_push
-    bl print_registers_w19_to_w26
-    extra_pop
-    pop_regs
-    ldp x9, x10, [sp], #16
+    // stp x9, x10, [sp, #-16]!
+    // push_regs
+    // extra_push
+    // bl print_registers_w19_to_w26
+    // extra_pop
+    // pop_regs
+    // ldp x9, x10, [sp], #16
 
 
 
