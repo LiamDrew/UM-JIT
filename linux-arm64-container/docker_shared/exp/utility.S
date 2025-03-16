@@ -7,27 +7,14 @@ test:
 
     // str w1, [x0]
 
-    mov w10, w0
-    mov w1, w19
+    // ldr x9, [x15, wA, UXTW #3]
+    ldr x9, [x15, w0, UXTW #3]
+    ldr x9, [x28, w0, UXTW #3]
 
-    mov x0, x14
-    mov x0, x27
+    blr x28
+    blr x15
 
-    // xor x27, x27
-    mov x27, #0
-
-    adr x14, +8
-    adr x13, +8
-
-    blr x12
-
-    CMP w0, #0
-    CMP w19, #0
-    CSEL w0, w0, w0, NE
-
-    cbnz w0, +8
-    cbz w0, +8
-    cbz w0, +8
-    cbz w0, +12
+    br x28
+    br x15
     
     ret

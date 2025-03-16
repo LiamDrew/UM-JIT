@@ -75,19 +75,23 @@ run:
     mov x25, xzr
     mov x26, xzr
 
+    // store the address of the segment currently being executed
+    mov x27, x0
+
     // NOTE: It would be ideal to use register x28 to store address of the
     // segment sequence, since that way it could be updated in the map_segment
     // function call with inline assembly.
 
-
-    // put the address of the large op function handler in x28
-    ldr x28, =large_op
-
-    // store the address of the segment currently being executed
-    mov x27, x0
-
     // store the address of the value sequence
-    mov x15, x1
+    mov x28, x1
+
+    ldr x15, =large_op
+
+    // // put the address of the large op function handler in x28
+    // ldr x28, =large_op
+
+    // // store the address of the value sequence
+    // mov x15, x1
 
     // store the default value of the large op in w14
     mov w14, #OP_DUPLICATE
@@ -147,11 +151,11 @@ handle_map:
 
     bl map_segment
 
+    mov x28, x16
+
     pop_regs
     extra_pop
     function_end
-
-    // restore_default_opcode
 ret
 
 
@@ -161,9 +165,6 @@ large_op:
     /* Plan: have x14 become the new opcode getting checked. The JITted code
      * will preserve #OP_DUPLICATE as the default, saving us an instruction in
      * the inject load program function */
-
-    // cmp x14, #OP_MAP
-    // beq .map
 
     cmp x14, #OP_UNMAP
     beq .unmap
@@ -176,20 +177,6 @@ large_op:
 
     cmp x14, #OP_DUPLICATE
     beq .dup
-
-// .map:
-//     function_start
-//     extra_push
-//     push_regs
-//     bl map_segment
-//     pop_regs
-//     extra_pop
-//     function_end
-
-//     restore_default_opcode
-//     // br maybe?
-//     br x13
-// ret
 
 .unmap:
     function_start

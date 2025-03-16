@@ -98,6 +98,20 @@ void print_registers_w19_to_w26(void)
     printf("PC = %u\n", reg_values[8]);
 }
 
+void print_x28(void)
+{
+    void *val;
+
+    __asm__ volatile(
+        "mov %0, x28"
+        : "=r"(val) // Output operand: store x28 value into val
+        :           // No input operands
+        :           // No clobbers
+    );
+
+    printf("x28 = %p\n", val);
+}
+
 // void initialize_instruction_bank();
 void *initialize_zero_segment(size_t fsize);
 void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t fsize);
@@ -472,12 +486,22 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
     // The address of val_seq is in x15
 
-    // put the address of the segment we want in x9
-    // ldr x9, [x15, wB, UXTW #3] (UXTW #3 -> multiply by 8 bytes for pointers)
-    *p++ = 0xE9;
-    *p++ = 0x59;
+    // updating this to be x28
+
+    // ldr x9, [x28, 20, uxtw #3]
+    *p++ = 0x89;
+    *p++ = 0x5B;
     *p++ = 0x60 + (BR + b);
-    *p++ = 0xf8;
+    *p++ = 0xF8;
+
+    // // put the address of the segment we want in x9
+    // // ldr x9, [x15, wB, UXTW #3] (UXTW #3 -> multiply by 8 bytes for pointers)
+    // *p++ = 0xE9;
+    // *p++ = 0x59;
+    // *p++ = 0x60 + (BR + b);
+    // *p++ = 0xf8;
+
+
 
     // load the value from the index in the target segment to register wA
     // ldr wA, [x9, wC, UXTW #2] (UXTW #2 -> multiply by 4 bytes for uint32_t)
@@ -510,11 +534,17 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     uint8_t *p = (uint8_t *)zero + offset;
 
     // load the address of the segment we want into x9
-    // ldr x9, [x15, wA, UXTW #3] (UXTW #3 -> multiply by 8 bytes for pointers)
-    *p++ = 0xE9;
-    *p++ = 0x59;
+    // // ldr x9, [x15, wA, UXTW #3] (UXTW #3 -> multiply by 8 bytes for pointers)
+    // *p++ = 0xE9;
+    // *p++ = 0x59;
+    // *p++ = 0x60 + (BR + a);
+    // *p++ = 0xf8;
+
+    // ldr x9, [x28, 20, uxtw #3]
+    *p++ = 0x89;
+    *p++ = 0x5B;
     *p++ = 0x60 + (BR + a);
-    *p++ = 0xf8;
+    *p++ = 0xF8;
 
     // store what we want to store at the right address
     // str wC, [x9, wB, uxtw #2] (UXTW #2 -> multiply by 4 bytes for uint32_t)
@@ -740,6 +770,7 @@ uint32_t map_segment(uint32_t size)
         // Expand if necessary
         if (gs.seq_size == gs.seq_cap)
         {
+            // print_x28();
             gs.seq_cap *= 2;
 
             // realloc the array that keeps track of sequence size
@@ -751,6 +782,16 @@ uint32_t map_segment(uint32_t size)
             assert(gs.val_seq != NULL);
 
             // NOTE: need to update the register that contains the value sequence in the case of recallocing.
+            // need to put some inline assembly in here
+            // printf("Sequence getting expanded\n");
+            // __asm__ volatile (
+            //     "mov x28, %0"
+            //     : // no outputs
+            //     : "r" (gs.val_seq) // input operand
+            //     : "x28" // clobber list
+            // );
+
+            // print_x28();
 
             // Initializing all reallocated memory
             for (uint32_t i = gs.seq_size; i < gs.seq_cap; i++)
@@ -781,6 +822,15 @@ uint32_t map_segment(uint32_t size)
     // zero out the new segment
     memset(gs.val_seq[new_seg_id], 0, size * sizeof(uint32_t));
 
+    // Using x16, an intraprocedure call temporary register, to store the new
+    // value of the value sequence
+    __asm__ volatile (
+        "mov x16, %0"
+        : 
+        : "r"(gs.val_seq)
+        : "x16"
+    );
+
     return new_seg_id;
 }
 
@@ -805,6 +855,7 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 
     // since this call is common, we are giving it it's own register to play
     // with since Arm is rich in registers and we want things to go fast
+    // This one does not need to be changed
     // blr x12
     *p++ = 0x80;
     *p++ = 0x01;
@@ -869,11 +920,18 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
     *p++ = 0x1F;
     *p++ = 0xF8;
 
-    // blr x28
-    *p++ = 0x80;
-    *p++ = 0x03;
+    // This needs to be changed, probably to blr x15
+    // blr x15
+    *p++ = 0xE0;
+    *p++ = 0x01;
     *p++ = 0x3F;
     *p++ = 0xD6;
+
+    // // blr x28
+    // *p++ = 0x80;
+    // *p++ = 0x03;
+    // *p++ = 0x3F;
+    // *p++ = 0xD6;
 
     // Restore x30 from stack
     *p++ = 0xFE; // ldr x30, [sp], #16
@@ -912,11 +970,18 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x00;
     *p++ = 0x10;
 
-    // br x28
-    *p++ = 0x80;
-    *p++ = 0x03;
+    // change this to br x15
+    // br x15
+    *p++ = 0xE0;
+    *p++ = 0x01;
     *p++ = 0x1F;
     *p++ = 0xD6;
+
+    // // br x28
+    // *p++ = 0x80;
+    // *p++ = 0x03;
+    // *p++ = 0x1F;
+    // *p++ = 0xD6;
 
     // 2 No op
     *p++ = 0x1F;
@@ -949,11 +1014,18 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x00;
     *p++ = 0x10;
 
-    // br x28
-    *p++ = 0x80;
-    *p++ = 0x03;
+    // change this to br x15
+    // br x15
+    *p++ = 0xE0;
+    *p++ = 0x01;
     *p++ = 0x1F;
     *p++ = 0xD6;
+
+    // // br x28
+    // *p++ = 0x80;
+    // *p++ = 0x03;
+    // *p++ = 0x1F;
+    // *p++ = 0xD6;
 
     // mov result into reg c
     *p++ = 0xE0 + (BR + c);
@@ -1036,9 +1108,16 @@ size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
     *p++ = 0x00 + (BR + b);
     *p++ = 0x2A;
 
-    // br x28 (We will do the return from the inline assembly)
-    *p++ = 0x80;
-    *p++ = 0x03;
+    // // br x28 (We will do the return from the inline assembly)
+    // *p++ = 0x80;
+    // *p++ = 0x03;
+    // *p++ = 0x1F;
+    // *p++ = 0xD6;
+
+    // change this to br x15
+    // br x15
+    *p++ = 0xE0;
+    *p++ = 0x01;
     *p++ = 0x1F;
     *p++ = 0xD6;
 
