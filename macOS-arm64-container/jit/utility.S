@@ -8,22 +8,43 @@
  * optimized for this sort of thing. That makes sense, but this will be something to profile for some of these functions
  */
 
+/* Even with the plethora of Arm registers, I'm still running into a register
+ * shortage for non-volatile registers. I'm using these macros to preserve
+ * these two registers as if they were non-volatile */
+
+// .extern _getchar
+// .extern _putchar
+// .extern _load_program
+// .extern _map_segment
+// .extern _unmap_segment
+
 .macro push_regs
-    stp x30, xzr, [sp, #-16]!
+    stp x14, x15, [sp, #-16]!   // Push x14 and x15 onto stack
 .endm
 
 .macro pop_regs
-    ldp x30, xzr, [sp], #16 
+    ldp x14, x15, [sp], #16     // Pop x14 and x15 from stack
+.endm
+
+.macro extra_push
+    stp x12, x13, [sp, #-16]!   // Push x12 and x13 onto stack
+.endm
+
+.macro extra_pop
+    ldp x12, x13, [sp], #16     // Pop x12 and x13 from stack
 .endm
 
 .macro function_start
     stp x29, x30, [sp, #-16]!   // Save frame pointer and link register
-    mov x29, sp                  // Set up frame pointer
+    mov x29, sp                 // Set up frame pointer
 .endm
 
 .macro function_end
     ldp x29, x30, [sp], #16     // Restore frame pointer and link register
-    ret
+.endm
+
+.macro restore_default_opcode
+    mov w14, #OP_DUPLICATE
 .endm
 
 /* Arm special registers are:
@@ -44,48 +65,206 @@
 _run:
     function_start
 
-    // Zero out the first 8 non-volatile registers
-    mov x19, XZR
-    mov x20, XZR
-    mov x21, XZR
-    mov x22, XZR
-    mov x23, XZR
-    mov x24, XZR
-    mov x25, XZR
-    mov x26, XZR
+    stp x19, x20, [sp, #-16]!
+    stp x21, x22, [sp, #-16]!
+    stp x23, x24, [sp, #-16]!
+    stp x25, x26, [sp, #-16]!
+    stp x27, x28, [sp, #-16]!
 
-    // Load the address of the function global in x27
 
-    // Storing x30 on the stack for future use
+    // Zero out the first 8 non-volatile registers for the UM
+    mov x19, xzr
+    mov x20, xzr
+    mov x21, xzr
+    mov x22, xzr
+    mov x23, xzr
+    mov x24, xzr
+    mov x25, xzr
+    mov x26, xzr
+
+    // store the address of the segment currently being executed
+    mov x27, x0
+
+    // NOTE: It would be ideal to use register x28 to store address of the
+    // segment sequence, since that way it could be updated in the map_segment
+    // function call with inline assembly.
+
+    // store the address of the value sequence
+    mov x28, x1
+
+    // ldr x15, =large_op
+    // Use this for position-independent code:
+    adrp x15, large_op@PAGE
+    add x15, x15, large_op@PAGEOFF
+
+    // // put the address of the large op function handler in x28
+    // ldr x28, =large_op
+
+    // // store the address of the value sequence
+    // mov x15, x1
+
+    // store the default value of the large op in w14
+    mov w14, #OP_DUPLICATE
+
+    // x13 will be used to store instruction pointer addresses when doing jumps
+
+    // put the address of the handle_map function in x12
+    // ldr x12, =handle_map
+
+    // Use:
+    adrp x12, handle_map@PAGE
+    add x12, x12, handle_map@PAGEOFF
+
+    // set the 32-bit program pointer to 0
+    // mov x27, 0
+    mov x10, 0
 
 loop:
-    ; Need to update this such that it calls the executable memory as a function
-
-    ; push_regs
-    ; mov x0, #54
-    ; bl _putchar      // Will return value in x0
-    ; pop_regs
+    // Finish if the executable memory is NULL
+    // cbz x0, done
+    cbz x27, done
     
-    ldr x27, =handler
+    mov x0, x27
 
-    ; push_regs
+    // Calculating the start position in executable memory
+    mov x9, #CHUNK
+    
+    // x0 = (x10 * x9) + x0
+    madd  x0, x10, x9, x0
 
-    blr x27
+    // Calling the executable memory
+    blr x0
 
-    ; pop_regs
 
+    // stp x9, x10, [sp, #-16]!
+    // push_regs
+    // extra_push
+    // bl print_registers_w19_to_w26
+    // extra_pop
+    // pop_regs
+    // ldp x9, x10, [sp], #16
+
+
+    // Jump back to the beginning of the loop
+    b loop
+done:
+    // Restore non-volatile registers before returning to main
+    ldp x27, x28, [sp], #16
+    ldp x25, x26, [sp], #16
+    ldp x23, x24, [sp], #16
+    ldp x21, x22, [sp], #16
+    ldp x19, x20, [sp], #16    
     function_end
+ret
 
-.global handler
-handler:
-
-    ; push_regs
+.global handle_map
+handle_map:
     function_start
-    mov x0, #54
-    bl _putchar      // Will return value in x0
+    extra_push
+    push_regs
+
+    bl _map_segment
+
+    mov x28, x16
+
+    pop_regs
+    extra_pop
     function_end
-    ; pop_regs
-    ret
+ret
 
 
+.global large_op
+large_op:
+
+    /* Plan: have x14 become the new opcode getting checked. The JITted code
+     * will preserve #OP_DUPLICATE as the default, saving us an instruction in
+     * the inject load program function */
+
+    cmp x14, #OP_UNMAP
+    beq .unmap
+
+    cmp x14, #OP_IN
+    beq .in
+
+    cmp x14, #OP_OUT
+    beq .out
+
+    cmp x14, #OP_DUPLICATE
+    beq .dup
+
+.unmap:
+    function_start
+    extra_push
+    push_regs
+    bl _unmap_segment
+    pop_regs
+    extra_pop
+    function_end
+
+    restore_default_opcode
+
+    // br?
+ret
+
+.out:
+    function_start
+    extra_push
+    push_regs
+    bl _putchar
+    pop_regs
+    extra_pop
+    function_end
+
+    restore_default_opcode
+    br x13
+
+.in:
+    function_start
+    extra_push
+    push_regs
+    bl _getchar
+    pop_regs
+    extra_pop
+    function_end
+
+    restore_default_opcode
+
+    br x13
+
+.dup:
+    function_start
+
+    /* NOTE: x10 is kind of a temporary situation over here. Once we find a
+     * better home for everything else we will decide on a forever home */
+
+    // push x10
+    stp x9, x10, [sp, #-16]!
+
+    extra_push
+    push_regs
+    
+    bl _load_program
+    
+    /* Only when we load and compile a different segment do we have to update
+     * x27 to store the new compiled executable memory */
+    mov x27, x0
+
+    pop_regs
+    extra_pop
+
+    // pop x10
+    ldp x9, x10, [sp], #16
+
+    // stp x9, x10, [sp, #-16]!
+    // push_regs
+    // extra_push
+    // bl print_registers_w19_to_w26
+    // extra_pop
+    // pop_regs
+    // ldp x9, x10, [sp], #16
+
+
+
+    function_end
+ret // this should return to the original loop
 

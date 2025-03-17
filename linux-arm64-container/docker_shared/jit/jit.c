@@ -23,13 +23,8 @@
 #define INIT_CAP 32500
 
 typedef uint32_t Instruction;
-// This will be necessary for when the function has to return the pointer to
-// the next executable memory. For now, we will let it be.
-// typedef void *(*Function)(void);
 
 typedef void *(*Function)(void);
-
-typedef int (*SimpleFunc)(void);
 
 struct GlobalState
 {
@@ -47,72 +42,6 @@ struct GlobalState
 
 struct GlobalState gs;
 
-// Add this to your C file
-void print_address(void *addr)
-{
-    printf("Address: %p\n", addr);
-}
-
-void print_hex_value(uint64_t value)
-{
-    printf("Value at address: 0x%lx\n", value);
-}
-
-void print_registers_w19_to_w26(void)
-{
-    uint32_t reg_values[9];
-
-    // Capture the register values using inline assembly
-    __asm__ volatile(
-        "str w19, %[r19]\n\t"
-        "str w20, %[r20]\n\t"
-        "str w21, %[r21]\n\t"
-        "str w22, %[r22]\n\t"
-        "str w23, %[r23]\n\t"
-        "str w24, %[r24]\n\t"
-        "str w25, %[r25]\n\t"
-        "str w26, %[r26]\n\t"
-        "str w27, %[r27]\n\t"
-        : [r19] "=m"(reg_values[0]),
-          [r20] "=m"(reg_values[1]),
-          [r21] "=m"(reg_values[2]),
-          [r22] "=m"(reg_values[3]),
-          [r23] "=m"(reg_values[4]),
-          [r24] "=m"(reg_values[5]),
-          [r25] "=m"(reg_values[6]),
-          [r26] "=m"(reg_values[7]),
-          [r27] "=m"(reg_values[8])
-        :
-        : "memory");
-
-    printf("\n");
-    printf("r0 = %u\n", reg_values[0]);
-    printf("r1 = %u\n", reg_values[1]);
-    printf("r2 = %u\n", reg_values[2]);
-    printf("r3 = %u\n", reg_values[3]);
-    printf("r4 = %u\n", reg_values[4]);
-    printf("r5 = %u\n", reg_values[5]);
-    printf("r6 = %u\n", reg_values[6]);
-    printf("r7 = %u\n", reg_values[7]);
-    printf("\n");
-    printf("PC = %u\n", reg_values[8]);
-}
-
-void print_x28(void)
-{
-    void *val;
-
-    __asm__ volatile(
-        "mov %0, x28"
-        : "=r"(val) // Output operand: store x28 value into val
-        :           // No input operands
-        :           // No clobbers
-    );
-
-    printf("x28 = %p\n", val);
-}
-
-// void initialize_instruction_bank();
 void *initialize_zero_segment(size_t fsize);
 void load_zero_segment(void *zero, uint32_t *zero_vals, FILE *fp, size_t fsize);
 uint64_t make_word(uint64_t word, unsigned width, unsigned lsb, uint64_t value);
@@ -195,18 +124,7 @@ int main(int argc, char *argv[])
 
     uint8_t *curr_seg = (uint8_t *)zero;
 
-    // NOTE: I'm suspecting this cache stuff is not necessary
-    // Clear instruction cache to make sure CPU sees our new code
-    // __builtin___clear_cache((char *)curr_seg, (char *)curr_seg + 8);
-
-    // Function fn = (Function)curr_seg;
-    // void *output = fn();
-    // printf("\nRETURN ADDRESS IS: %p\n", output);
-    // assert(output == NULL);
-
     run(curr_seg, gs.val_seq);
-
-    // printf("\nFinished running the assembly code\n");
 
     // Free all program segments
     for (uint32_t i = 0; i < gs.seq_size; i++)
@@ -225,8 +143,6 @@ void *initialize_zero_segment(size_t asmbytes)
     void *zero = mmap(NULL, asmbytes, PROT_READ | PROT_WRITE | PROT_EXEC,
                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     assert(zero != MAP_FAILED);
-
-    // TODO: Add this back in
     memset(zero, 0, asmbytes);
     return zero;
 }
@@ -415,7 +331,7 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = (upper_mov >> 16) & 0xFF;
     *p++ = (upper_mov >> 24) & 0xFF;
 
-    // 4 No Ops
+    // 3 No Ops
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -440,7 +356,7 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 
     // cmp w0, #0x0
     uint32_t cmp_instr = 0x7100001F;
-    cmp_instr |= ((BR + c) << 5); // Put register C in the right bit position
+    cmp_instr |= ((BR + c) << 5);
     *p++ = cmp_instr & 0xFF;
     *p++ = (cmp_instr >> 8) & 0xFF;
     *p++ = (cmp_instr >> 16) & 0xFF;
@@ -457,7 +373,7 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (csel_instr >> 16) & 0xFF;
     *p++ = (csel_instr >> 24) & 0xFF;
 
-    // 4 No Ops
+    // 3 No Ops
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -476,15 +392,18 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return CHUNK;
 }
 
-
-// NOTE: update these two functions to use x28 instead of x15 for storing the
-// the segment address we want.
-
 size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
     uint8_t *p = (uint8_t *)zero + offset;
 
     // The address of val_seq is in x15
+
+    // // put the address of the segment we want in x9
+    // // ldr x9, [x15, wB, UXTW #3] (UXTW #3 -> multiply by 8 bytes for pointers)
+    // *p++ = 0xE9;
+    // *p++ = 0x59;
+    // *p++ = 0x60 + (BR + b);
+    // *p++ = 0xf8;
 
     // updating this to be x28
 
@@ -494,15 +413,6 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x60 + (BR + b);
     *p++ = 0xF8;
 
-    // // put the address of the segment we want in x9
-    // // ldr x9, [x15, wB, UXTW #3] (UXTW #3 -> multiply by 8 bytes for pointers)
-    // *p++ = 0xE9;
-    // *p++ = 0x59;
-    // *p++ = 0x60 + (BR + b);
-    // *p++ = 0xf8;
-
-
-
     // load the value from the index in the target segment to register wA
     // ldr wA, [x9, wC, UXTW #2] (UXTW #2 -> multiply by 4 bytes for uint32_t)
     *p++ = 0x20 + (BR + a); // dest register
@@ -510,7 +420,7 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x60 + (BR + c); // using C as an index
     *p++ = 0xb8;
 
-    // 5 No Ops
+    // 3 No Ops
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -553,7 +463,8 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x20 + (BR + b);
     *p++ = 0xB8;
 
-    // 4 No Ops
+
+    // 3 No Ops
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -722,7 +633,7 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (mvn_instr >> 16) & 0xFF;
     *p++ = (mvn_instr >> 24) & 0xFF;
 
-    // 4 No Ops
+    // 3 No Ops
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -780,18 +691,6 @@ uint32_t map_segment(uint32_t size)
             // also need to init the memory segment
             gs.val_seq = realloc(gs.val_seq, gs.seq_cap * sizeof(uint32_t *));
             assert(gs.val_seq != NULL);
-
-            // NOTE: need to update the register that contains the value sequence in the case of recallocing.
-            // need to put some inline assembly in here
-            // printf("Sequence getting expanded\n");
-            // __asm__ volatile (
-            //     "mov x28, %0"
-            //     : // no outputs
-            //     : "r" (gs.val_seq) // input operand
-            //     : "x28" // clobber list
-            // );
-
-            // print_x28();
 
             // Initializing all reallocated memory
             for (uint32_t i = gs.seq_size; i < gs.seq_cap; i++)
