@@ -14,3 +14,8 @@ linux-arm64-container/docker_shared/emulator/unrolled_sandmark.um
 linux-arm64-container/docker_shared/jit/ref.txt
 linux-arm64-container/docker_shared/jit/ours.txt
 *.txt
+macOS-arm64-container/umasm/manyadds.um
+macOS-arm64-container/umasm/manycmoves.um
+macOS-arm64-container/umasm/manydivs.um
+macOS-arm64-container/umasm/manyloads.um
+macOS-arm64-container/umasm/manynands.um
