@@ -24,65 +24,20 @@ int main(int argc, char *argv[])
     (void)argc;
     (void)argv;
 
-    const char *filename = "bigadd.um";
+    const char *filename = "manyloads.um";
 
     FILE *fp = fopen(filename, "wb");
     assert(fp != NULL);
 
     // use fwrite()
+    size_t bw = 2000000; // 100,000
+    Instruction words[2000000] = {0};
 
-    Instruction words[15] = {0};
+    for (size_t i = 0; i < (bw - 1); i++) {
+        words[i] = three_reg(1, 3, 0, 0);
+    }
 
-    size_t bw = 14;
-
-    // r3 = 1
-    words[0] = load_val(13, 1, 3);
-
-    // load 67 into r2
-    words[1] = load_val(13, 67, 2);
-
-    // nand r6 with r6 and put result in r1
-    words[2] = three_reg(6, 1, 6, 6);
-
-    // print out r1 result
-    words[3] = three_reg(10, 0, 0, 1);
-
-    // add r1 to r2, store in r2
-    words[4] = three_reg(3, 2, 2, 1);
-
-    // print out r2 result
-    words[5] = three_reg(10, 0, 0, 2);
-
-    // r7 = 2
-    words[6] = load_val(13, 2, 7);
-
-    // r0 = r2 nand r2
-    words[7] = three_reg(6, 0, 2, 2);
-
-    // printout r0
-    words[8] = three_reg(10, 0, 0, 0);
-
-    // r7 = r7 + r0
-    words[9] = three_reg(3, 7, 7, 0);
-
-    // printout r7
-    // words[10] = three_reg(10, 0, 0, 7);
-
-    words[10] = three_reg(0, 0, 0, 0);
-
-    // The isse is the ORDER of operations for addition. Say what?
-    //r7 = r3 + r7
-    // r7 = r7 + r3
-    words[11] = three_reg(3, 7, 3, 7);
-
-    // printout r7
-    words[12] = three_reg(10, 0, 0, 7);
-
-    // load program to print out value
-    words[13] = three_reg(7, 0, 0, 0);
-    // words[13] = three_reg(12, 0, 4, 7);
-
-
+    words[bw - 1] = three_reg(7, 0, 0, 0);
 
     // NOTE: must write bytes to disk in big endian order
     for (size_t i = 0; i < bw; i++)
