@@ -16,5 +16,10 @@ test:
 
     br x28
     br x15
+
+    add x9, x28, x0
+    add x9, x28, x1
+    add x9, x28, x19
+
     
     ret

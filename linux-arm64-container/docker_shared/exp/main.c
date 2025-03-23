@@ -10,6 +10,14 @@ typedef void *(*Function)(void);
 
 void help();
 
+void help() {
+    int x = 0x12345678;
+    (void)x;
+}
+
+// :testing:
+
+
 int main(int argc, char *argv[]) {
 
     // int x = 0x12345678;
@@ -26,17 +34,13 @@ int main(int argc, char *argv[]) {
     uint32_t x = 19;
     uint32_t y = ~x + 1; // to convert to negative, flip the bits and add 1
 
-    setvbuf(stdout, NULL, _IONBF, 0);
+    // setvbuf(stdout, NULL, _IONBF, 0);
+    // goto 
 
     printf("Y value is %d\n", y);
 
     return 0;
 }
-
-// void help() {
-//     int x = 0x12345678;
-//     (void)x;
-// }
 
 // #include <stdio.h>
 // #include <stdlib.h>
