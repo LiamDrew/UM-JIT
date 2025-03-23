@@ -135,7 +135,7 @@ handle_map:
 
     mov x1, x28
     bl _map_segment
-
+    // bl _vs_calloc
     // Not necessary anymore because umem will not change
     // mov x28, x16
 
@@ -176,15 +176,15 @@ large_op:
     function_end
 
     restore_default_opcode
-
-    // br?
 ret
 
 .out:
     function_start
     extra_push
     push_regs
+
     bl _putchar
+
     pop_regs
     extra_pop
     function_end
@@ -196,7 +196,9 @@ ret
     function_start
     extra_push
     push_regs
+
     bl _getchar
+
     pop_regs
     extra_pop
     function_end
@@ -230,16 +232,6 @@ ret
     // pop x10
     ldp x9, x10, [sp], #16
 
-    // stp x9, x10, [sp, #-16]!
-    // push_regs
-    // extra_push
-    // bl print_registers_w19_to_w26
-    // extra_pop
-    // pop_regs
-    // ldp x9, x10, [sp], #16
-
-
-
     function_end
-ret // this should return to the original loop
+ret // this will return to the original loop
 
