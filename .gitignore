@@ -19,3 +19,4 @@ macOS-arm64-container/umasm/manycmoves.um
 macOS-arm64-container/umasm/manydivs.um
 macOS-arm64-container/umasm/manyloads.um
 macOS-arm64-container/umasm/manynands.um
+/darwin-arm64-container/emulator

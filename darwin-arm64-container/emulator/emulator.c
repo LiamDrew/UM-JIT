@@ -1,6 +1,6 @@
 /**
  * @file main.c
- * @author Liam Drew
+ * @author Liam Drew 
  * @date January 2025
  * @brief
  * This program implements a Universal Machine (UM) emulator. The UM is an

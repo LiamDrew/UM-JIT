@@ -275,6 +275,7 @@ size_t cond_move(uint8_t *p, unsigned a, unsigned b, unsigned c)
     /* cmp w0, #0x0 */
     uint32_t cmp_instr = 0x7100001F;
     cmp_instr |= ((BR + c) << 5);
+
     *p++ = cmp_instr & 0xFF;
     *p++ = (cmp_instr >> 8) & 0xFF;
     *p++ = (cmp_instr >> 16) & 0xFF;
@@ -286,6 +287,7 @@ size_t cond_move(uint8_t *p, unsigned a, unsigned b, unsigned c)
     csel_instr |= ((BR + b) << 5);
     csel_instr |= ((BR + a) << 16);
     csel_instr |= (0x1 << 12);
+
     *p++ = csel_instr & 0xFF;
     *p++ = (csel_instr >> 8) & 0xFF;
     *p++ = (csel_instr >> 16) & 0xFF;
@@ -409,6 +411,7 @@ size_t mult_regs(uint8_t *p, unsigned a, unsigned b, unsigned c)
 size_t div_regs(uint8_t *p, unsigned a, unsigned b, unsigned c)
 {
     /* udiv wA, wB, wC -> (wA = wB / wC) */
+
     uint32_t udiv_instr = 0x1AC00800; /* Base opcode for udiv instruction */
     udiv_instr |= (BR + a);           /* Destination register */
     udiv_instr |= ((BR + b) << 5);    /* Dividend register */
@@ -418,6 +421,11 @@ size_t div_regs(uint8_t *p, unsigned a, unsigned b, unsigned c)
     *p++ = (udiv_instr >> 8) & 0xFF;
     *p++ = (udiv_instr >> 16) & 0xFF;
     *p++ = (udiv_instr >> 24) & 0xFF;
+
+    // *p++ = 0x00 | (BR + a) | (((BR + b) & 0x07) << 5);
+    // *p++ = 0x08 | (((BR + b) & 0x18) >> 3);
+    // *p++ = 0xC0 + (BR + c);
+    // *p++ = 0x1A;
 
     /* 2 No Ops */
     *p++ = 0x1F;
@@ -472,14 +480,10 @@ size_t handle_halt(uint8_t *p)
 {
     /* Move the halt opcode into w1
      * mov w1, OP_HALT */
-    uint32_t mov = 0x52800000;
-    mov |= (OP_HALT & 0xFFFF) << 5;
-    mov |= OP_REG;
-
-    *p++ = mov & 0xFF;
-    *p++ = (mov >> 8) & 0xFF;
-    *p++ = (mov >> 16) & 0xFF;
-    *p++ = (mov >> 24) & 0xFF;
+    *p++ = 0x00 | (OP_HALT << 5) | OP_REG;
+    *p++ = 0x00;
+    *p++ = 0x80;
+    *p++ = 0x52;
 
     /* br x15 */
     *p++ = 0xE0;
@@ -501,11 +505,10 @@ size_t inject_map_segment(uint8_t *p, unsigned b, unsigned c)
     /* mov w0, wC */
     *p++ = 0xE0;
     *p++ = 0x03;
-    *p++ = BR + c;
+    *p++ = (BR + c);
     *p++ = 0x2A;
 
     /* Call map segment function */
-
     /* blr x12 */
     *p++ = 0x80;
     *p++ = 0x01;
@@ -533,11 +536,10 @@ size_t inject_unmap_segment(uint8_t *p, unsigned c)
      * mov w0, wC */
     *p++ = 0xE0;
     *p++ = 0x03;
-    *p++ = BR + c;
+    *p++ = (BR + c);
     *p++ = 0x2A;
 
     /* Call unmap segment function */
-
     /* blr x13 */
     *p++ = 0xA0;
     *p++ = 0x01;
@@ -561,16 +563,12 @@ size_t print_reg(uint8_t *p, unsigned c)
     *p++ = BR + c;
     *p++ = 0x2A;
 
-    /* Move the print register opcode into w1
-     * mov w1, OP_OUT */
-    uint32_t mov = 0x52800000;
-    mov |= (OP_OUT & 0xFFFF) << 5;
-    mov |= OP_REG;
-
-    *p++ = mov & 0xFF;
-    *p++ = (mov >> 8) & 0xFF;
-    *p++ = (mov >> 16) & 0xFF;
-    *p++ = (mov >> 24) & 0xFF;
+    /* Move the print register opcode into w1 */
+    /* mov w1, OP_OUT */
+    *p++ = 0x00 | (OP_OUT << 5) | OP_REG;
+    *p++ = 0x00;
+    *p++ = 0x80;
+    *p++ = 0x52;
 
     /* blr x15 */
     *p++ = 0xE0;
@@ -583,16 +581,12 @@ size_t print_reg(uint8_t *p, unsigned c)
 
 size_t read_into_reg(uint8_t *p, unsigned c)
 {
-    /* Move the read register opcode into w1
-     * mov w1, OP_IN */
-    uint32_t mov = 0x52800000;
-    mov |= (OP_IN & 0xFFFF) << 5;
-    mov |= OP_REG;
-
-    *p++ = mov & 0xFF;
-    *p++ = (mov >> 8) & 0xFF;
-    *p++ = (mov >> 16) & 0xFF;
-    *p++ = (mov >> 24) & 0xFF;
+    /* Move the read register opcode into w1 */
+    /* mov w1, OP_IN */
+    *p++ = 0x00 | (OP_IN << 5) | OP_REG;
+    *p++ = 0x00;
+    *p++ = 0x80;
+    *p++ = 0x52;
 
     /* blr x15 */
     *p++ = 0xE0;

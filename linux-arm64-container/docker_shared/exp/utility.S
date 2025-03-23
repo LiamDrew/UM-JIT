@@ -7,21 +7,16 @@ test:
 
     // str w1, [x0]
 
-    // ldr x9, [x15, wA, UXTW #3]
-    ldr x9, [x15, w0, UXTW #3]
-    ldr x9, [x28, w0, UXTW #3]
+    mov w0, #HELP
+    mov w0, 0
 
-    blr x28
-    blr x15
-
-    br x28
-    br x15
-
-    blr x13
-
-    add x9, x28, x0
-    add x9, x28, x1
-    add x9, x28, x19
+    udiv w19, w19, w19
+    udiv w0, w0, w19
+    udiv w0, w0, w0
+    udiv w0, w1, w0
+    udiv w0, w7, w0
+    udiv w0, w15, w0
+    udiv w0, w19, w0
 
     
     ret

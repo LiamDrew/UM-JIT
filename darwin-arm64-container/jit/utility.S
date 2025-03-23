@@ -1,5 +1,10 @@
 #include "utility.h"
 
+.extern usable
+.extern rec
+.extern Mem_T
+.extern start_unused
+
 /* Arm special registers are:
  * x0 (first argument, return register)
  * x1 (second argument)
@@ -203,8 +208,60 @@ ret
 handle_unmap:
     function_start
     push_regs
+
+    /* Let's start with handle unmap. This function will be *relatively* easy
+     * to unroll into assembly, but it will still be a challenge. */
+
+    /* Save all non-volatile registers */
+    stp x19, x20, [sp, #-16]!
+    stp x21, x22, [sp, #-16]!
+    stp x23, x24, [sp, #-16]!
+    stp x25, x26, [sp, #-16]!
+    stp x27, x28, [sp, #-16]!
+
+    // subtract 
+
+    /* Restore non-volatile registers before returning to main */
+    ldp x27, x28, [sp], #16
+    ldp x25, x26, [sp], #16
+    ldp x23, x24, [sp], #16
+    ldp x21, x22, [sp], #16
+    ldp x19, x20, [sp], #16  
+
     bl _unmap_segment
-    // bl _vs_free
     pop_regs
     function_end
 ret
+
+/* The C code looks like this:
+inline void free_segment(uint8_t *umem, uint32_t seg_addr, Stack_T *rec)
+{
+    uint32_t sys_addr = seg_addr - BOOK_SIZE;
+
+    uint32_t *virt = convert_address(umem, sys_addr);
+    uint32_t cap = *virt;
+
+    uint32_t index = ((cap + 8) / 32) - 1;
+
+    rec[index] = stack_push(rec[index], seg_addr);
+}
+
+inline Stack_T stack_push(Stack_T s, uint32_t elem)
+{
+    if (s.size == s.capacity)
+    {
+        s.capacity *= 2;
+        uint32_t *temp = malloc(s.capacity * sizeof(uint32_t));
+        for (uint32_t i = 0; i < s.size; i++)
+        {
+            temp[i] = s.stack[i];
+        }
+
+        free(s.stack);
+        s.stack = temp;
+    }
+
+    s.stack[s.size++] = elem;
+    return s;
+}
+ */
