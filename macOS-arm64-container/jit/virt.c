@@ -6,12 +6,6 @@ uint8_t *usable = NULL;
 Stack_T *rec = NULL;
 uint32_t start_unused;
 
-// /* External definition for the inline function */
-// void *convert_address(uint8_t *umem, uint32_t addr)
-// {
-//     return umem + addr;
-// }
-
 uint8_t *init_memory_system(uint32_t kernel_size)
 {
     /* Safely initialize the memory state */
