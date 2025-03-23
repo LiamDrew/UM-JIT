@@ -1,34 +1,5 @@
 #include "utility.h"
 
-.macro push_regs
-    stp x14, x15, [sp, #-16]!   // Push x14 and x15 onto stack
-.endm
-
-.macro pop_regs
-    ldp x14, x15, [sp], #16     // Pop x14 and x15 from stack
-.endm
-
-.macro extra_push
-    stp x12, x13, [sp, #-16]!   // Push x12 and x13 onto stack
-.endm
-
-.macro extra_pop
-    ldp x12, x13, [sp], #16     // Pop x12 and x13 from stack
-.endm
-
-.macro function_start
-    stp x29, x30, [sp, #-16]!   // Save frame pointer and link register
-    mov x29, sp                 // Set up frame pointer
-.endm
-
-.macro function_end
-    ldp x29, x30, [sp], #16     // Restore frame pointer and link register
-.endm
-
-.macro restore_default_opcode
-    mov w14, #OP_DUPLICATE
-.endm
-
 /* Arm special registers are:
  * x0 (first argument, return register)
  * x1 (second argument)
@@ -43,18 +14,41 @@
  * Non-volatile general-purpose registers are x19-x28
  */
 
+.macro push_regs
+    stp x12, x13, [sp, #-16]!   /* Push x12 and x13 onto stack */
+    stp x14, x15, [sp, #-16]!   /* Push x14 and x15 onto stack */
+.endm
+
+.macro pop_regs
+    ldp x14, x15, [sp], #16     /* Pop x14 and x15 from stack */
+    ldp x12, x13, [sp], #16     /* Pop x12 and x13 from stack */
+.endm
+
+.macro function_start
+    stp x29, x30, [sp, #-16]!   /* Save frame pointer and link register */
+    mov x29, sp                 /* Set up frame pointer */
+.endm
+
+.macro function_end
+    ldp x29, x30, [sp], #16     /* Restore frame pointer and link register */
+.endm
+
+.macro restore_default_opcode
+    mov w14, #OP_DUPLICATE
+.endm
+
 .global _run
 _run:
     function_start
 
+    /* Save non-volatile registers */
     stp x19, x20, [sp, #-16]!
     stp x21, x22, [sp, #-16]!
     stp x23, x24, [sp, #-16]!
     stp x25, x26, [sp, #-16]!
     stp x27, x28, [sp, #-16]!
 
-
-    // Zero out the first 8 non-volatile registers for the UM
+    /* Zero out the first 8 non-volatile registers for UM use */
     mov x19, xzr
     mov x20, xzr
     mov x21, xzr
@@ -64,60 +58,51 @@ _run:
     mov x25, xzr
     mov x26, xzr
 
-    // store the address of the segment currently being executed
+    /* Store the address of the segment currently being executed */
     mov x27, x0
 
-    // store the base usable memory address (umem)
+    /* Store the base usable memory address (umem) */
     mov x28, x1
 
-    // ldr x15, =large_op
-    // Use this for position-independent code:
+    /* Load the address of the large_op label into register x15
+     * On Linux, the instruction is -> (ldr x15, =large_op)
+     * On Darwin, we need the following: */
     adrp x15, large_op@PAGE
     add x15, x15, large_op@PAGEOFF
 
-    // store the default value of the large op in w14
+    /* Store the default value of the large_op opcode in w14 */
     mov w14, #OP_DUPLICATE
 
-    // x13 will be used to store instruction pointer addresses when doing jumps
+    /* x13 will store the instruction pointer address when doing jumps */
 
-    // put the address of the handle_map function in x12
+    /* Store the address of the handle_map function in x12 */
     adrp x12, handle_map@PAGE
     add x12, x12, handle_map@PAGEOFF
 
-    // set the 32-bit program pointer to 0
-    // mov x27, 0
+    /* Set the 32-bit program pointer to 0 */
     mov x10, 0
 
 loop:
-    // Finish if the executable memory is NULL
-    // cbz x0, done
+    /* Finish if the executable memory is NULL
+     * cbz x0, done */
     cbz x27, done
     
     mov x0, x27
 
-    // Calculating the start position in executable memory
+    /* Calculating the start position in executable memory */
     mov x9, #CHUNK
     
-    // x0 = (x10 * x9) + x0
+    /* x0 = (x10 * x9) + x0 */
     madd  x0, x10, x9, x0
 
-    // Calling the executable memory
+    /* Calling the executable memory as a function */
     blr x0
 
-
-    // stp x9, x10, [sp, #-16]!
-    // push_regs
-    // extra_push
-    // bl print_registers_w19_to_w26
-    // extra_pop
-    // pop_regs
-    // ldp x9, x10, [sp], #16
-
-
-    // Jump back to the beginning of the loop
+    /* Jump back to the beginning of the loop */
     b loop
+
 done:
-    // Restore non-volatile registers before returning to main
+    /* Restore non-volatile registers before returning to main */
     ldp x27, x28, [sp], #16
     ldp x25, x26, [sp], #16
     ldp x23, x24, [sp], #16
@@ -129,29 +114,19 @@ ret
 .global handle_map
 handle_map:
     function_start
-    extra_push
     push_regs
-
-
     mov x1, x28
     bl _map_segment
-    // bl _vs_calloc
-    // Not necessary anymore because umem will not change
-    // mov x28, x16
-
     pop_regs
-    extra_pop
     function_end
 ret
 
 
 .global large_op
 large_op:
-
     /* Plan: have x14 become the new opcode getting checked. The JITted code
      * will preserve #OP_DUPLICATE as the default, saving us an instruction in
      * the inject load program function */
-
     cmp x14, #OP_UNMAP
     beq .unmap
 
@@ -166,27 +141,18 @@ large_op:
 
 .unmap:
     function_start
-    extra_push
     push_regs
-
     bl _unmap_segment
-
     pop_regs
-    extra_pop
     function_end
-
     restore_default_opcode
 ret
 
 .out:
     function_start
-    extra_push
     push_regs
-
     bl _putchar
-
     pop_regs
-    extra_pop
     function_end
 
     restore_default_opcode
@@ -194,29 +160,18 @@ ret
 
 .in:
     function_start
-    extra_push
     push_regs
-
     bl _getchar
-
     pop_regs
-    extra_pop
     function_end
-
     restore_default_opcode
-
     br x13
 
 .dup:
     function_start
 
-    /* NOTE: x10 is kind of a temporary situation over here. Once we find a
-     * better home for everything else we will decide on a forever home */
-
-    // push x10
+    /* push x10 */
     stp x9, x10, [sp, #-16]!
-
-    extra_push
     push_regs
 
     mov x1, x28
@@ -225,13 +180,11 @@ ret
     /* Only when we load and compile a different segment do we have to update
      * x27 to store the new compiled executable memory */
     mov x27, x0
-
     pop_regs
-    extra_pop
 
-    // pop x10
+    /* pop x10 */
     ldp x9, x10, [sp], #16
 
     function_end
-ret // this will return to the original loop
+ret /* From here, we will return to the main loop */
 

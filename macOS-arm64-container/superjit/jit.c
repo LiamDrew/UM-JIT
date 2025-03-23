@@ -294,7 +294,7 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (cmp_instr >> 16) & 0xFF;
     *p++ = (cmp_instr >> 24) & 0xFF;
 
-    // TODO: figure out this instruction
+    /* csel wA, wB, wA, CONDITION (flag set above) */
     uint32_t csel_instr = 0x1A800000;
     csel_instr |= ((BR + a));
     csel_instr |= ((BR + b) << 5);
