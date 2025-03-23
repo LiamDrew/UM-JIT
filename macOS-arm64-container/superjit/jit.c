@@ -261,12 +261,7 @@ size_t load_reg(uint8_t *p, unsigned a, uint32_t value)
     *p++ = (upper_mov >> 16) & 0xFF;
     *p++ = (upper_mov >> 24) & 0xFF;
 
-    /* 2 No Ops */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
+    /* 1 No Op */
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -296,12 +291,7 @@ size_t cond_move(uint8_t *p, unsigned a, unsigned b, unsigned c)
     *p++ = (csel_instr >> 16) & 0xFF;
     *p++ = (csel_instr >> 24) & 0xFF;
 
-    /* 2 No Ops */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
+    /* 1 No Op */
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -328,12 +318,7 @@ size_t seg_load(uint8_t *p, unsigned a, unsigned b, unsigned c)
     *p++ = 0x60 + (BR + c); /* using C as an index */
     *p++ = 0xb8;
 
-    /* 2 No Ops */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
+    /* 1 No Op */
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -357,12 +342,7 @@ size_t seg_store(uint8_t *p, unsigned a, unsigned b, unsigned c)
     *p++ = 0x20 + (BR + b);
     *p++ = 0xB8;
 
-    /* 2 No Ops */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
+    /* 1 No Op */
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -384,12 +364,7 @@ size_t add_regs(uint8_t *p, unsigned a, unsigned b, unsigned c)
     *p++ = (add_instr >> 16) & 0xFF;
     *p++ = (add_instr >> 24) & 0xFF;
 
-    /* 3 No Ops */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
+    /* 2 No Ops */
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -417,12 +392,7 @@ size_t mult_regs(uint8_t *p, unsigned a, unsigned b, unsigned c)
     *p++ = (mul_instr >> 16) & 0xFF;
     *p++ = (mul_instr >> 24) & 0xFF;
 
-    /* 3 No Ops */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
+    /* 2 No Ops */
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -449,12 +419,7 @@ size_t div_regs(uint8_t *p, unsigned a, unsigned b, unsigned c)
     *p++ = (udiv_instr >> 16) & 0xFF;
     *p++ = (udiv_instr >> 24) & 0xFF;
 
-    /* 3 No Ops */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
+    /* 2 No Ops */
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -493,32 +458,33 @@ size_t nand_regs(uint8_t *p, unsigned a, unsigned b, unsigned c)
     *p++ = (mvn_instr >> 16) & 0xFF;
     *p++ = (mvn_instr >> 24) & 0xFF;
 
-    /* w No Ops */
+    /* 1 No Op */
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
     *p++ = 0xD5;
 
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
 
     return CHUNK;
 }
 
 size_t handle_halt(uint8_t *p)
 {
-    /* mov x27, #0 */
-    *p++ = 0x1B;
-    *p++ = 0x00;
-    *p++ = 0x80;
-    *p++ = 0xD2;
+    /* Move the halt opcode into w1
+     * mov w1, OP_HALT */
+    uint32_t mov = 0x52800000;
+    mov |= (OP_HALT & 0xFFFF) << 5;
+    mov |= OP_REG;
 
-    /* ret */
-    *p++ = 0xC0;
-    *p++ = 0x03;
-    *p++ = 0x5F;
+    *p++ = mov & 0xFF;
+    *p++ = (mov >> 8) & 0xFF;
+    *p++ = (mov >> 16) & 0xFF;
+    *p++ = (mov >> 24) & 0xFF;
+
+    /* br x15 */
+    *p++ = 0xE0;
+    *p++ = 0x01;
+    *p++ = 0x1F;
     *p++ = 0xD6;
 
     return CHUNK;
@@ -529,8 +495,6 @@ uint32_t map_segment(uint32_t size, uint8_t *umem)
     return vs_calloc(umem, size * sizeof(uint32_t));
 }
 
-/* NOTE: Important plan: can I figure out how to use the bl instruction?
- * I think it is probably more trouble than it is worth*/
 size_t inject_map_segment(uint8_t *p, unsigned b, unsigned c)
 {
     /* Move register c to be the function call argument */
@@ -542,38 +506,11 @@ size_t inject_map_segment(uint8_t *p, unsigned b, unsigned c)
 
     /* Call map segment function */
 
-    /* Save current instruction pointer (+8 bytes) to x13
-     * adr x13, +8 */
-    *p++ = 0x4D;
-    *p++ = 0x00;
-    *p++ = 0x00;
-    *p++ = 0x10;
-
-    /* br x12 */
+    /* blr x12 */
     *p++ = 0x80;
     *p++ = 0x01;
-    *p++ = 0x1F;
+    *p++ = 0x3F;
     *p++ = 0xD6;
-
-    // /* Save x30 to stack:
-    //  * str x30, [sp, #-16]! */
-    // *p++ = 0xFE;
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0xF8;
-
-    // /* blr x12 */
-    // *p++ = 0x80;
-    // *p++ = 0x01;
-    // *p++ = 0x3F;
-    // *p++ = 0xD6;
-
-    // /* Restore x30 from stack:
-    //  * ldr x30, [sp], #16 */
-    // *p++ = 0xFE;
-    // *p++ = 0x07;
-    // *p++ = 0x41;
-    // *p++ = 0xF8;
 
     /* Mov return value from w0 to wB:
      * mov wB, w0 */
@@ -612,44 +549,11 @@ size_t inject_unmap_segment(uint8_t *p, unsigned c)
 
     /* Call unmap segment function */
 
-    /* Save current instruction pointer (+8 bytes) to x13
-     * adr x13, +8 */
-    *p++ = 0x4D;
-    *p++ = 0x00;
-    *p++ = 0x00;
-    *p++ = 0x10;
-
-    /* br x15 */
+    /* blr x15 */
     *p++ = 0xE0;
     *p++ = 0x01;
-    *p++ = 0x1F;
+    *p++ = 0x3F;
     *p++ = 0xD6;
-
-    // /* 1 No Op */
-    // *p++ = 0x1F;
-    // *p++ = 0x20;
-    // *p++ = 0x03;
-    // *p++ = 0xD5;
-
-    // /* Save x30 to stack
-    //  * str x30, [sp, #-16]! */
-    // *p++ = 0xFE;
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0xF8;
-
-    // /* blr x15 */
-    // *p++ = 0xE0;
-    // *p++ = 0x01;
-    // *p++ = 0x3F;
-    // *p++ = 0xD6;
-
-    // /* Restore x30 from stack
-    //  * ldr x30, [sp], #16 */
-    // *p++ = 0xFE;
-    // *p++ = 0x07;
-    // *p++ = 0x41;
-    // *p++ = 0xF8;
 
     return CHUNK;
 }
@@ -673,17 +577,10 @@ size_t print_reg(uint8_t *p, unsigned c)
     *p++ = (mov >> 16) & 0xFF;
     *p++ = (mov >> 24) & 0xFF;
 
-    /* Save current instruction pointer (+8 bytes) to x13
-     * adr x13, +8 */
-    *p++ = 0x4D;
-    *p++ = 0x00;
-    *p++ = 0x00;
-    *p++ = 0x10;
-
-    /* br x15 */
+    /* blr x15 */
     *p++ = 0xE0;
     *p++ = 0x01;
-    *p++ = 0x1F;
+    *p++ = 0x3F;
     *p++ = 0xD6;
 
     return CHUNK;
@@ -702,17 +599,10 @@ size_t read_into_reg(uint8_t *p, unsigned c)
     *p++ = (mov >> 16) & 0xFF;
     *p++ = (mov >> 24) & 0xFF;
 
-    /* Save current instruction pointer (+8 bytes) to x13
-     * adr x13, +8 */
-    *p++ = 0x4D;
-    *p++ = 0x00;
-    *p++ = 0x00;
-    *p++ = 0x10;
-
-    /* br x15 */
+    /* blr x15 */
     *p++ = 0xE0;
     *p++ = 0x01;
-    *p++ = 0x1F;
+    *p++ = 0x3F;
     *p++ = 0xD6;
 
     /* Move result into register c

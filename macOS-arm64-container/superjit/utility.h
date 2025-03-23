@@ -1,8 +1,7 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
-// #define CHUNK 20
-#define CHUNK 16
+#define CHUNK 12
 #define MULT (CHUNK / sizeof(uint32_t))
 #define BR 19    /* First non-volatile general purpose register */
 #define OP_REG 14
@@ -13,6 +12,7 @@
 #define OP_IN 3
 #define OP_DUPLICATE 4
 #define OP_RECOMPILE 5
+#define OP_HALT 6
 
 #ifndef __ASSEMBLER__
     #include <stdint.h>

@@ -87,16 +87,15 @@ loop:
      * cbz x0, done */
     cbz x27, done
     
-    mov x0, x27
-
     /* Calculating the start position in executable memory */
+    mov x0, x27
     mov x9, #CHUNK
     
     /* x0 = (x10 * x9) + x0 */
     madd  x0, x10, x9, x0
 
     /* Calling the executable memory as a function */
-    blr x0
+    br x0
 
     /* Jump back to the beginning of the loop */
     b loop
@@ -119,14 +118,12 @@ handle_map:
     bl _map_segment
     pop_regs
     function_end
-
-    br x13
-// ret
+ret
 
 
 .global large_op
 large_op:
-    /* Plan: have x14 become the new opcode getting checked. The JITted code
+    /* Approach: have x14 become the new opcode getting checked. The JITted code
      * will preserve #OP_DUPLICATE as the default, saving us an instruction in
      * the inject load program function */
     cmp x14, #OP_DUPLICATE
@@ -141,6 +138,9 @@ large_op:
     cmp x14, #OP_OUT
     beq .out
 
+    cmp x14, #OP_HALT
+    beq .halt
+
 .unmap:
     function_start
     push_regs
@@ -148,9 +148,7 @@ large_op:
     pop_regs
     function_end
     restore_default_opcode
-
-    br x13
-// ret
+ret
 
 .out:
     function_start
@@ -160,7 +158,7 @@ large_op:
     function_end
 
     restore_default_opcode
-    br x13
+ret
 
 .in:
     function_start
@@ -169,11 +167,13 @@ large_op:
     pop_regs
     function_end
     restore_default_opcode
-    br x13
+ret
 
 .dup:
+    /* If w0 is not 0, duplicate the segment and load it into segment 0.
+     * Otherwise, branch back to the loop */
     cbnz w0, +8
-    ret
+    b loop
 
     function_start
 
@@ -193,5 +193,13 @@ large_op:
     ldp x9, x10, [sp], #16
 
     function_end
-ret /* From here, we will return to the main loop */
+
+    /* Branch back to the main loop */
+    b loop
+
+.halt:
+    /* Zero out the active executable memory segment and branch back to the
+     * loop, ending the program. */
+    mov x27, #0
+    b loop
 
