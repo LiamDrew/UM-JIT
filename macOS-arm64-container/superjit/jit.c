@@ -20,6 +20,8 @@
 
 #include "virt.h"
 
+#include <sys/time.h>
+
 #define OPS 15
 #define INIT_CAP 32500
 
@@ -32,29 +34,29 @@ void load_zero_segment(void *zero, uint8_t *umem, FILE *fp, size_t fsize);
 uint64_t make_word(uint64_t word, unsigned width, unsigned lsb, uint64_t value);
 
 size_t compile_instruction(void *zero, uint32_t word, size_t offset);
-size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value);
-size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
-size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
-size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
-size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
-size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
-size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
-size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c);
-size_t handle_halt(void *zero, size_t offset);
+size_t load_reg(uint8_t *p, unsigned a, uint32_t value);
+size_t cond_move(uint8_t *p, unsigned a, unsigned b, unsigned c);
+size_t seg_load(uint8_t *p, unsigned a, unsigned b, unsigned c);
+size_t seg_store(uint8_t *p, unsigned a, unsigned b, unsigned c);
+size_t add_regs(uint8_t *p, unsigned a, unsigned b, unsigned c);
+size_t mult_regs(uint8_t *p, unsigned a, unsigned b, unsigned c);
+size_t div_regs(uint8_t *p, unsigned a, unsigned b, unsigned c);
+size_t nand_regs(uint8_t *p, unsigned a, unsigned b, unsigned c);
+size_t handle_halt(uint8_t *p);
 uint32_t map_segment(uint32_t size, uint8_t *umem);
-size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c);
+size_t inject_map_segment(uint8_t *p, unsigned b, unsigned c);
 
 void unmap_segment(uint32_t segmentID);
-size_t inject_unmap_segment(void *zero, size_t offset, unsigned c);
+size_t inject_unmap_segment(uint8_t *p, unsigned c);
 
 void print_out(uint32_t x);
-size_t print_reg(void *zero, size_t offset, unsigned c);
+size_t print_reg(uint8_t *p, unsigned c);
 
 unsigned char read_char(void);
-size_t read_into_reg(void *zero, size_t offset, unsigned c);
+size_t read_into_reg(uint8_t *p, unsigned c);
 
 void *load_program(uint32_t b_val, uint8_t *umem);
-size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c);
+size_t inject_load_program(uint8_t *p, unsigned b, unsigned c);
 
 int main(int argc, char *argv[])
 {
@@ -161,12 +163,14 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     uint32_t opcode = (word >> 28) & 0xF;
     uint32_t a = 0;
 
+    uint8_t *p = (uint8_t *)zero + offset;
+
     /* Load Value */
     if (opcode == 13)
     {
         a = (word >> 25) & 0x7;
         uint32_t val = word & 0x1FFFFFF;
-        offset += load_reg(zero, offset, a, val);
+        offset += load_reg(p, a, val);
         return offset;
     }
 
@@ -178,59 +182,55 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
 
     /* Output */
     if (opcode == 10)
-        offset += print_reg(zero, offset, c);
+        offset += print_reg(p, c);
 
     /* Addition */
     else if (opcode == 3)
-        offset += add_regs(zero, offset, a, b, c);
+        offset += add_regs(p, a, b, c);
 
     /* Halt */
     else if (opcode == 7)
-        offset += handle_halt(zero, offset);
+        offset += handle_halt(p);
 
     /* Bitwise NAND */
     else if (opcode == 6)
-        offset += nand_regs(zero, offset, a, b, c);
-
-    /* Addition */
-    else if (opcode == 3)
-        offset += add_regs(zero, offset, a, b, c);
+        offset += nand_regs(p, a, b, c);
 
     /* Multiplication */
     else if (opcode == 4)
-        offset += mult_regs(zero, offset, a, b, c);
+        offset += mult_regs(p, a, b, c);
 
     /* Division */
     else if (opcode == 5)
-        offset += div_regs(zero, offset, a, b, c);
+        offset += div_regs(p, a, b, c);
 
     /* Conditional Move */
     else if (opcode == 0)
-        offset += cond_move(zero, offset, a, b, c);
+        offset += cond_move(p, a, b, c);
 
     /* Input */
     else if (opcode == 11)
-        offset += read_into_reg(zero, offset, c);
+        offset += read_into_reg(p, c);
 
     /* Segmented Load */
     else if (opcode == 1)
-        offset += seg_load(zero, offset, a, b, c);
+        offset += seg_load(p, a, b, c);
 
     /* Segmented Store */
     else if (opcode == 2)
-        offset += seg_store(zero, offset, a, b, c);
+        offset += seg_store(p, a, b, c);
 
     /* Load Program */
     else if (opcode == 12)
-        offset += inject_load_program(zero, offset, b, c);
+        offset += inject_load_program(p, b, c);
 
     /* Map Segment */
     else if (opcode == 8)
-        offset += inject_map_segment(zero, offset, b, c);
+        offset += inject_map_segment(p, b, c);
 
     /* Unmap Segment */
     else if (opcode == 9)
-        offset += inject_unmap_segment(zero, offset, c);
+        offset += inject_unmap_segment(p, c);
 
     /* Invalid Opcode */
     else
@@ -239,10 +239,8 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
     return offset;
 }
 
-size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
+size_t load_reg(uint8_t *p, unsigned a, uint32_t value)
 {
-    uint8_t *p = (uint8_t *)zero + offset;
-
     /* mov w19, 0x0000 */
     uint32_t lower_mov = 0x52800000;
     lower_mov |= (value & 0xFFFF) << 5;
@@ -263,12 +261,7 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = (upper_mov >> 16) & 0xFF;
     *p++ = (upper_mov >> 24) & 0xFF;
 
-    /* 3 No Ops */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
+    /* 2 No Ops */
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -282,10 +275,8 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     return CHUNK;
 }
 
-size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+size_t cond_move(uint8_t *p, unsigned a, unsigned b, unsigned c)
 {
-    uint8_t *p = (uint8_t *)zero + offset;
-
     /* cmp w0, #0x0 */
     uint32_t cmp_instr = 0x7100001F;
     cmp_instr |= ((BR + c) << 5);
@@ -305,12 +296,7 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (csel_instr >> 16) & 0xFF;
     *p++ = (csel_instr >> 24) & 0xFF;
 
-    /* 3 No Ops */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
+    /* 2 No Ops */
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -324,10 +310,8 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return CHUNK;
 }
 
-size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+size_t seg_load(uint8_t *p, unsigned a, unsigned b, unsigned c)
 {
-    uint8_t *p = (uint8_t *)zero + offset;
-
     /* x28 contains the first usable memory address in the 32-bit address
      * space. */
 
@@ -344,12 +328,7 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x60 + (BR + c); /* using C as an index */
     *p++ = 0xb8;
 
-    /* 3 No Ops */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
+    /* 2 No Ops */
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -363,10 +342,8 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return CHUNK;
 }
 
-size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+size_t seg_store(uint8_t *p, unsigned a, unsigned b, unsigned c)
 {
-    uint8_t *p = (uint8_t *)zero + offset;
-
     /* add x9, x28, wB */
     *p++ = 0x89;
     *p++ = 0x03;
@@ -380,6 +357,33 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x20 + (BR + b);
     *p++ = 0xB8;
 
+    /* 2 No Ops */
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
+    *p++ = 0x1F;
+    *p++ = 0x20;
+    *p++ = 0x03;
+    *p++ = 0xD5;
+
+    return CHUNK;
+}
+
+size_t add_regs(uint8_t *p, unsigned a, unsigned b, unsigned c)
+{
+    /* add wA, wB, wC */
+    uint32_t add_instr = 0x0B000000;
+    add_instr |= (BR + a);
+    add_instr |= ((BR + b) << 5);
+    add_instr |= ((BR + c) << 16);
+
+    *p++ = add_instr & 0xFF;
+    *p++ = (add_instr >> 8) & 0xFF;
+    *p++ = (add_instr >> 16) & 0xFF;
+    *p++ = (add_instr >> 24) & 0xFF;
+
     /* 3 No Ops */
     *p++ = 0x1F;
     *p++ = 0x20;
@@ -399,49 +403,8 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return CHUNK;
 }
 
-size_t add_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+size_t mult_regs(uint8_t *p, unsigned a, unsigned b, unsigned c)
 {
-    uint8_t *p = (uint8_t *)zero + offset;
-
-    /* add wA, wB, wC */
-    uint32_t add_instr = 0x0B000000;
-    add_instr |= (BR + a);
-    add_instr |= ((BR + b) << 5);
-    add_instr |= ((BR + c) << 16);
-
-    *p++ = add_instr & 0xFF;
-    *p++ = (add_instr >> 8) & 0xFF;
-    *p++ = (add_instr >> 16) & 0xFF;
-    *p++ = (add_instr >> 24) & 0xFF;
-
-    /* 4 No Ops */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
-    return CHUNK;
-}
-
-size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
-{
-    uint8_t *p = (uint8_t *)zero + offset;
-
     /* mul wA, wB, wC -> (wA = wB x wC) */
     uint32_t mul_instr = 0x1B000000; /* Base opcode for mul instruction */
     mul_instr |= (BR + a);           /* Destination register */
@@ -454,12 +417,7 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (mul_instr >> 16) & 0xFF;
     *p++ = (mul_instr >> 24) & 0xFF;
 
-    /* 4 No Ops */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
+    /* 3 No Ops */
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -478,10 +436,8 @@ size_t mult_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return CHUNK;
 }
 
-size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+size_t div_regs(uint8_t *p, unsigned a, unsigned b, unsigned c)
 {
-    uint8_t *p = (uint8_t *)zero + offset;
-
     /* udiv wA, wB, wC -> (wA = wB / wC) */
     uint32_t udiv_instr = 0x1AC00800; /* Base opcode for udiv instruction */
     udiv_instr |= (BR + a);           /* Destination register */
@@ -493,12 +449,7 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (udiv_instr >> 16) & 0xFF;
     *p++ = (udiv_instr >> 24) & 0xFF;
 
-    /* 4 No Ops */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
+    /* 3 No Ops */
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -517,10 +468,8 @@ size_t div_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return CHUNK;
 }
 
-size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
+size_t nand_regs(uint8_t *p, unsigned a, unsigned b, unsigned c)
 {
-    uint8_t *p = (uint8_t *)zero + offset;
-
     /* wA = NOT(wB AND wC) */
 
     /* and w9, wB, wC  (using w9 as temporary) */
@@ -544,12 +493,7 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = (mvn_instr >> 16) & 0xFF;
     *p++ = (mvn_instr >> 24) & 0xFF;
 
-    /* 3 No Ops */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
+    /* w No Ops */
     *p++ = 0x1F;
     *p++ = 0x20;
     *p++ = 0x03;
@@ -563,10 +507,8 @@ size_t nand_regs(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     return CHUNK;
 }
 
-size_t handle_halt(void *zero, size_t offset)
+size_t handle_halt(uint8_t *p)
 {
-    uint8_t *p = (uint8_t *)zero + offset;
-
     /* mov x27, #0 */
     *p++ = 0x1B;
     *p++ = 0x00;
@@ -587,10 +529,10 @@ uint32_t map_segment(uint32_t size, uint8_t *umem)
     return vs_calloc(umem, size * sizeof(uint32_t));
 }
 
-size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
+/* NOTE: Important plan: can I figure out how to use the bl instruction?
+ * I think it is probably more trouble than it is worth*/
+size_t inject_map_segment(uint8_t *p, unsigned b, unsigned c)
 {
-    uint8_t *p = (uint8_t *)zero + offset;
-
     /* Move register c to be the function call argument */
     /* mov w0, wC */
     *p++ = 0xE0;
@@ -600,25 +542,38 @@ size_t inject_map_segment(void *zero, size_t offset, unsigned b, unsigned c)
 
     /* Call map segment function */
 
-    /* Save x30 to stack:
-     * str x30, [sp, #-16]! */
-    *p++ = 0xFE;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0xF8;
+    /* Save current instruction pointer (+8 bytes) to x13
+     * adr x13, +8 */
+    *p++ = 0x4D;
+    *p++ = 0x00;
+    *p++ = 0x00;
+    *p++ = 0x10;
 
-    /* blr x12 */
+    /* br x12 */
     *p++ = 0x80;
     *p++ = 0x01;
-    *p++ = 0x3F;
+    *p++ = 0x1F;
     *p++ = 0xD6;
 
-    /* Restore x30 from stack:
-     * ldr x30, [sp], #16 */
-    *p++ = 0xFE;
-    *p++ = 0x07;
-    *p++ = 0x41;
-    *p++ = 0xF8;
+    // /* Save x30 to stack:
+    //  * str x30, [sp, #-16]! */
+    // *p++ = 0xFE;
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0xF8;
+
+    // /* blr x12 */
+    // *p++ = 0x80;
+    // *p++ = 0x01;
+    // *p++ = 0x3F;
+    // *p++ = 0xD6;
+
+    // /* Restore x30 from stack:
+    //  * ldr x30, [sp], #16 */
+    // *p++ = 0xFE;
+    // *p++ = 0x07;
+    // *p++ = 0x41;
+    // *p++ = 0xF8;
 
     /* Mov return value from w0 to wB:
      * mov wB, w0 */
@@ -635,10 +590,8 @@ void unmap_segment(uint32_t segment)
     vs_free(segment);
 }
 
-size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
+size_t inject_unmap_segment(uint8_t *p, unsigned c)
 {
-    uint8_t *p = (uint8_t *)zero + offset;
-
     /* Move register c to be the function call argument
      * mov w0, wC */
     *p++ = 0xE0;
@@ -659,33 +612,50 @@ size_t inject_unmap_segment(void *zero, size_t offset, unsigned c)
 
     /* Call unmap segment function */
 
-    /* Save x30 to stack
-     * str x30, [sp, #-16]! */
-    *p++ = 0xFE;
-    *p++ = 0x0F;
-    *p++ = 0x1F;
-    *p++ = 0xF8;
+    /* Save current instruction pointer (+8 bytes) to x13
+     * adr x13, +8 */
+    *p++ = 0x4D;
+    *p++ = 0x00;
+    *p++ = 0x00;
+    *p++ = 0x10;
 
-    /* blr x15 */
+    /* br x15 */
     *p++ = 0xE0;
     *p++ = 0x01;
-    *p++ = 0x3F;
+    *p++ = 0x1F;
     *p++ = 0xD6;
 
-    /* Restore x30 from stack
-     * ldr x30, [sp], #16 */
-    *p++ = 0xFE;
-    *p++ = 0x07;
-    *p++ = 0x41;
-    *p++ = 0xF8;
+    // /* 1 No Op */
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
+
+    // /* Save x30 to stack
+    //  * str x30, [sp, #-16]! */
+    // *p++ = 0xFE;
+    // *p++ = 0x0F;
+    // *p++ = 0x1F;
+    // *p++ = 0xF8;
+
+    // /* blr x15 */
+    // *p++ = 0xE0;
+    // *p++ = 0x01;
+    // *p++ = 0x3F;
+    // *p++ = 0xD6;
+
+    // /* Restore x30 from stack
+    //  * ldr x30, [sp], #16 */
+    // *p++ = 0xFE;
+    // *p++ = 0x07;
+    // *p++ = 0x41;
+    // *p++ = 0xF8;
 
     return CHUNK;
 }
 
-size_t print_reg(void *zero, size_t offset, unsigned c)
+size_t print_reg(uint8_t *p, unsigned c)
 {
-    uint8_t *p = (uint8_t *)zero + offset;
-
     /* mov w0, wC */
     *p++ = 0xE0;
     *p++ = 0x03;
@@ -716,19 +686,11 @@ size_t print_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x1F;
     *p++ = 0xD6;
 
-    /* 1 No Op */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
-
     return CHUNK;
 }
 
-size_t read_into_reg(void *zero, size_t offset, unsigned c)
+size_t read_into_reg(uint8_t *p, unsigned c)
 {
-    uint8_t *p = (uint8_t *)zero + offset;
-
     /* Move the read register opcode into w1
      * mov w1, OP_IN */
     uint32_t mov = 0x52800000;
@@ -759,12 +721,6 @@ size_t read_into_reg(void *zero, size_t offset, unsigned c)
     *p++ = 0x03;
     *p++ = 0x00;
     *p++ = 0x2A;
-
-    /* 1 No Op */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
 
     return CHUNK;
 }
@@ -804,30 +760,14 @@ void *load_program(uint32_t b_val, uint8_t *umem)
     return new_zero;
 }
 
-size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c)
+size_t inject_load_program(uint8_t *p, unsigned b, unsigned c)
 {
-    uint8_t *p = (uint8_t *)zero + offset;
-
     /* Move the 32-bit program counter into x10
      * mov x10, wC */
     *p++ = 0xEA;
     *p++ = 0x03;
     *p++ = 0x00 + (BR + c);
     *p++ = 0x2A;
-
-    /* Check if the segment being loaded is segment 0
-     * If wB is 0, jump straight to the return
-     * cbnz wB, +8 */
-    *p++ = 0x40 + (BR + b);
-    *p++ = 0x00;
-    *p++ = 0x00;
-    *p++ = 0x35;
-
-    /* ret */
-    *p++ = 0xC0;
-    *p++ = 0x03;
-    *p++ = 0x5F;
-    *p++ = 0xD6;
 
     /* mov w0, wB */
     *p++ = 0xE0;

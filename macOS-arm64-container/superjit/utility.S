@@ -6,12 +6,12 @@
  * x2 (third argument)
  * etc. (x0-x7)
  * x8: Indirect result location register
+ * Volatile general-purpose registers are: x9-x15
  * x16, x17: Intra-procedure-call temporary registers (IP0, IP1)
  * x18: Platform register (for platform specific uses)
+ * Non-volatile general-purpose registers are x19-x28
  * x29: Frame pointer (for managing stack frame)
  * x30: Link register
- * Volatile general-purpose registers are: x9-x15
- * Non-volatile general-purpose registers are x19-x28
  */
 
 .macro push_regs
@@ -119,7 +119,9 @@ handle_map:
     bl _map_segment
     pop_regs
     function_end
-ret
+
+    br x13
+// ret
 
 
 .global large_op
@@ -127,6 +129,9 @@ large_op:
     /* Plan: have x14 become the new opcode getting checked. The JITted code
      * will preserve #OP_DUPLICATE as the default, saving us an instruction in
      * the inject load program function */
+    cmp x14, #OP_DUPLICATE
+    beq .dup
+
     cmp x14, #OP_UNMAP
     beq .unmap
 
@@ -136,9 +141,6 @@ large_op:
     cmp x14, #OP_OUT
     beq .out
 
-    cmp x14, #OP_DUPLICATE
-    beq .dup
-
 .unmap:
     function_start
     push_regs
@@ -146,7 +148,9 @@ large_op:
     pop_regs
     function_end
     restore_default_opcode
-ret
+
+    br x13
+// ret
 
 .out:
     function_start
@@ -168,6 +172,9 @@ ret
     br x13
 
 .dup:
+    cbnz w0, +8
+    ret
+
     function_start
 
     /* push x10 */

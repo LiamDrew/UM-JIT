@@ -1,7 +1,8 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
-#define CHUNK 20
+// #define CHUNK 20
+#define CHUNK 16
 #define MULT (CHUNK / sizeof(uint32_t))
 #define BR 19    /* First non-volatile general purpose register */
 #define OP_REG 14
@@ -15,7 +16,6 @@
 
 #ifndef __ASSEMBLER__
     #include <stdint.h>
-    // void run(uint8_t *zero, uint32_t **seg_table);
     void run(uint8_t *zero, uint8_t *umem);
 #endif
 
