@@ -1,8 +1,12 @@
 # UM-JIT
 
-A high performance virtual runtime for Universal Machine programs. Powered by a Just-In-Time compiler that compiles Universal Machine assembly language to native machine code on Arm64 and x86-64 platforms. Compiles and executes benchmark Universal Machine programs 3.68 times faster than an emulator-based runtime. Video demo [here](https://www.youtube.com/watch?v=aWdoqx7MhJY&ab_channel=LiamDrew).
+A high performance virtual runtime for Universal Machine programs. Powered by a just-in-time compiler that compiles Universal Machine assembly language to native machine code on Arm64 and x86-64 platforms. Compiles and executes benchmark Universal Machine programs up to 4.5 times faster than an emulator-based runtime. Video demo [here](https://www.youtube.com/watch?v=aWdoqx7MhJY&ab_channel=LiamDrew).
 
 ## Overview
+
+The Universal Machine (or UM) is a simple virtual machine with a RISC-style instruction set. The UM has 8 general-purpose 32 bit registers, an instruction pointer, and allocates memory segments identified by a 32 bit segment number. The UM's memory is word-oriented, not byte oriented.
+
+I didn't even think about that. We could give the UM 16 GB of memory instead of 4GB because it's word oriented. I wonder if we could use that to save on overhead in any way.
 
 The Universal Machine (or UM) is an simple virtual machine that all CS students at Tufts implement in CS40: Machine Structure and Assembly Language Programming. The UM has 8 32-bit registers, recognizes 14 instructions, and has 32-bit word-oriented memory. One special memory segment contains the current UM "program" that is being executed. The memory of the UM is bounded only by the memory constraints of the host machine.
 
