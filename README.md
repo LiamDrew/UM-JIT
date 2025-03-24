@@ -4,11 +4,27 @@ A high performance virtual runtime for Universal Machine programs. Powered by a 
 
 ## Overview
 
-The Universal Machine (or UM) is a simple virtual machine with a RISC-style instruction set. The UM has 8 general-purpose 32 bit registers, an instruction pointer, and allocates memory segments identified by a 32 bit segment number. The UM's memory is word-oriented, not byte oriented.
+The Universal Machine (or UM) is a simple 32 bit virtual machine with a RISC-style instruction set. The UM has 8 general-purpose 32 bit registers, an instruction pointer, and can map memory segments that are each identified by a 32 bit integer. Much like RISC machine code, each UM machine code instruction is packed in 4 byte "words", with certain bits to identify the opcode, source and destination registers, and values to load into registers. Unlike a typical machine, the UM's memory is oriented around these 4 byte words, not single bytes.
 
-I didn't even think about that. We could give the UM 16 GB of memory instead of 4GB because it's word oriented. I wonder if we could use that to save on overhead in any way.
+The UM recognizes 14 instructions:
+Conditional Move
+Segmented Load
+Segmented Store
+Addition
+Multiplication
+Division
+Bitwise NAND
+Halt
+Map Segment
+Unmap Segment
+Output
+Input
+Load Program
+Load Value
 
-The Universal Machine (or UM) is an simple virtual machine that all CS students at Tufts implement in CS40: Machine Structure and Assembly Language Programming. The UM has 8 32-bit registers, recognizes 14 instructions, and has 32-bit word-oriented memory. One special memory segment contains the current UM "program" that is being executed. The memory of the UM is bounded only by the memory constraints of the host machine.
+One special memory segment contains the current UM "program" that is being executed. The memory of the UM is bounded only by the memory constraints of the host machine.
+
+All CS students at Tufts implement in CS40: Machine Structure and Assembly Language Programming. The UM has 8 32-bit registers, recognizes 14 instructions, and has 32-bit word-oriented memory.
 
 Students implement the UM as an emulator with a stack allocated array to store UM register contents and heap allocated memory segments.
 

@@ -422,11 +422,6 @@ size_t div_regs(uint8_t *p, unsigned a, unsigned b, unsigned c)
     *p++ = (udiv_instr >> 16) & 0xFF;
     *p++ = (udiv_instr >> 24) & 0xFF;
 
-    // *p++ = 0x00 | (BR + a) | (((BR + b) & 0x07) << 5);
-    // *p++ = 0x08 | (((BR + b) & 0x18) >> 3);
-    // *p++ = 0xC0 + (BR + c);
-    // *p++ = 0x1A;
-
     /* 2 No Ops */
     *p++ = 0x1F;
     *p++ = 0x20;
