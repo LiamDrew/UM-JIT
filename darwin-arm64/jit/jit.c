@@ -528,7 +528,7 @@ void unmap_segment(uint32_t segment)
 size_t inject_unmap_segment(uint8_t *p, unsigned c)
 {
     // TODO: switch this over to do recompiling
-    
+
     /* Move register c to be the function call argument
      * mov w0, wC */
     *p++ = 0xE0;

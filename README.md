@@ -56,8 +56,7 @@ Put together, this JIT-based implementation runs UM programs up to 4.58 times fa
 x86-64:  
 ```docker buildx build --platform=linux/amd64 -t dev-tools-x86 .```  
 Arm64 (Aarch64):  
-```docker buildx build --platform=linux/arm64 -t dev-tools-aarch64 .```
-
+```docker buildx build --platform=linux/arm64 -t dev-tools-aarch64 .```  
 Both containers have the utilities you need to run the program. They can each access their own `docker_shared` directory, which is shared between the container and your machine.
 
 4. Start the docker container:  
@@ -81,6 +80,14 @@ The `/jit` directory contains the executable binary source code for the JIT comp
 I timed my program in two environments.
 First was in a docker container running x86_64 linux on my apple silicon mac
 The second was on my student VM on the Tufts department servers running x86_64 redhat linux.
+
+
+| Runtime | Platform | Best Compiler + Flags | OS     | Hardware | Time (seconds) |
+| ------- | -------- | --------------------- | ------ | -------- | -------------- |
+| JIT     | Arm64    | clang -O2             | Darwin | M3 Max   | 0.53           |
+| JIT     | Arm64    | clang -O2             | Darwin | M3 Max   | 0.53           |
+
+
 
 Here is the perfomance comparisons between the emulator and the JIT in these environemnts
 

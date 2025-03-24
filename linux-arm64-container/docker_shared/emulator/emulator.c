@@ -1,20 +1,3 @@
-/**
- * @file main.c
- * @author Liam Drew
- * @date January 2025
- * @brief
- * This program implements a Universal Machine (UM) emulator. The UM is an
- * extremely simple virtual machine. For more information about the UM
- * specification, please see the project README.
- *
- * This UM emulator has been profiled for an x86 linux system hosted in a Docker
- * container on an Apple Silicon Mac. It runs the sandmark, a benchmark
- * UM assembly language program, in 2.80 seconds
- *
- * This already fast UM emulator is the starting benchmark for my UM assembly
- * to x86 assembly just-in-time compiler.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -52,16 +35,6 @@ static inline bool exec_instr(Instruction word, Instruction **pp,
 uint32_t map_segment(uint32_t size);
 void unmap_segment(uint32_t segment);
 void load_segment(uint32_t index, uint32_t *zero);
-
-void print_registers(uint32_t *regs, uint32_t pc)
-{
-    printf("\n");
-    for (uint32_t i = 0; i < 8; i++) {
-        printf("r%u = %u\n", i, regs[i]);
-    }
-    printf("\n");
-    printf("PC = %u\n", pc);
-}
 
 int main(int argc, char *argv[])
 {
@@ -207,7 +180,6 @@ static inline bool exec_instr(Instruction word, Instruction **pp,
     {
         load_segment(regs[b], zero);
         *pp = segment_sequence[0] + regs[c];
-        print_registers(regs, regs[c]);
     }
 
     /* Addition */
@@ -343,30 +315,5 @@ void load_segment(uint32_t index, uint32_t *zero)
         memcpy(new_zero, segment_sequence[index],
                copied_seq_size * sizeof(uint32_t));
         segment_sequence[0] = new_zero;
-
-        // open new file
-        const char *filename = "unrolled_sandmark.um";
-
-        FILE *fp = fopen(filename, "wb");
-        assert(fp != NULL);
-
-        // put everything in the list in big endian order
-
-        for (size_t i = 0; i < copied_seq_size; i++) {
-            new_zero[i] = htonl(new_zero[i]);
-        }
-
-        fwrite(new_zero, sizeof(Instruction), copied_seq_size, fp);
-
-        fclose(fp);
-
-
-
-        // write bytes to the file in big endian order
-
-        assert(false);
-        
-
-        printf("Finishing load program\n");
     }
 }
