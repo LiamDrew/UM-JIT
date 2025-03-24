@@ -19,6 +19,8 @@
  * x30: Link register
  */
 
+// TODO: is the way I'm pushing registers to the stack slower than the way the
+// C compiler does it? Figure this out
 .macro push_regs
     stp x12, x13, [sp, #-16]!   /* Push x12 and x13 onto stack */
     stp x14, x15, [sp, #-16]!   /* Push x14 and x15 onto stack */
@@ -209,26 +211,94 @@ handle_unmap:
     function_start
     push_regs
 
-    /* Let's start with handle unmap. This function will be *relatively* easy
-     * to unroll into assembly, but it will still be a challenge. */
+    // w0 contains the 32_bit segment ID
+    mov x8, x28 // mov umem to x8
 
-    /* Save all non-volatile registers */
+    // all we need to do is load the address of the recycler into a register
+    adrp x9, _rec@PAGE
+    add x9, x9, _rec@PAGEOFF
+
+    // subtract 8 from the segment address
+    sub w10, w0, #8
+
+    // access the 32 bit integer at that point
+    ldr w8, [x8, w10, uxtw]
+
+    // calculate the index that corresponds with that 32 bit integer
+    add w8, w8, #8     // adding 8 to the capacity
+    lsr w8, w8, #5     // divide by 32 (logical shift right 5 bits)
+    sub w8, w8, #1     // subtract by 1
+
     stp x19, x20, [sp, #-16]!
     stp x21, x22, [sp, #-16]!
-    stp x23, x24, [sp, #-16]!
-    stp x25, x26, [sp, #-16]!
-    stp x27, x28, [sp, #-16]!
 
-    // subtract 
+    add	x21, x9, w8, uxtw #4 // get the address of the stack object we want
+    ldr x19, [x21] // get the address of the under-hood array
+    
+    // load the size of the stack into a register, increment it, and store it
+    // back to memory
+    ldr w8, [x21, #8]
+    add w9, w8, #1
+    str w9, [x21, #8]
+    
+    // store the 32-bit seg id at the end of the stack array
+    str w0, [x19, x8, lsl #2]
 
-    /* Restore non-volatile registers before returning to main */
-    ldp x27, x28, [sp], #16
-    ldp x25, x26, [sp], #16
-    ldp x23, x24, [sp], #16
+    // compiler says:
+    ldr w22, [x21, #8]
+
+    // I'm thinking why not just do this?
+    // mov w22, w9
+
+    mov x8, x21
+    ldr x9, [x8, #0xc]! // what is the point of the exclamation mark?
+
+    // if size == capacity, expand
+
+    cmp w22, w9
+    b.ne no_exp
+    // do expanding in here
+    lsl w9, w22, #1 // multiply capacity by 2, store temp result in w9
+    str w9, [x8] // update capacity in the struct
+    // I have no idea what this does and have no internet right now
+    ubfiz x0, x9, #2, #32
+    bl _malloc
+    mov x20, x0
+    lsl x2, x22, #2
+    mov x1, x19
+    bl _memcpy
+    mov x0, x19
+    bl _free
+
+    str x20, [x21]
+
+    // TODO: I need wifi to figure out how to do something I don't know how to
+    // to do.
+
+
+no_exp:
+    // add to the end of the stack
+    
+
+    /* Do the actual expanding (ugh) */
+
+    // NOTE: old_cap needs to be protected from syscalls
+
+    // save the old capacity
+    // double the actual capacity
+    // malloc the new capacity
+    // memcpy the old memory into the new stack
+    // free the old memory
+    // update the memory stored by the stack
+
+    // else, jump down here
+    // store the new element at the top of the stack
+    // increment the size of the stack
+
     ldp x21, x22, [sp], #16
-    ldp x19, x20, [sp], #16  
+    ldp x19, x20, [sp], #16   
 
-    bl _unmap_segment
+    // bl _unmap_segment
     pop_regs
     function_end
 ret
@@ -243,25 +313,24 @@ inline void free_segment(uint8_t *umem, uint32_t seg_addr, Stack_T *rec)
 
     uint32_t index = ((cap + 8) / 32) - 1;
 
-    rec[index] = stack_push(rec[index], seg_addr);
+    stack_push(&rec[index], seg_addr);
 }
 
-inline Stack_T stack_push(Stack_T s, uint32_t elem)
+inline void stack_push(Stack_T *s, uint32_t elem)
 {
-    if (s.size == s.capacity)
-    {
-        s.capacity *= 2;
-        uint32_t *temp = malloc(s.capacity * sizeof(uint32_t));
-        for (uint32_t i = 0; i < s.size; i++)
-        {
-            temp[i] = s.stack[i];
-        }
+    s->stack[s->size++] = elem;
 
-        free(s.stack);
-        s.stack = temp;
+    if (s->size == s->capacity)
+    {
+        uint32_t old_cap = s->capacity;
+        uint32_t new_cap = old_cap * 2;
+        s->capacity = new_cap;
+        uint32_t *temp = malloc(new_cap * sizeof(uint32_t));
+        memcpy(temp, s->stack, old_cap * sizeof(uint32_t));
+        free(s->stack);
+        s->stack = temp;
     }
 
-    s.stack[s.size++] = elem;
-    return s;
+    return;
 }
  */

@@ -64,24 +64,44 @@ inline uint32_t stack_top(Stack_T s)
     return s.stack[s.size - 1];
 }
 
-inline Stack_T stack_push(Stack_T s, uint32_t elem)
+// inline Stack_T stack_push(Stack_T s, uint32_t elem)
+// {
+//     if (s.size == s.capacity)
+//     {
+//         /* Expand the stack */
+//         s.capacity *= 2;
+//         uint32_t *temp = malloc(s.capacity * sizeof(uint32_t));
+//         for (uint32_t i = 0; i < s.size; i++)
+//         {
+//             temp[i] = s.stack[i];
+//         }
+
+//         free(s.stack);
+//         s.stack = temp;
+//     }
+
+//     s.stack[s.size++] = elem;
+//     return s;
+// }
+
+inline void stack_push(Stack_T *s, uint32_t elem)
 {
-    if (s.size == s.capacity)
+    s->stack[s->size++] = elem;
+
+    /* Very bad practice, but I am the programmer and I do what I want*/
+    if (s->size == s->capacity)
     {
         /* Expand the stack */
-        s.capacity *= 2;
-        uint32_t *temp = malloc(s.capacity * sizeof(uint32_t));
-        for (uint32_t i = 0; i < s.size; i++)
-        {
-            temp[i] = s.stack[i];
-        }
-
-        free(s.stack);
-        s.stack = temp;
+        uint32_t old_cap = s->capacity;
+        uint32_t new_cap = old_cap * 2;
+        s->capacity = new_cap;
+        uint32_t *temp = malloc(new_cap * sizeof(uint32_t));
+        memcpy(temp, s->stack, old_cap * sizeof(uint32_t));
+        free(s->stack);
+        s->stack = temp;
     }
 
-    s.stack[s.size++] = elem;
-    return s;
+    return;
 }
 
 inline Stack_T stack_pop(Stack_T s)
@@ -134,7 +154,8 @@ inline void free_segment(uint8_t *umem, uint32_t seg_addr, Stack_T *rec)
 
     /* NOTE: intentionally storing the user-facing v^2 address in the stack
      * for easy reuse in the future */
-    rec[index] = stack_push(rec[index], seg_addr);
+    // rec[index] = stack_push(rec[index], seg_addr);
+    stack_push(&rec[index], seg_addr);
 }
 
 /* Memory system interface */

@@ -552,6 +552,17 @@ size_t inject_unmap_segment(uint8_t *p, unsigned c)
     *p++ = 0x03;
     *p++ = 0xD5;
 
+    // (void)c;
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
+
+    // *p++ = 0x1F;
+    // *p++ = 0x20;
+    // *p++ = 0x03;
+    // *p++ = 0xD5;
+
     return CHUNK;
 }
 
