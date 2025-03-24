@@ -211,45 +211,61 @@ handle_unmap:
     function_start
     push_regs
 
-    // w0 contains the 32_bit segment ID
-    mov x8, x28 // mov umem to x8
+    /* All this suffering with the assembly to save no time at all, lol. Useful
+     * exercise for learning assembly */
 
-    // all we need to do is load the address of the recycler into a register
-    adrp x9, _rec@PAGE
+    stp x19, x20, [sp, #-16]!
+    stp x21, x22, [sp, #-16]!
+
+    mov x8, x28                                              
+
+    adrp x9, _rec@PAGE          // load address of recycler into x9 
     add x9, x9, _rec@PAGEOFF
+    ldr x9, [x9]
 
     // subtract 8 from the segment address
-    sub w10, w0, #8
+    sub w10, w0, #0x8
 
     // access the 32 bit integer at that point
     ldr w8, [x8, w10, uxtw]
 
     // calculate the index that corresponds with that 32 bit integer
-    add w8, w8, #8     // adding 8 to the capacity
+    add w8, w8, #0x8     // adding 8 to the capacity
     lsr w8, w8, #5     // divide by 32 (logical shift right 5 bits)
-    sub w8, w8, #1     // subtract by 1
+    sub w8, w8, #0x1     // subtract by 1
 
-    stp x19, x20, [sp, #-16]!
-    stp x21, x22, [sp, #-16]!
-
+    // is this actually the stack object we want?
     add	x21, x9, w8, uxtw #4 // get the address of the stack object we want
+    
+    // mov x0, x21
+    // push_regs
+    // bl _print_pointer
+    // pop_regs
+    
     ldr x19, [x21] // get the address of the under-hood array
     
     // load the size of the stack into a register, increment it, and store it
     // back to memory
-    ldr w8, [x21, #8]
-    add w9, w8, #1
-    str w9, [x21, #8]
-    
+
+    /* Here's what we know. The stack address is correct, we are correctly
+     * getting the size and the capacity of the stack here. However, when we
+     * try to increment the size of the stack, we start having a problem.
+     * OH my god I just figured out the bug that is the dumbest shit ever. It
+     * is indeed working correctly but it's giving the recycler problems.  */
+    ldr w8, [x21, #0x8]
+    add w9, w8, #0x1
+    str w9, [x21, #0x8]
+
     // store the 32-bit seg id at the end of the stack array
     str w0, [x19, x8, lsl #2]
 
     // compiler says:
-    ldr w22, [x21, #8]
+    // ldr w22, [x21, #8]
 
     // I'm thinking why not just do this?
-    // mov w22, w9
+    mov w22, w9
 
+    // Load the capacity into reg c
     mov x8, x21
     ldr x9, [x8, #0xc]! // what is the point of the exclamation mark?
 
@@ -257,10 +273,17 @@ handle_unmap:
 
     cmp w22, w9
     b.ne no_exp
+
     // do expanding in here
     lsl w9, w22, #1 // multiply capacity by 2, store temp result in w9
     str w9, [x8] // update capacity in the struct
-    // I have no idea what this does and have no internet right now
+
+    // Goal: do the expansion using only two regs
+
+    // 1 reg for s->stack
+
+    // 1 reg for old cap
+
     ubfiz x0, x9, #2, #32
     bl _malloc
     mov x20, x0
@@ -272,28 +295,7 @@ handle_unmap:
 
     str x20, [x21]
 
-    // TODO: I need wifi to figure out how to do something I don't know how to
-    // to do.
-
-
-no_exp:
-    // add to the end of the stack
-    
-
-    /* Do the actual expanding (ugh) */
-
-    // NOTE: old_cap needs to be protected from syscalls
-
-    // save the old capacity
-    // double the actual capacity
-    // malloc the new capacity
-    // memcpy the old memory into the new stack
-    // free the old memory
-    // update the memory stored by the stack
-
-    // else, jump down here
-    // store the new element at the top of the stack
-    // increment the size of the stack
+    no_exp:
 
     ldp x21, x22, [sp], #16
     ldp x19, x20, [sp], #16   

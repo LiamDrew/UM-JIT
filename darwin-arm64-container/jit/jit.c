@@ -58,6 +58,18 @@ size_t read_into_reg(uint8_t *p, unsigned c);
 void *load_program(uint32_t b_val, uint8_t *umem);
 size_t inject_load_program(uint8_t *p, unsigned b, unsigned c);
 
+void print_pointer(void *ptr)
+{
+    printf("Ptr val is %p\n", ptr);
+    // assert(false);
+}
+
+void print_value(uint32_t val)
+{
+    printf("Normal val is %u\n", val);
+    assert(false);
+}
+
 int main(int argc, char *argv[])
 {
     if (argc != 2)
@@ -673,3 +685,21 @@ size_t inject_load_program(uint8_t *p, unsigned b, unsigned c)
 
     return CHUNK;
 }
+
+// inline void stack_push(Stack_T *s, uint32_t elem)
+// {
+//     s->stack[s->size++] = elem;
+
+//     if (s->size == s->capacity)
+//     {
+//         uint32_t old_cap = s->capacity;
+//         uint32_t new_cap = old_cap * 2;
+//         s->capacity = new_cap;
+//         uint32_t *temp = malloc(new_cap * sizeof(uint32_t));
+//         memcpy(temp, s->stack, old_cap * sizeof(uint32_t));
+//         free(s->stack);
+//         s->stack = temp;
+//     }
+
+//     return;
+// }

@@ -1,5 +1,6 @@
 #include "virt.h"
 #include <sys/mman.h>
+#include <stdio.h>
 
 Mem_T *mem = NULL;
 uint8_t *usable = NULL;
@@ -22,6 +23,8 @@ uint8_t *init_memory_system(uint32_t kernel_size)
     mem->mem = virt;
     mem->usable_mem = (void *)((uint8_t *)virt + BOOK_SIZE);
     rec = recycler_init();
+    printf("Stack ptr value is %p\n", (void *)rec);
+    printf("Address of stack ptr is %p\n", &rec);
     mem->recycler = rec;
 
     /* The kernel virtual size is 8 bytes smaller than its physical size */

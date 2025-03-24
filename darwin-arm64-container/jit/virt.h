@@ -179,7 +179,10 @@ inline uint32_t vs_calloc(uint8_t *umem, uint32_t size)
 
     /* Look for segments to be recycled. If there are freed segments that are
      * ready to be recycled, recycled them */
+
+    // TODO: fix this nonsense
     uint32_t freed_seg = find_freed_segment(size, rec);
+    // uint32_t freed_seg = SEG_NOT_FOUND;
 
     /* check that a free segment is available */
     if (freed_seg != SEG_NOT_FOUND)
