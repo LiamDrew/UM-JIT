@@ -1,18 +1,23 @@
 #include "utility.h"
 
-# Thanks Tom
-#define C(val)  $ ## val
+/* x86_64 System V register calling convention:
+ * rax stores the return value
+ * Function argument order is: rdi, rsi, rdx, rcx
+ * volatile registers are rax, rcx, rdx, rsi, rdi, r8, r9, r10, r11
+ * non-volatile registers are rbx, rbp, r12, r13, r14, r15
+ */
 
-# x86_64 volatile registers are rax, rcx, rdx, r8, r9, r10, r11
-# non-volatile registers are rbx, rbp, rdi, rsi, rsp, r12, r13, r14, r15
 .macro push_regs
     push %r8
     push %r9
     push %r10
     push %r11
+    push %rcx
+
 .endm
 
 .macro pop_regs
+    pop %rcx
     pop %r11
     pop %r10
     pop %r9
@@ -21,6 +26,15 @@
 
 .global run
 run:
+    /* Per the x86 calling convention, push the non-volatile registers to the
+     * stack */
+    push %rbx
+    push %rbp
+    push %r12
+    push %r13
+    push %r14
+    push %r15
+
     # zero machine registers for JIT compiler use
     xor %r8, %r8
     xor %r9, %r9
@@ -31,19 +45,28 @@ run:
     xor %r14, %r14
     xor %r15, %r15
 
-    # Load the address of the function global into RBX
+    /* Load the address of the function global into register RBX */
     lea function(%rip), %rbx
 
-    # Set the 32-bit program pointer RSI to 0
-    movl $0, %esi
-
-    # Address of active segment is currently in RDI
-    # Move that address into rbp
+    /* The address of the executable segment is currently in rdi. 
+     * Save the address of the current executable memory into rbp */
     mov %rdi, %rbp
-    # lea gs(%rip), %rbp
+
+    /* I am going to use rcx to store the address of the value sequence that
+     * I want to use */
+    mov %rsi, %rcx
+    
+    /* Set the 32-bit program pointer RSI to 0 */
+    movl $0, %esi
 
 
 loop:
+
+    # Move the result into rdi
+    mov %rbp, %rdi
+
+    /* NOTE: at this point, rdi must contain the address of executable memory */
+
     # Check if the program pointer to the zero segment is NULL
     test %rdi, %rdi
     jz done
@@ -55,17 +78,23 @@ loop:
     imul $CHUNK, %rax
     add %rdi, %rax
 
-    # Call the function
-    call *%rax
+    /* Jump to the executable memory */
+    jmp *%rax
 
-    # Move the result into rdi
-    mov %rax, %rdi
-    mov %rax, %rbp
 
-    # Loop back
-    jmp loop
 
 done:
+    // push_regs
+    // call say_hi
+    // pop_regs
+
+    pop %r15
+    pop %r14
+    pop %r13
+    pop %r12
+    pop %rbp
+    pop %rbx
+
     ret
 
 # NOTE: I am going to try doing this Tom's way first to get it working
@@ -73,17 +102,22 @@ done:
 
 .global function
 function:
-    cmp C(OP_MAP), %al
-    je .map
-    cmp C(OP_UNMAP), %al
-    je .unmap
-    cmp C(OP_OUT), %al
-    je .out
-    cmp C(OP_DUPLICATE), %al
+    cmp $OP_DUPLICATE, %al
     je .load
-    cmp C(OP_IN), %al
+
+    cmp $OP_MAP, %al
+    je .map
+    cmp $OP_UNMAP, %al
+    je .unmap
+    cmp $OP_OUT, %al
+    je .out
+    cmp $OP_IN, %al
     je .in
-    cmp $6, %al
+    
+    cmp $OP_HALT, %al
+    je .halt
+
+    cmp $7, %al
     je .debug
 ret
 
@@ -108,19 +142,39 @@ ret
 ret
 
 .load:
+
+    /* The address of the new executable memory segment needs to go in rax */
+    // jmp loop
+    test %edi, %edi
+    jne skip
+    jmp loop
+    // ret
+
+    skip:
     # RSI gets updated right before load_program gets called
     push %rsi
     push_regs
     call load_program
     pop_regs
     pop %rsi
-ret
+    mov %rax, %rbp
+    jmp loop
+
+// ret
 
 .in:
     push_regs
     call getchar@PLT
     pop_regs
 ret
+
+.halt:
+    // push_regs
+    // call say_hi
+    // pop_regs
+
+    // ret
+    jmp done
 
 .debug:
     push %rax
