@@ -25,7 +25,7 @@
 #define OPS 15
 #define INIT_CAP 32500
 
-#define SELF_MODIFYING 0    /* Set this to 1 to handle self-modifying code */
+#define SELF_MODIFYING 0   /* Set this to 1 to handle self-modifying code */
 
 typedef uint32_t Instruction;
 
@@ -332,9 +332,14 @@ size_t seg_load(uint8_t *p, unsigned a, unsigned b, unsigned c)
     return CHUNK;
 }
 
+void print_wb(uint32_t b)
+{
+    printf("wB is %u\n", b);
+}
+
 size_t seg_store(uint8_t *p, unsigned a, unsigned b, unsigned c)
 {
-    /* add x9, x28, wB */
+    /* add x9, x28, wA */
     *p++ = 0x89;
     *p++ = 0x03;
     *p++ = 0x00 + (BR + a);

@@ -108,7 +108,8 @@ function:
     jmp .recompile
 
 .recompile:
-    /* Handle the recompiling logic in here */
+    /* TODO: add self modifying code as a JIT feature 
+     * This likely will require expanding the CHUNK size */
 ret
 
 .map:
@@ -135,7 +136,6 @@ ret
 .load:
 
     /* The address of the new executable memory segment needs to go in rax */
-    // jmp loop
     test %edi, %edi
     jne skip
     jmp loop

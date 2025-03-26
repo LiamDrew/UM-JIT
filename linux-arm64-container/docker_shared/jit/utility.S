@@ -207,5 +207,8 @@ ret
 
 .global handle_self_modifying
 handle_self_modifying:
+    /* TODO: add self modifying code as a JIT feature
+     * NOTE: This may not be possible with my current CHUNK size.
+     * It likely needs to be expanded. */
 ret
 
