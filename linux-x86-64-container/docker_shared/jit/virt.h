@@ -64,24 +64,43 @@ inline uint32_t stack_top(Stack_T s)
     return s.stack[s.size - 1];
 }
 
-inline Stack_T stack_push(Stack_T s, uint32_t elem)
+// inline Stack_T stack_push(Stack_T s, uint32_t elem)
+// {
+//     if (s.size == s.capacity)
+//     {
+//         /* Expand the stack */
+//         s.capacity *= 2;
+//         uint32_t *temp = malloc(s.capacity * sizeof(uint32_t));
+//         for (uint32_t i = 0; i < s.size; i++)
+//         {
+//             temp[i] = s.stack[i];
+//         }
+
+//         free(s.stack);
+//         s.stack = temp;
+//     }
+
+//     s.stack[s.size++] = elem;
+//     return s;
+// }
+
+inline void stack_push(Stack_T *s, uint32_t elem)
 {
-    if (s.size == s.capacity)
+    if (s->size == s->capacity)
     {
         /* Expand the stack */
-        s.capacity *= 2;
-        uint32_t *temp = malloc(s.capacity * sizeof(uint32_t));
-        for (uint32_t i = 0; i < s.size; i++)
+        s->capacity *= 2;
+        uint32_t *temp = malloc(s->capacity * sizeof(uint32_t));
+        for (uint32_t i = 0; i < s->size; i++)
         {
-            temp[i] = s.stack[i];
+            temp[i] = s->stack[i];
         }
 
-        free(s.stack);
-        s.stack = temp;
+        free(s->stack);
+        s->stack = temp;
     }
 
-    s.stack[s.size++] = elem;
-    return s;
+    s->stack[s->size++] = elem;
 }
 
 inline Stack_T stack_pop(Stack_T s)
@@ -132,7 +151,8 @@ inline void free_segment(uint8_t *umem, uint32_t seg_addr, Stack_T *rec)
 
     /* NOTE: intentionally storing the user-facing v^2 address in the stack
      * for easy reuse in the future */
-    rec[index] = stack_push(rec[index], seg_addr);
+    // rec[index] = stack_push(rec[index], seg_addr);
+    stack_push(&rec[index], seg_addr);
 }
 
 /* Memory system interface */
