@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
 
 typedef struct
 {
@@ -105,8 +106,9 @@ inline void stack_push(Stack_T *s, uint32_t elem)
 
 inline Stack_T stack_pop(Stack_T s)
 {
-    /* Omitted to improve performance:
-     * assert(s.size > 0); */
+    /* Omitted to improve performance: */
+    
+    assert(s.size > 0);
 
     s.size--;
     return s;
@@ -126,8 +128,8 @@ inline uint32_t find_freed_segment(uint32_t size, Stack_T *rec)
 {
     uint32_t index = get_idx_from_alloc_size(size);
 
-    /* Omitted to improve performance:
-     * assert(index < REC_BUCKETS); */
+    /* Omitted to improve performance: */
+    assert(index < REC_BUCKETS);
 
     Stack_T s = rec[index];
 
@@ -140,18 +142,43 @@ inline uint32_t find_freed_segment(uint32_t size, Stack_T *rec)
     return freed_segment;
 }
 
+// inline void free_segment(uint8_t *umem, uint32_t seg_addr, Stack_T *rec)
+// {
+//     uint32_t sys_addr = seg_addr - BOOK_SIZE;
+
+//     uint32_t *virt = convert_address(umem, sys_addr);
+//     uint32_t cap = *virt;
+
+//     uint32_t index = ((cap + 8) / 32) - 1;
+//     // printf("index is %u\n", index);
+
+//     /* NOTE: intentionally storing the user-facing v^2 address in the stack
+//      * for easy reuse in the future */
+//     // rec[index] = stack_push(rec[index], seg_addr);
+//     stack_push(&rec[index], seg_addr);
+// }
+
 inline void free_segment(uint8_t *umem, uint32_t seg_addr, Stack_T *rec)
 {
     uint32_t sys_addr = seg_addr - BOOK_SIZE;
-
     uint32_t *virt = convert_address(umem, sys_addr);
     uint32_t cap = *virt;
-
-    uint32_t index = ((cap + 8) / 32) - 1;
-
-    /* NOTE: intentionally storing the user-facing v^2 address in the stack
-     * for easy reuse in the future */
-    // rec[index] = stack_push(rec[index], seg_addr);
+    
+    // Calculate index safely
+    uint32_t blocks = (cap + 8) / 32;
+    if (blocks == 0) {
+        // Handle the error case - either log, assert, or assign to a valid bucket
+        fprintf(stderr, "Error: Invalid segment size for recycling\n");
+        return;
+    }
+    uint32_t index = blocks - 1;
+    
+    // Additional safety check
+    if (index >= REC_BUCKETS) {
+        fprintf(stderr, "Error: Index out of bounds for recycler\n");
+        return;
+    }
+    
     stack_push(&rec[index], seg_addr);
 }
 
@@ -217,7 +244,8 @@ static inline uint32_t vs_calloc(uint8_t *umem, uint32_t size)
  * Free a virtual segment for future use. */
 static inline void vs_free(uint32_t addr)
 {
-    free_segment(usable, addr, rec);
+    (void)addr;
+    // free_segment(usable, addr, rec);
 }
 
 /* Set At (set_at):
