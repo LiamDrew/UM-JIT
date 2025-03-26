@@ -77,63 +77,49 @@ The `/jit` directory contains the executable binary source code for the JIT comp
 
 ## Performance
 
-I timed my program in two environments.
-First was in a docker container running x86_64 linux on my apple silicon mac
-The second was on my student VM on the Tufts department servers running x86_64 redhat linux.
+I timed my emulator and JIT-compiler runtimes on the `sandmark.umz` benchmark in 4 different environments:
+1. Natively on Arm64 MacOS
+2. An Arm64 Linux environment in a Docker container on the Mac.
+3. An x86-64 Linux environment in a Docker container on the Mac, emulated by Rosetta 2 (Apple's x86-64 virtualization layer).
+4. Natively on an x86-64 Linux machine on the Tufts CS department servers
 
 
-| Runtime | Platform | Best Compiler + Flags | OS     | Hardware | Time (seconds) |
-| ------- | -------- | --------------------- | ------ | -------- | -------------- |
-| JIT     | Arm64    | clang -O2             | Darwin | M3 Max   | 0.53           |
-| JIT     | Arm64    | clang -O2             | Darwin | M3 Max   | 0.53           |
+| Runtime  | Architecture | Compiler  | OS     | Hardware   | Time (seconds) |
+| -------- | ------------ | --------- | ------ | ---------- | -------------- |
+| JIT      | Arm64        | clang -O2 | Darwin | M3 Mac     | 0.53           |
+| Emulator | Arm64        | clang -O2 | Darwin | M3 Mac     | 2.42           |
+| JIT      | Arm64        | clang -O2 | Linux  | M3 Mac     | 0.61           |
+| Emulator | Arm64        | clang -O2 | Linux  | M3 Mac     | 2.39           |
+| JIT      | x86-64*      | clang -O2 | Linux  | M3 Mac     | 0.76           |
+| Emulator | x86-64*      | clang -O2 | Linux  | M3 Mac     | 2.73           |
+| JIT      | x86-64       | gcc -O2   | Linux  | Intel Xeon | 1.44           |
+| Emulator | x86-64       | gcc -O2   | Linux  | Intel Xeon | 4.45           |
 
+*Run via emulation with Rosetta 2  
 
+ Hardware Specs:  
+1. M3 Max (10 Performance Cores @ 4.05 GHz & 4 Efficiency Cores @ 2.20GHz)
+2. Intel(R) Xeon(R) Silver 4214Y CPU @ 2.20GHz
 
-Here is the perfomance comparisons between the emulator and the JIT in these environemnts
+Here are my conclusions:
+1. Arm is a much better architecture than x86. (Surpise). Seriously, this project gave me a much greater appreciation for the excellent engineering that went into the Arm architecture. All instructions are 4 bytes, 
 
-### x86 Container:
-#### Emulator:
-Midmark: 0.13 seconds  
-Sandmark: 2.8 seconds  
-
-#### JIT Compiler:
-Midmark: 0.09 seconds  
-Sandmark: 1.01 seconds  
-
-### Tufts student VM:
-#### Emulator:
-Midmark: 0.19 seconds  
-Sandmark: 5.10 seconds  
-
-#### JIT Compiler:
-Midmark: 0.14 seconds  
-Sandmark: 3.63 seconds  
-
-The apple hardware is significantly faster than my VM, even with the ARM hardware emulating x86. To get an idea of how much slower emulated x86 is than native ARM, I modified the emulator to run in native C and ran the program in 3 different environments
-1. Native MacOS (which forced me to compile with clang; gcc is my compiler of choice)
-2. A docker container running Aarch64 Ubuntu linux 
-3. A docker container running x86_64 Ubuntu linux (I was planning to use redhat, but some utilities I needed weren't available)
-
-The emulator ran the sandmark.umz benchmark (a UM program containing over 2 million instructions) in:
-1. 2.50 seconds on MacOS
-2. 2.29 seconds in the Aarch64 container (which is compatile with Apple's ARM architecture)
-3. 2.80 seconds in the x86 container (which is not compatible with Apple's ARM architecture and has to run the rosetta emulator)
-
-Wait, what? Yup, you read that right. The program ran faster in a docker container running linux on the Mac than it did just running natively on MacOS. The Aarch container run was achieved by compiling with gcc using the -O1 flag. Using clang and/or -O2 resulted in a 2.5 second runtime, so gcc found the sweet spot here with -01. On macOS, gcc wasn't available, so I was forced to compile with clang, and found -O2 to be the best optimization. In the x86 docker container, I found best results compiling with gcc and -O2.
 
 Based on these initial tests, I concluded 3 things:
-1. Apple makes excellent hardware
+1. Apple makes excellent hardware. 
+2. Docker is an amazing piece of software
 2. The emulated x86_64 architecture running on the Apple hardware, is about 20% slower than the native ARM architecture
-3. Amazingly, Docker runs Aarch linux on Apple hardware faster than MacOS runs on Apple hardware. (Some of this is likely due to gcc being better optimized than clang).
+
 
 ## Potential Improvements and Considerations
-The benchmark assembly language programs used to test emulators have a couple weaknesses that I exploited to make my JIT faster. If a UM program were to encounter a segmented store that stored an instruction into the zero segment that was going to be executed, this compiler would crash. However, neither the midmark or the sandmark demand this of the JIT. To handle this case, any instruction stored in the zero segment would have to be compiled into machine code, even if it never ends up being executed. This slows the program down, so I removed it from my compiler and am noting the choice here.
+The benchmark assembly language programs used to test emulators have a "weaknesses" that I exploited to make my JIT faster. If a UM program were to encounter a segmented store that stored an instruction into the zero segment that was going to be executed, this compiler would crash. However, neither the midmark or the sandmark demand this of the JIT. To handle this case, any instruction stored in the zero segment would have to be compiled into machine code, even if it never ends up being executed. This slows the program down, so I removed it from my compiler.
 
 ## Acknowledgements
 Professor Mark Sheldon, for giving me the idea to make a JIT compiler for the Univeral Machine.  
 
-Tom Hebb, for sharing a similar JIT compiler built years ago. Tom's project had several brilliant ideas that helped me make my JIT compiler much faster, most notably the use of hand-written assembly at compile time to compliment the JIT compiled machine code for complex instructions.  
+Tom Hebb, for sharing a similar JIT compiler he built years ago. Tom's project had several brilliant ideas that helped me improve my original JIT compiler significantly, most notably branching from the JIT compiled machine code to hand-written assembly (written at compile time) to handle complex instructions.
+
+Milo Goldstein, Jason Miller, Hameedah Lawal, and Yoda Ermias (my JumboHack 2025 teammates) for helping me designing and implement the Virt32 memory allocator used in this project.
 
 Peter Wolfe, my project partner for the Univeral Machine assignment. 
 
-Milo Goldstein, Jason Miller, Hameedah Lawal, and Yoda Ermias (my JumboHack 2025 teammates) for helping me designing and implement the Virt32 memory allocator for use with the Universal Machine.
