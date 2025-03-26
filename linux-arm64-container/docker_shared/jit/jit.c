@@ -25,6 +25,8 @@
 #define OPS 15
 #define INIT_CAP 32500
 
+#define SELF_MODIFYING 0    /* Set this to 1 to handle self-modifying code */
+
 typedef uint32_t Instruction;
 
 typedef void *(*Function)(void);
@@ -345,11 +347,23 @@ size_t seg_store(uint8_t *p, unsigned a, unsigned b, unsigned c)
     *p++ = 0x20 + (BR + b);
     *p++ = 0xB8;
 
-    /* 1 No Op */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
+    /* If the self-modifying flag is set, branch to the assembly handler for
+     * self modifying code. This hurts program peformance. */
+    if (SELF_MODIFYING) {
+        /* blr x13 */
+        *p++ = 0xA0;
+        *p++ = 0x01;
+        *p++ = 0x3F;
+        *p++ = 0xD6;
+    }
+
+    else {
+        /* 1 No Op */
+        *p++ = 0x1F;
+        *p++ = 0x20;
+        *p++ = 0x03;
+        *p++ = 0xD5;
+    }
 
     return CHUNK;
 }
@@ -527,8 +541,6 @@ void unmap_segment(uint32_t segment)
 
 size_t inject_unmap_segment(uint8_t *p, unsigned c)
 {
-    // TODO: switch this over to do recompiling
-
     /* Move register c to be the function call argument
      * mov w0, wC */
     *p++ = 0xE0;
@@ -536,18 +548,18 @@ size_t inject_unmap_segment(uint8_t *p, unsigned c)
     *p++ = (BR + c);
     *p++ = 0x2A;
 
-    /* Call unmap segment function */
-    /* blr x13 */
-    *p++ = 0xA0;
+    /* Move the print register opcode into w1 */
+    /* mov w1, OP_OUT */
+    *p++ = 0x00 | (OP_UNMAP << 5) | OP_REG;
+    *p++ = 0x00;
+    *p++ = 0x80;
+    *p++ = 0x52;
+
+    /* blr x15 */
+    *p++ = 0xE0;
     *p++ = 0x01;
     *p++ = 0x3F;
     *p++ = 0xD6;
-
-    /* 1 No Op */
-    *p++ = 0x1F;
-    *p++ = 0x20;
-    *p++ = 0x03;
-    *p++ = 0xD5;
 
     return CHUNK;
 }

@@ -59,7 +59,6 @@ run:
     /* Set the 32-bit program pointer RSI to 0 */
     movl $0, %esi
 
-
 loop:
 
     /* Move the executable memory address into rdi */

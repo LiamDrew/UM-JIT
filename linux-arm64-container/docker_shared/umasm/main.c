@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
     (void)argc;
     (void)argv;
 
-    const char *filename = "sub.um";
+    const char *filename = "self_modify.um";
 
     FILE *fp = fopen(filename, "wb");
     assert(fp != NULL);
@@ -35,23 +35,26 @@ int main(int argc, char *argv[])
 
     size_t bw = 8;
 
-    // r3 = 8
-    words[0] = load_val(13, 8, 3);
+    // r2 = the load index (index of output instruction)
+    words[0] = load_val(13, 3, 2);
 
-    // nand r1 with r1 and put result in r4
-    words[2] = three_reg(6, 4, 1, 1);
+    // r3 = the store index (index of cmov 0,0,0 instruction)
+    words[1] = load_val(13, 6, 3);
 
-    // r4 = r3 + r4
-    words[3] = three_reg(3, 4, 3, 4);
+    // r1 = 49
+    words[2] = load_val(13, 49, 1);
 
-    // load 48 into r6
-    words[4] = load_val(13, 48, 6);
+    // output r1
+    words[3] = three_reg(10, 0, 0, 1);
 
-    // r6 = r6 + r4
-    words[5] = three_reg(3, 6, 6, 4);
+    // seg load into r4 from index r2
+    words[4] = three_reg(1, 4, 0, 2);
 
-    // output r6
-    words[6] = three_reg(10, 0, 0, 6);
+    // seg store value r4 into segment 0 at index r3
+    words[5] = three_reg(2, 0, 3, 4);
+
+    // cmov r0, r0 = r0
+    words[6] = three_reg(0, 0, 0, 0);
 
     // halt
     words[7] = three_reg(7, 0, 0, 0);

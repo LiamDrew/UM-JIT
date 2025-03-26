@@ -70,7 +70,7 @@ run:
     /* Store the default value of the large_op opcode in w14 */
     mov w14, #OP_DUPLICATE
 
-    ldr x13, =handle_unmap
+    ldr x13, =handle_self_modifying
 
     /* Store the address of the handle_map function in x12 */
     ldr x12, =handle_map
@@ -116,6 +116,9 @@ large_op:
     cmp x14, #OP_DUPLICATE
     beq .dup
 
+    cmp x14, #OP_UNMAP
+    beq .unmap
+
     cmp x14, #OP_IN
     beq .in
 
@@ -152,6 +155,18 @@ large_op:
 
     /* Branch back to the main loop */
     b loop
+
+.unmap:
+    function_start
+    push_regs
+
+    bl unmap_segment
+
+    pop_regs
+    function_end
+
+    restore_default_opcode
+ret
 
 .out:
     function_start
@@ -190,14 +205,7 @@ handle_map:
     function_end
 ret
 
-.global handle_unmap
-handle_unmap:
-    function_start
-    push_regs
-
-    bl unmap_segment
-
-    pop_regs
-    function_end
+.global handle_self_modifying
+handle_self_modifying:
 ret
 
