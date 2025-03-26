@@ -1,15 +1,15 @@
 .DS_Store
 .vscode/
 *.o
-linux-arm64-container/docker_shared/jit/jit
-
-linux-arm64-container/docker_shared/jit/unrolled_sandmark_jit.um
-linux-x86-64-container/docker_shared/umasm/unrolled_sandmark.um
-linux-x86-64-container/docker_shared/umasm/unrolled_sandmark_jit.um
-linux-x86-64-container/docker_shared/umasm/unrolled_tuffer.um
-linux-arm64-container/docker_shared/emulator/unrolled_sandmark.um
-linux-arm64-container/docker_shared/jit/ref.txt
-linux-arm64-container/docker_shared/jit/ours.txt
 
 /darwin-arm64/emulator
 /darwin-arm64/original-emulator
+
+linux-arm64-container/docker_shared/emulator/Makefile
+linux-arm64-container/docker_shared/emulator/mod_emulator.c
+linux-arm64-container/docker_shared/emulator/virt.c
+linux-arm64-container/docker_shared/emulator/virt.h
+
+linux-arm64-container/docker_shared/original-emulator
+
+

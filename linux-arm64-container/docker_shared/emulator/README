@@ -1,6 +1,0 @@
-The emulator source code is omitted, but an executable binary is provided.
-Run with `./um ../umasm/[program.um]`
-
-Also, please note that the emulator used to time on Darwin is slightly
-different (and faster) than this one, and can be found in the Virt32 project on
-my Github.
