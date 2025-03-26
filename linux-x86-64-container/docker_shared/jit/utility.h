@@ -1,8 +1,8 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
-// #define CHUNK 10
-#define CHUNK 13
+#define CHUNK 10
+// #define CHUNK 13
 
 
 #define OP_MAP 0

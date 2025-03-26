@@ -94,11 +94,11 @@ ret
 
 .global function
 function:
-    cmp $OP_LOAD, %al
-    je .val_load
+    // cmp $OP_LOAD, %al
+    // je .val_load
 
-    cmp $OP_STORE, %al
-    je .val_store
+    // cmp $OP_STORE, %al
+    // je .val_store
 
     cmp $OP_DUPLICATE, %al
     je .load
