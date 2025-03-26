@@ -10,6 +10,7 @@ linux-arm64-container/docker_shared/emulator/mod_emulator.c
 linux-arm64-container/docker_shared/emulator/virt.c
 linux-arm64-container/docker_shared/emulator/virt.h
 
-linux-arm64-container/docker_shared/original-emulator
+linux-arm64-container/docker_shared/original-emulator/emulator.c
+linux-arm64-container/docker_shared/original-emulator/Makefile
 
 
