@@ -1,9 +1,8 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
-#define CHUNK 12
+#define CHUNK 10
 
-// Huge thank you to Tom for showing me the way with this
 #define OP_MAP 0
 #define OP_UNMAP 1
 #define OP_OUT 2
@@ -13,8 +12,6 @@
 #define OP_HALT 6
 
 #ifndef __ASSEMBLER__
-    // void zero_regs(void);
-    // void run(uint8_t *zero);
     void run(uint8_t *zero, uint32_t **seq_addr);
 #endif
 

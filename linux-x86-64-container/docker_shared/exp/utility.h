@@ -2,7 +2,7 @@
 #define UTILITY_H
 
 #ifndef __ASSEMBLER__
-    void test(void);
+    unsigned test(void);
 #endif
 
 #endif

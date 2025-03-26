@@ -2,15 +2,15 @@
 
 .global test
 test:
-    mov %rcx, %rax
-    mov (%rcx), %rax
-
-    // mov (%rax, %r8,8) %rax
-    // mov (%rcx, %r8,8) %rax
-    // mov rax, [rax + r8d*8]
-    movq (%rax,%r8,8),%rax
-    movq (%rcx,%r8,8),%rax
-
-    call *%rbx
-    jmp *%rbx
+    mov $2, %rax
+    mov $3, %r8d
+    mov $4, %r9d
+    lea (%r8d, %r8d, 1), %r8d
+    lea (%r8d, %r8d, 1), %r9d
+    lea (%r8d, %r8d, 1), %r10d
+    lea (%r8d, %r8d, 1), %r11d
+    // lea (%r9d, %r8d, 1), %r8d
+    // lea (%r8d, %r9d, 1), %r8d
+    // lea (%r8d, %r8d, 1), %r9d
+    mov %r8d, %eax
     ret
