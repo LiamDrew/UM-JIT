@@ -35,7 +35,7 @@ run:
     push %r14
     push %r15
 
-    # zero machine registers for JIT compiler use
+    /* zero machine registers for JIT compiler use */
     xor %r8, %r8
     xor %r9, %r9
     xor %r10, %r10
@@ -52,10 +52,8 @@ run:
      * Save the address of the current executable memory into rbp */
     mov %rdi, %rbp
 
-    /* I am going to use rcx to store the address of the value sequence that
-     * I want to use */
-
-    // Now stores the address of umem
+    /* I am going to use rcx to store the address of the usable memory provided
+     * by Virt32 */
     mov %rsi, %rcx
     
     /* Set the 32-bit program pointer RSI to 0 */
@@ -64,19 +62,19 @@ run:
 
 loop:
 
-    # Move the result into rdi
+    /* Move the executable memory address into rdi */
     mov %rbp, %rdi
 
     /* NOTE: at this point, rdi must contain the address of executable memory */
 
-    # Check if the program pointer to the zero segment is NULL
+    /* Check if the program pointer to the zero segment is NULL */
     test %rdi, %rdi
     jz done
 
-    # Move the program counter to eax
+    /* Move the program counter to eax */
     movl %esi, %eax
 
-    # Caclulate the address of the function we are going to be calling
+    /* Caclulate the address of the function we are going to be calling */
     imul $CHUNK, %rax
     add %rdi, %rax
 
@@ -84,6 +82,7 @@ loop:
     jmp *%rax
 
 done:
+    /* Restore non-volatile registers */
     pop %r15
     pop %r14
     pop %r13
@@ -107,12 +106,18 @@ function:
     cmp $OP_HALT, %al
     je .halt
 
+    jmp .recompile
+
+.recompile:
+    /* Handle the recompiling logic in here */
+ret
+
 .map:
     push_regs
     mov %rcx, %rsi
     call map_segment
     pop_regs
-    # return address is in rax
+    /* return address is in rax */
 ret
 
 .unmap:
@@ -135,10 +140,9 @@ ret
     test %edi, %edi
     jne skip
     jmp loop
-    // ret
 
     skip:
-    # RSI gets updated right before load_program gets called
+    /* rsi gets updated right before load_program gets called */
     push %rsi
     push_regs
     mov %rcx, %rsi
@@ -148,7 +152,6 @@ ret
     mov %rax, %rbp
 jmp loop
 
-
 .in:
     push_regs
     call getchar@PLT
@@ -157,9 +160,3 @@ ret
 
 .halt:
     jmp done
-
-.section .rodata
-rax_fmt:
-    .string "RAX: 0x%lx\n"
-rbp_fmt:
-    .string "RBP: 0x%lx\n"
