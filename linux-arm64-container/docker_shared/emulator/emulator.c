@@ -306,7 +306,6 @@ void unmap_segment(uint32_t segment)
 
 void load_segment(uint32_t index, uint32_t *zero)
 {
-    (void)zero;
     if (index > 0)
     {
         uint32_t copied_seq_size = segment_lengths[index];
@@ -315,5 +314,6 @@ void load_segment(uint32_t index, uint32_t *zero)
         memcpy(new_zero, segment_sequence[index],
                copied_seq_size * sizeof(uint32_t));
         segment_sequence[0] = new_zero;
+        free(zero);
     }
 }

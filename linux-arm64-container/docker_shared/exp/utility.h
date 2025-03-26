@@ -4,7 +4,6 @@
 #define HELP 1
 
 #ifndef __ASSEMBLER__
-    // unsigned test(void);
     unsigned test(int *arr);
 
 #endif

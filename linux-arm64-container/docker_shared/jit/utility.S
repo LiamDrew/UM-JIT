@@ -64,26 +64,15 @@ run:
     /* Store the base usable memory address (umem) */
     mov x28, x1
 
-    /* Load the address of the large_op label into register x15
-     * On Linux, the instruction is -> (ldr x15, =large_op)
-     * On Darwin, we need the following: */
-    // adrp x15, large_op@PAGE
-    // add x15, x15, large_op@PAGEOFF
-
+    /* Load the address of the large_op label into register x15 */
     ldr x15, =large_op
 
     /* Store the default value of the large_op opcode in w14 */
     mov w14, #OP_DUPLICATE
 
-    // adrp x13, handle_unmap@PAGE
-    // add x13, x13, handle_unmap@PAGEOFF
-
     ldr x13, =handle_unmap
 
     /* Store the address of the handle_map function in x12 */
-    // adrp x12, handle_map@PAGE
-    // add x12, x12, handle_map@PAGEOFF
-
     ldr x12, =handle_map
 
     /* Set the 32-bit program pointer to 0 */

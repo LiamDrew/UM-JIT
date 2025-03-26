@@ -15,13 +15,13 @@
  */
 
 .macro push_regs
-    stp x12, x13, [sp, #-16]!   /* Push x12 and x13 onto stack */
-    stp x14, x15, [sp, #-16]!   /* Push x14 and x15 onto stack */
+    stp x12, x13, [sp, #-32]! /* Push x12 and x13 onto stack */
+    stp x14, x15, [sp, #16]   /* Push x14 and x15 onto stack */
 .endm
 
 .macro pop_regs
-    ldp x14, x15, [sp], #16     /* Pop x14 and x15 from stack */
-    ldp x12, x13, [sp], #16     /* Pop x12 and x13 from stack */
+    ldp x14, x15, [sp, #16]   /* Pop x14 and x15 from stack */
+    ldp x12, x13, [sp], #32   /* Pop x12 and x13 from stack */
 .endm
 
 .macro function_start
