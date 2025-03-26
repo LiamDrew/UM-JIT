@@ -83,27 +83,23 @@ loop:
     /* Jump to the executable memory */
     jmp *%rax
 
-
-
 done:
-    // push_regs
-    // call say_hi
-    // pop_regs
-
     pop %r15
     pop %r14
     pop %r13
     pop %r12
     pop %rbp
     pop %rbx
-
-    ret
-
-# NOTE: I am going to try doing this Tom's way first to get it working
-# I will then see if it can be improved upon
+ret
 
 .global function
 function:
+    cmp $OP_LOAD, %al
+    je .val_load
+
+    cmp $OP_STORE, %al
+    je .val_store
+
     cmp $OP_DUPLICATE, %al
     je .load
 
@@ -121,6 +117,18 @@ function:
 
     cmp $7, %al
     je .debug
+ret
+
+.val_load:
+    push_regs
+    call seg_load_print
+    pop_regs
+ret
+
+.val_store:
+    push_regs
+    call seg_store_print
+    pop_regs
 ret
 
 .map:
@@ -162,9 +170,8 @@ ret
     pop_regs
     pop %rsi
     mov %rax, %rbp
-    jmp loop
+jmp loop
 
-// ret
 
 .in:
     push_regs
@@ -173,11 +180,6 @@ ret
 ret
 
 .halt:
-    // push_regs
-    // call say_hi
-    // pop_regs
-
-    // ret
     jmp done
 
 .debug:
