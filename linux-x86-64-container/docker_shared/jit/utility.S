@@ -54,6 +54,8 @@ run:
 
     /* I am going to use rcx to store the address of the value sequence that
      * I want to use */
+
+    // Now stores the address of umem
     mov %rsi, %rcx
     
     /* Set the 32-bit program pointer RSI to 0 */
@@ -123,6 +125,7 @@ ret
 
 .map:
     push_regs
+    mov %rcx, %rsi
     call map_segment
     pop_regs
     # return address is in rax
@@ -154,6 +157,7 @@ ret
     # RSI gets updated right before load_program gets called
     push %rsi
     push_regs
+    mov %rcx, %rsi
     call load_program
     pop_regs
     pop %rsi

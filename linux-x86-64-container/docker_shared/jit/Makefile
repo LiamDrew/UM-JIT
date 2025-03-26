@@ -1,14 +1,34 @@
-src = $(wildcard *.c) $(wildcard *.S)
-obj = $(src:.c=.o)
-obj = $(src:.S=.o)
+# src = $(wildcard *.c) $(wildcard *.S)
+# obj = $(src:.c=.o)
+# obj = $(src:.S=.o)
+
+# CC = clang
+# CFLAGS = -Wall -Wextra -Werror -Wpedantic -O2
+
+# LDFLAGS =
+
+# jit: $(obj)
+# 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# clean:
+# 	rm -f *.o jit
 
 CC = clang
-CFLAGS = -Wall -Wextra -Werror -Wpedantic -O2
-
+CFLAGS = -g -Wall -Wextra -Werror -Wpedantic -O2
 LDFLAGS =
 
-jit: $(obj)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+jit: jit.o utility.o virt.o
+	$(CC) $(CFLAGS) -o jit jit.o utility.o virt.o $(LDFLAGS)
 
+jit.o: jit.c utility.h
+	$(CC) $(CFLAGS) -c jit.c
+
+utility.o: utility.S utility.h
+	$(CC) -c utility.S
+
+virt.o: virt.c virt.h
+	$(CC) -c virt.c
+
+.PHONY: clean
 clean:
 	rm -f *.o jit
