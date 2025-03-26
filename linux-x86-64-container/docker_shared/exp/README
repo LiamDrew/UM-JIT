@@ -1,0 +1,5 @@
+This is the x86 version of my assembly development approach. This is another
+simple program that will assemble handwritten x86 assembly into machine code.
+It helps for figuring out how x86 instructions are encoded byte-by-byte.
+
+Included to make my development process more transparent.

@@ -2,3 +2,6 @@ Here is a simple program for compiling handwritten assembly in utility.S.
 This is very helpful for figuring out what bytes of machine code need to be
 included in the JIT compiler, as well as figuring out how machine instructions
 are bitpacked based on different register numbers.
+
+I included this to make the development process for this project more
+transparent.

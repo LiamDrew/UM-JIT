@@ -1,2 +1,2 @@
 This is the emulator used for timing benchmarks. The source is omitted, but
-the `um` executable binary is provided and can be timed in the linux container.
+the `um` executable linux binary is provided and can be timed in the container.

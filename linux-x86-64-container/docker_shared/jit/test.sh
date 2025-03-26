@@ -1,3 +1,5 @@
+# A simple test script for running simple UM programs with the JIT.
+# (This container was the original development environment for the JIT.)
 
 echo "Testing print six"
 output=$(./jit ../umasm/print-six.um)

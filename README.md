@@ -106,6 +106,8 @@ Here's what I noticed:
 ## Potential Improvements and Considerations
 The benchmark Universal Machine assembly language programs used to test these runtimes have a weaknesses that I exploited to make my JIT faster. If a UM program modifies iteself by storing an instruction into the zero segment it intends to execute, the JIT compiler will have undefined behavior. To handle this case, any instruction stored in the zero segment would have to be compiled into machine code, even if it never ends up being executed. I omitted this feature because it would slow the JIT down.
 
+This feature would be relatively easy to add in both platform versions of the JIT.
+
 ## Takeaways
 This project has no practical application, but taught me a ton about computer architecture, operating systems, assembly language, and how writing performant programs.
 

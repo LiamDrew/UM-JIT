@@ -94,15 +94,8 @@ ret
 
 .global function
 function:
-    // cmp $OP_LOAD, %al
-    // je .val_load
-
-    // cmp $OP_STORE, %al
-    // je .val_store
-
     cmp $OP_DUPLICATE, %al
     je .load
-
     cmp $OP_MAP, %al
     je .map
     cmp $OP_UNMAP, %al
@@ -111,25 +104,8 @@ function:
     je .out
     cmp $OP_IN, %al
     je .in
-    
     cmp $OP_HALT, %al
     je .halt
-
-    cmp $7, %al
-    je .debug
-ret
-
-.val_load:
-    push_regs
-    call seg_load_print
-    pop_regs
-ret
-
-.val_store:
-    push_regs
-    call seg_store_print
-    pop_regs
-ret
 
 .map:
     push_regs
@@ -181,35 +157,6 @@ ret
 
 .halt:
     jmp done
-
-.debug:
-    push %rax
-    push %rbp
-
-    push %rdi
-    push %rsi
-
-    # Print RAX first - need to move saved rax value into rsi for printf
-    mov 24(%rsp), %rsi   # Get saved rax value from stack
-    lea rax_fmt(%rip), %rdi  # First arg is format string
-    xor %eax, %eax      # Clear AL (number of vector registers used)
-    call printf@PLT
-
-    # Print RBP
-    mov 16(%rsp), %rsi   # Get saved rbp value from stack
-    lea rbp_fmt(%rip), %rdi  # First arg is format string
-    xor %eax, %eax      # Clear AL
-    call printf@PLT
-
-    pop %rsi
-    pop %rdi
-    pop %rbp
-    pop %rax
-
-
-    mov $0, %rdi
-    call exit@PLT
-ret
 
 .section .rodata
 rax_fmt:

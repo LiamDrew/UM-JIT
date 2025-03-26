@@ -4,11 +4,7 @@
  * @date January 2025
  * @brief 
  * A Just-In-Time compiler from Universal Machine assembly language to
- * x86 assembly language.
- * 
- * This JIT completes the sandmark in 1.02 seconds in an x86 docker container
- * running on an Apple Silicon Mac. It is nearly 3 times faster than the
- * benchmark emulator.
+ * x86 assembly language. Uses the Virt32 memory allocator.
 */
 
 #include <stdio.h>
@@ -29,7 +25,6 @@
 typedef uint32_t Instruction;
 typedef void *(*Function)(void);
 
-void initialize_instruction_bank();
 void *initialize_zero_segment(size_t fsize);
 void load_zero_segment(void *zero, uint8_t *umem, FILE *fp, size_t fsize);
 uint64_t make_word(uint64_t word, unsigned width, unsigned lsb, uint64_t value);
@@ -56,7 +51,6 @@ size_t print_reg(void *zero, size_t offset, unsigned c);
 unsigned char read_char(void);
 size_t read_into_reg(void *zero, size_t offset, unsigned c);
 
-// void *load_program(uint32_t b_val);
 void *load_program(uint32_t b_val, uint8_t *umem);
 size_t inject_load_program(void *zero, size_t offset, unsigned b, unsigned c);
 
@@ -87,9 +81,8 @@ int main(int argc, char *argv[])
     }
 
     uint8_t *umem = init_memory_system(KERN_SIZE);
-    printf("Umem at the beginning is %p\n", (void *)umem);
 
-    // Initialize executable and non-executable memory for the zero segment
+    /* Initialize executable and non-executable memory for the zero segment */
     size_t asmbytes = fsize * ((CHUNK + 3) / 4);
     void *zero = initialize_zero_segment(asmbytes);
 
@@ -135,11 +128,10 @@ void load_zero_segment(void *zero, uint8_t *umem, FILE *fp, size_t fsize)
         else if (i % 4 == 3)
         {
             word = make_word(word, 8, 0, c_char);
-            // zero_vals[i / 4] = word;
             
             set_at(umem, 0 + (i / 4) * sizeof(uint32_t), word);
 
-            // compile the UM word into machine code
+            /* Compile the UM word into machine code */
             offset = compile_instruction(zero, word, offset);
             word = 0;
         }
@@ -166,8 +158,6 @@ size_t compile_instruction(void *zero, Instruction word, size_t offset)
 {
     uint32_t opcode = (word >> 28) & 0xF;
     uint32_t a = 0;
-
-    // printf("Opcode is %u\n", opcode);
 
     // Load Value
     if (opcode == 13)
@@ -297,10 +287,6 @@ size_t load_reg(void *zero, size_t offset, unsigned a, uint32_t value)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
     return CHUNK;
 }
 
@@ -324,10 +310,6 @@ size_t cond_move(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     *p++ = 0x1F;
     *p++ = 0x00;
 
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
     return CHUNK;
 }
 
@@ -341,39 +323,6 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     uint8_t *p = (uint8_t *)zero + offset;
     // $r[A] := $m[$r[B]][$r[C]]
 
-    // // mov %rBd, %edi
-    // *p++ = 0x44;
-    // *p++ = 0x89;
-    // *p++ = 0xc7 | (b << 3);
-
-    // // mov %rCd, %esi
-    // *p++ = 0x44;
-    // *p++ = 0x89;
-    // *p++ = 0xc6 | (c << 3);
-
-    // // put the right opcode into rax
-    // *p++ = 0xb0;
-    // *p++ = 0x00 | OP_LOAD;
-
-    // // call the function
-    // *p++ = 0xff;
-    // *p++ = 0xd3;
-
-    // // mov %eax, rAd
-    // *p++ = 0x41;
-    // *p++ = 0x89;
-    // *p++ = 0xc0 | a;
-
-    // // mov %rcx,%rax
-    // *p++ = 0x48;
-    // *p++ = 0x89;
-    // *p++ = 0xc8;
-
-    // // add rB, rax
-    // *p++ = 0x4c;
-    // *p++ = 0x01;
-    // *p++ = 0xc0 | (b << 3);
-
     *p++ = 0x4a;
     *p++ = 0x8d;
     *p++ = 0x04;
@@ -382,49 +331,13 @@ size_t seg_load(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     // mov rAd, [rax + rCd*4]
     *p++ = 0x46;                    // REX prefix: REX.R and REX.X
     *p++ = 0x8B;                    // MOV opcode
-    *p++ = 0x04 | (a << 3);         // ModRM byte with register selection (a in reg field for destination)
+    *p++ = 0x04 | (a << 3);         // ModRM byte with register selection
     *p++ = 0x80 | (c << 3); // SIB: scale=2 (4), index=C's lower bits, base=rax
 
     *p++ = 0x90;
     *p++ = 0x90;
 
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
-
     return CHUNK;
-}
-
-uint32_t seg_load_print(uint32_t seg_addr, uint32_t index, uint32_t garbage, uint8_t *umem)
-{
-    (void)garbage;
-    // printf("\nSEGMENTED LOAD\n");
-    // printf("Segment address is %u\n", seg_addr);
-    // printf("Segment index is %u\n", index);
-    // printf("Mem addr is %p\n", (void *)umem);
-
-    uint8_t *temp = umem + seg_addr;
-    uint32_t *real_addr = (uint32_t *)temp;
-    // something is going wrong in memory right here
-    uint32_t result = real_addr[index];
-    // uint32_t result = *real_addr;
-    // printf("Storing the result %u\n", result);
-    return result;
-}
-
-void seg_store_print(uint32_t seg_addr, uint32_t index, uint32_t value, uint8_t *umem)
-{
-    // printf("\nSEGMENTED Store\n");
-    // printf("Segment address is %u\n", seg_addr);
-    // printf("Segment index is %u\n", index);
-    // printf("Value is %u\n", value);
-    // printf("Mem addr is %p\n", (void *)umem);
-
-    uint8_t *temp = umem + seg_addr;
-    uint32_t *real_addr = (uint32_t *)temp;
-    real_addr[index] = value;
-    // uint32_t x = (uint32_t)11 << 30;
-    // *real_addr = x;
 }
 
 /*
@@ -432,8 +345,7 @@ void seg_store_print(uint32_t seg_addr, uint32_t index, uint32_t value, uint8_t 
  * In order to do this, this segmented store compilation function would need to
  * be updated so that it compiles any value loaded into the zero segment into
  * machine code. This requires an inline function call to a C function, which
- * slows the program down. This implementation omits such a call, but
- * INSERT OTHER VERSION HERE handles this.
+ * slows the program down. 
  */
 size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
 {
@@ -457,10 +369,6 @@ size_t seg_store(void *zero, size_t offset, unsigned a, unsigned b, unsigned c)
     // opcodes: brilliant!
     *p++ = 0x90;
     *p++ = 0x90;
-
-    // *p++ = 0x0F;
-    // *p++ = 0x1F;
-    // *p++ = 0x00;
 
     return CHUNK;
 }
@@ -717,8 +625,6 @@ void *load_program(uint32_t b_val, uint8_t *umem)
 {
     /* Ensure the segment we are loading is not the zero segment */
     assert(b_val != 0);
-    // printf("b_val is %u\n", b_val);
-    // printf("umem is %p\n", (void *)umem);
 
     /* Get the size of the segment we want to duplicate */
     uint32_t *seg_addr = (uint32_t *)convert_address(umem, b_val);
@@ -732,10 +638,9 @@ void *load_program(uint32_t b_val, uint8_t *umem)
 
     /* Allocate new exectuable memory for the segment being mapped
      * Note that copy size is in bytes, not words*/
-    // TODO: fix this 3 business
-    void *new_zero = mmap(NULL, copy_size * 3,
+    void *new_zero = mmap(NULL, num_words * CHUNK,
                           PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    memset(new_zero, 0, copy_size * 3);
+    memset(new_zero, 0, num_words * CHUNK);
 
     /* Compile the segment being mapped into machine instructions */
     uint32_t offset = 0;
