@@ -32,3 +32,4 @@ CMD ["/bin/bash"]
 
 # NOTE: Command to run a container using this image
 # docker run --platform=linux/arm64 -it -v "$PWD/docker_shared:/home/developer/shared" dev-tools-aarch64
+
