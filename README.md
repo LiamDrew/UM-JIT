@@ -1,6 +1,6 @@
 # UM-JIT
 
-A high performance virtual runtime for Universal Machine programs. Powered by a just-in-time compiler that compiles Universal Machine assembly language to native machine code on Arm64 and x86-64 platforms. Compiles and executes benchmark Universal Machine programs up to 4.5 times faster than an emulator-based runtime.
+A high performance virtual machine for executing Universal Machine programs. Powered by a just-in-time compiler that compiles Universal Machine assembly language to native machine code on Arm64 and x86-64 platforms. Compiles and executes benchmark Universal Machine programs up to 4.5 times faster than an emulator-based runtime.
 
 ## Overview
 
