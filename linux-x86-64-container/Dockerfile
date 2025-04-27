@@ -31,5 +31,5 @@ CMD ["/bin/bash"]
 # docker buildx build --platform=linux/amd64 -t dev-tools-x86 .
 
 # NOTE: Command to run a container using this image
-# docker run --platform=linux/amd64 -it -v "$PWD/docker_shared:/home/developer/shared" dev-tools-x86
+# docker run --platform=linux/amd64 -it -v "$PWD:/home/developer/" -v "$PWD/../umasm:/home/developer/umasm" dev-tools-x86
 

@@ -15,3 +15,4 @@ linux-x86-64-container/docker_shared/emulator/virt.c
 linux-x86-64-container/docker_shared/emulator/virt.h
 
 
+/darwin-arm64/umasm/*

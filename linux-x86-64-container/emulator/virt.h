@@ -98,8 +98,6 @@ inline bool stack_is_empty(Stack_T s)
     return s.size == 0;
 }
 
-
-
 /* Recycler functions*/
 Stack_T *recycler_init(void);
 
@@ -150,7 +148,7 @@ void kern_memcpy(uint32_t src_addr, uint32_t copy_size);
 /* Virtual Segment Calloc (vs_calloc):
  * Carve out a segment of virtual memory and serve it to the program as
  * zeroed-out v^2 memory */
-inline uint32_t vs_calloc(uint8_t *umem, uint32_t size)
+static inline uint32_t vs_calloc(uint8_t *umem, uint32_t size)
 {
     /* Users may only ask vs_malloc for (2^24 - 8) bytes of contiguous space
      * Omitted for performance reasons. The user must use our module correctly:
@@ -197,15 +195,14 @@ inline uint32_t vs_calloc(uint8_t *umem, uint32_t size)
 
 /* Virtual Segment Free (vs_free):
  * Free a virtual segment for future use. */
-inline void vs_free(uint32_t addr)
+static inline void vs_free(uint32_t addr)
 {
-    (void)addr;
-    // free_segment(usable, addr, rec);
+    free_segment(usable, addr, rec);
 }
 
 /* Set At (set_at):
  * Store a uint32_t at a virtual address */
-inline void set_at(uint8_t *umem, uint32_t addr, uint32_t value)
+static inline void set_at(uint8_t *umem, uint32_t addr, uint32_t value)
 {
     uint32_t *dest = convert_address(umem, addr);
     *dest = value;
