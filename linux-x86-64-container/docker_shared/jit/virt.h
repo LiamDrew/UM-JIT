@@ -244,8 +244,8 @@ static inline uint32_t vs_calloc(uint8_t *umem, uint32_t size)
  * Free a virtual segment for future use. */
 static inline void vs_free(uint32_t addr)
 {
-    (void)addr;
-    // free_segment(usable, addr, rec);
+    // (void)addr;.
+    free_segment(usable, addr, rec);
 }
 
 /* Set At (set_at):

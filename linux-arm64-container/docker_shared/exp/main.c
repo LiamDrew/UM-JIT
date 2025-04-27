@@ -16,9 +16,13 @@ void help() {
 }
 
 int main(int argc, char *argv[]) {
-    uint32_t x = 19;
-    uint32_t y = ~x + 1; // to convert to negative, flip the bits and add 1
-    printf("Y value is %d\n", y);
+    // uint32_t x = 19;
+    // uint32_t y = ~x + 1; // to convert to negative, flip the bits and add 1
+    // printf("Y value is %d\n", y);
+
+    printf("Hi there\n");
+    unsigned x = test();
+    printf("X is %u\n", x);
 
     return 0;
 }
