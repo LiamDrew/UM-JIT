@@ -16,3 +16,5 @@ linux-x86-64-container/docker_shared/emulator/virt.h
 
 
 /darwin-arm64/umasm/*
+linux-arm64-container/.bash_history
+linux-x86-64-container/.bash_history

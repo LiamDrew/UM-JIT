@@ -7,3 +7,5 @@ ls
 /usr/bin/time ./jit ../umasm/sandmark.umz
 /usr/bin/time ./jit ../umasm/sandmark.umz
 exit
+ls
+exit
