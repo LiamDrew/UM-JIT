@@ -24,20 +24,19 @@ int main(int argc, char *argv[])
     (void)argc;
     (void)argv;
 
-    const char *filename = "manyloads.um";
+    const char *filename = "halt.um";
 
     FILE *fp = fopen(filename, "wb");
     assert(fp != NULL);
 
     // use fwrite()
-    size_t bw = 2000000; // 100,000
-    Instruction words[2000000] = {0};
 
-    for (size_t i = 0; i < (bw - 1); i++) {
-        words[i] = three_reg(1, 3, 0, 0);
-    }
+    Instruction words[2] = {0};
 
-    words[bw - 1] = three_reg(7, 0, 0, 0);
+    size_t bw = 1;
+
+    // r3 = 1
+    words[0] = three_reg(7, 0, 0, 0);
 
     // NOTE: must write bytes to disk in big endian order
     for (size_t i = 0; i < bw; i++)
